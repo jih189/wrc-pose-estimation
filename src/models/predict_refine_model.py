@@ -3,14 +3,17 @@ import numpy as np
 import cv2
 import matplotlib.pyplot as plt
 
-from models.model import *
+from models.model import Refine_Net
 import torchgeometry as tgm
 import kornia
 
 import torch
+import torch.nn as nn
 from torchvision import utils
+import src.common.chamfer2D.dist_chamfer_2D as CHAMFER2D
 
 from torch.autograd import Variable
+from tqdm import tqdm
 
 IMG_SIZE = 128
 
@@ -23,16 +26,17 @@ def init():
     mymodel = torch.load("best_model.pth")
     mymodel.eval()
 
-    return mymodel
+    chamLoss = CHAMFER2D.chamfer_2DDist()
+
+    return mymodel, chamLoss
 
 
-def predict(mymodel, predict_index):
+def predict(mymodel, predict_index, chamLoss, view_image):
     numForTest = "{:06d}".format(predict_index)
     processed_data_dir = "data/processed/pulley/"
 
     # load rgb image
     img_path = processed_data_dir + numForTest + "img.png"
-    print("input data = ", img_path)
     img = cv2.imread(img_path)
 
     # calculate the resize scale
@@ -209,12 +213,25 @@ def predict(mymodel, predict_index):
             preimg, (int(p[0]), int(p[1])), radius=0, color=(0, 0, 255), thickness=-1
         )
 
-    preimg = cv2.resize(preimg, (0, 0), fx=5, fy=5)
-
-    cv2.imshow("test", preimg)
-    cv2.waitKey(0)
+    if view_image:
+        preimg = cv2.resize(preimg, (0, 0), fx=5, fy=5)
+        cv2.imshow("test", preimg)
+        cv2.waitKey(0)
+        return None
+    else:
+        dist1, dist2, idx1, idx2 = chamLoss(predict_2d_pts, label_2d_pts)
+        ch_loss = torch.mean(dist1, 1) + torch.mean(dist2, 1)
+        return ch_loss.cpu().detach().numpy()[0]
 
 
 if __name__ == "__main__":
-    m = init()
-    predict(m, 3658)
+    m, chamLoss = init()
+    predict(m, 4419, chamLoss, True)
+    # highestLoss = 0.0
+    # highestIndex = None
+    # for i in tqdm(range(5773)):
+    #     ch_loss = predict(m, i, chamLoss, False)
+    #     if ch_loss > highestLoss:
+    #         highestIndex = i
+    #         highestLoss = ch_loss
+    # print("worst case: ", highestIndex)

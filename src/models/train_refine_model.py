@@ -1,5 +1,5 @@
-from src.common.DataLoader import *
-from models.model import *
+from src.common.DataLoader import Refine_data
+from models.model import Refine_Net
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -21,10 +21,10 @@ wandb.init(project="wrc-pose-refinement")
 LOG_INTERVAL = 1
 
 batch_size = 128
-epochs = 1800
+epochs = 1500
 lr = 1e-6
 momentum = 0.9
-w_decay = 15.0
+w_decay = 18.0
 lambda_chamfer = 0.05
 lambda3d = 100.0
 
@@ -52,13 +52,13 @@ f.close()
 print("Split training and validation set done")
 
 # build train data loader
-train_dataset = Real_data(data_path=train_dir)
+train_dataset = Refine_data(data_path=train_dir, isTrain=True)
 train_loader = DataLoader(
     train_dataset, batch_size=batch_size, shuffle=True, num_workers=16
 )
 
 # build val data loader
-val_dataset = Real_data(data_path=val_dir)
+val_dataset = Refine_data(data_path=val_dir, isTrain=False)
 val_loader = DataLoader(
     val_dataset, batch_size=batch_size, shuffle=True, num_workers=16
 )

@@ -13,6 +13,25 @@ def weights_init(m):
             torch.nn.init.zeros_(m.bias)
 
 
+class Magic_Net(nn.Module):
+    def __init__(self, viewpt_class=7, rot_class=10):
+        super(Magic_Net, self).__init__()
+        self.viewpt_class = viewpt_class
+        self.rot_class = rot_class
+
+        self.resnet = models.resnet50(pretrained=True)
+        self.resnet.layer4[1].conv2 = nn.Conv2d(
+            512, 512, kernel_size=15, stride=1, padding=7
+        )
+
+        self.resnet.avgpool = nn.AdaptiveAvgPool2d((1, 1))
+        self.resnet.fc = nn.Linear(2048, self.viewpt_class + self.rot_class + 2)
+
+    def forward(self, x):
+        x1 = self.resnet(x)
+        return x1
+
+
 class Refine_Net(nn.Module):
     def __init__(self):
         super().__init__()
@@ -49,8 +68,8 @@ class Refine_Net(nn.Module):
         # self.bn0_i = nn.BatchNorm2d(64)
         # self.m0_i = Refine_Net.create_stage(64)
 
-        self.maxpool = nn.MaxPool2d(kernel_size=5, stride=2, padding=2)
-        self.relu = nn.ReLU(inplace=True)
+        # self.maxpool = nn.MaxPool2d(kernel_size=5, stride=2, padding=2)
+        # self.relu = nn.ReLU(inplace=True)
         # self.conv1 = nn.Conv2d(64, 128, kernel_size=3, stride=1, padding=1)
         # self.bn1 = nn.BatchNorm2d(128)
         # self.m1 = Refine_Net.create_stage(128)

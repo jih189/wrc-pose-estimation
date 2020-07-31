@@ -4,13 +4,94 @@ import matplotlib.pyplot as plt
 
 import torch
 from torch.utils.data import Dataset, DataLoader
+import src.common.object_model as OM
 from torchvision import utils
 import random
 
 numberOfSampledPoint = 1000
 
 
-class Real_data(Dataset):
+class Rot_data(Dataset):
+    def __init__(self, n_class=200, data_path="", resX=240, resY=240, isTrain=True):
+        trainBit = ""
+        if isTrain:
+            trainOrVal = "train.txt"
+        else:
+            trainOrVal = "val.txt"
+        self.n_class = n_class
+        self.dataNames = []
+        self.dataPath = data_path
+        with open(data_path + trainOrVal, "r") as reader:
+            # read the data path
+            for line in reader.readlines():
+                self.dataNames.append(line.rstrip("\n"))
+        self.resX = resX
+        self.resY = resY
+
+        camera_matrix = np.array(
+            [
+                [654.968116289191, 0, 322.67377109101744],
+                [0, 657.1436336052552, 248.70937432215163],
+                [0, 0, 1],
+            ],
+            dtype="double",
+        )
+
+        dist_coefs = np.zeros((4, 1))
+
+        OM.setup(640, 480)
+
+        OM.setProjectMatrixWithIntr(camera_matrix, 640, 480)
+
+        self.obj = OM.ObjectModel()
+        self.obj.loadObjectCADModel("MBRFA30-2-P6.obj")
+        self.obj.setIntrinsicMatrix(camera_matrix)
+
+        self.obj.determineSharpEdges(0.05)
+        self.obj.generateSamplePoints(0.001, 0.001)
+
+    def __len__(self):
+        return len(self.dataNames)
+
+    def __getitem__(self, idx):
+        # create label
+        label_path = self.dataPath + self.dataNames[idx] + ".npy"
+        pose = np.load(label_path)
+        # remove the symmetry
+        pose = OM.symmetricRemove(pose)
+        self.obj.setModelviewMatrix(pose)
+        viewPoint, inplaneRotation, offsetFromCenter, depth = self.obj.getLabel()
+        vpidx = OM.cal_idx(viewPoint)
+
+        center_pt = np.array(self.obj.project3Dto2D([0, 0, 0], pose))
+
+        # (upperleftx, upperlefty, lowerrightx, lowerrighty)
+        boundingbox = np.load(self.dataPath + "bounding" + self.dataNames[idx] + ".npy")
+        upperleftx, upperlefty, lowerrightx, lowerrighty = (
+            boundingbox[0].astype(np.int),
+            boundingbox[1].astype(np.int),
+            boundingbox[2].astype(np.int),
+            boundingbox[3].astype(np.int),
+        )
+
+        l = lowerrightx - upperleftx
+
+        offset = np.array(
+            [(center_pt[0, 0] - upperleftx) / l, (center_pt[1, 0] - upperlefty) / l]
+        )
+
+        img_path = self.dataPath + "crop" + self.dataNames[idx] + ".png"
+        img = cv2.imread(img_path)
+        img = cv2.resize(img, (self.resY, self.resX), interpolation=cv2.INTER_AREA)
+        img = img[:, :, :3].transpose(2, 0, 1)
+
+        inplaneRotation = inplaneRotation % (2 * np.pi) / (2 * np.pi / 60)
+        inplaneRotation = int(inplaneRotation)
+
+        return img, vpidx, inplaneRotation, offset, depth
+
+
+class Refine_data(Dataset):
     def __init__(self, data_path="", isTrain=True):
         trainBit = ""
         if isTrain:
