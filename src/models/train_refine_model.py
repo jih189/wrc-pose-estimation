@@ -20,8 +20,8 @@ wandb.init(project="wrc-pose-refinement")
 
 LOG_INTERVAL = 1
 
-batch_size = 128
-epochs = 1500
+batch_size = 64
+epochs = 1200
 lr = 1e-6
 momentum = 0.9
 w_decay = 18.0
@@ -329,10 +329,10 @@ def train():
         )
 
         if pre_loss == None:
-            torch.save(mymodel, "best_model.pth")
+            torch.save(mymodel, "best_model_refine.pth")
             pre_loss = val_loss
         elif pre_loss > val_loss:
-            torch.save(mymodel, "best_model.pth")
+            torch.save(mymodel, "best_model_refine.pth")
             pre_loss = val_loss
         mymodel.train()
         if (epoch + 1) % 100 == 0:
