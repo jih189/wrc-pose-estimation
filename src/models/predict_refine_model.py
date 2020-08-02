@@ -23,7 +23,7 @@ def init():
     mymodel = Refine_Net().cuda()
 
     mymodel = nn.DataParallel(mymodel)
-    mymodel = torch.load("best_model.pth")
+    mymodel = torch.load("best_model_refine.pth")
     mymodel.eval()
 
     chamLoss = CHAMFER2D.chamfer_2DDist()
@@ -106,8 +106,10 @@ def predict(mymodel, predict_index, chamLoss, view_image):
     targetPose = Variable(torch.from_numpy(targetPose).cuda()).float()
     targetPose = targetPose.unsqueeze(0)
 
+    # running model
     inputData = torch.cat((edge_img, mask_img, bounding_img, img), 1)
     rot, trans, dist = mymodel(inputData)
+    print("dist", dist)
 
     trans = trans.unsqueeze(1)
     trans = (trans - 0.5) * 128
@@ -226,12 +228,14 @@ def predict(mymodel, predict_index, chamLoss, view_image):
 
 if __name__ == "__main__":
     m, chamLoss = init()
-    predict(m, 4419, chamLoss, True)
-    # highestLoss = 0.0
-    # highestIndex = None
+    # predict(m, 4419, chamLoss, True)
+    highestLoss = 0.0
+    highestIndex = None
+    predict(m, 2356, chamLoss, False)
     # for i in tqdm(range(5773)):
-    #     ch_loss = predict(m, i, chamLoss, False)
-    #     if ch_loss > highestLoss:
-    #         highestIndex = i
-    #         highestLoss = ch_loss
+    #    ch_loss = predict(m, i, chamLoss, False)
+    #    if ch_loss > highestLoss:
+    #        highestIndex = i
+    #        highestLoss = ch_loss
     # print("worst case: ", highestIndex)
+

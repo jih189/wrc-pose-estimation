@@ -30,15 +30,6 @@ obj.setIntrinsicMatrix(camera_matrix)
 obj.determineSharpEdges(0.05)
 obj.generateSamplePoints(0.001, 0.001)
 
-
-def angleBetweenVec(v1, v2):
-    uv1 = v1 / np.linalg.norm(v1)
-    uv2 = v2 / np.linalg.norm(v2)
-    cosang = np.dot(uv1.T, uv2)
-    sinang = np.cross(uv1.T, uv2.T)
-    return np.arctan2(sinang, cosang)
-
-
 test_file = "002450"
 
 img_path = "data/processed/pulley_crop/crop" + test_file + ".png"
