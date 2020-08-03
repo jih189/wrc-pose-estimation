@@ -3,7 +3,7 @@ import numpy as np
 import cv2
 import matplotlib.pyplot as plt
 
-from models.model import Refine_Net
+from models.model import Refine_Net, PSPNet
 import torchgeometry as tgm
 import kornia
 
@@ -15,7 +15,7 @@ import src.common.chamfer2D.dist_chamfer_2D as CHAMFER2D
 from torch.autograd import Variable
 from tqdm import tqdm
 
-IMG_SIZE = 128
+IMG_SIZE = 240
 
 
 def init():
@@ -26,14 +26,20 @@ def init():
     mymodel = torch.load("best_model_refine.pth")
     mymodel.eval()
 
+    PSPmodel = PSPNet().cuda()
+    PSPmodel = nn.DataParallel(PSPmodel)
+    PSPmodel = torch.load("best_model_psp.pth")
+    PSPmodel.eval()
+
     chamLoss = CHAMFER2D.chamfer_2DDist()
+    softmax = nn.Softmax2d()
 
-    return mymodel, chamLoss
+    return mymodel, PSPmodel, softmax, chamLoss
 
 
-def predict(mymodel, predict_index, chamLoss, view_image):
+def predict(mymodel, pspmodel, softmax, predict_index, chamLoss, view_image):
     numForTest = "{:06d}".format(predict_index)
-    processed_data_dir = "data/processed/pulley/"
+    processed_data_dir = "data/processed/pulley_refine/"
 
     # load rgb image
     img_path = processed_data_dir + numForTest + "img.png"
@@ -60,16 +66,21 @@ def predict(mymodel, predict_index, chamLoss, view_image):
     edge_img = Variable(torch.from_numpy(edge_img).cuda()).float()
     edge_img = edge_img.unsqueeze(0)
 
-    # load bounding image
-    bounding_path = processed_data_dir + numForTest + "bounding.png"
-    bounding_img = cv2.imread(bounding_path)
-    bounding_img = cv2.resize(
-        bounding_img, (IMG_SIZE, IMG_SIZE), interpolation=cv2.INTER_AREA
-    )
-    bounding_img = bounding_img[:, :, :1].transpose(2, 0, 1)
+    predictMask = pspmodel(img)
+    predictMask = softmax(predictMask)
+    predictMask = predictMask[:, 1, :, :]
+    predictMask = predictMask.unsqueeze(1)
 
-    bounding_img = Variable(torch.from_numpy(bounding_img).cuda()).float()
-    bounding_img = bounding_img.unsqueeze(0)
+    # load bounding image
+    # bounding_path = processed_data_dir + numForTest + "bounding.png"
+    # bounding_img = cv2.imread(bounding_path)
+    # bounding_img = cv2.resize(
+    #     bounding_img, (IMG_SIZE, IMG_SIZE), interpolation=cv2.INTER_AREA
+    # )
+    # bounding_img = bounding_img[:, :, :1].transpose(2, 0, 1)
+
+    # bounding_img = Variable(torch.from_numpy(bounding_img).cuda()).float()
+    # bounding_img = bounding_img.unsqueeze(0)
 
     # load the mask image
     mask_path = processed_data_dir + numForTest + "mask.png"
@@ -107,12 +118,12 @@ def predict(mymodel, predict_index, chamLoss, view_image):
     targetPose = targetPose.unsqueeze(0)
 
     # running model
-    inputData = torch.cat((edge_img, mask_img, bounding_img, img), 1)
+    inputData = torch.cat((edge_img, mask_img, predictMask, img), 1)
     rot, trans, dist = mymodel(inputData)
     print("dist", dist)
 
     trans = trans.unsqueeze(1)
-    trans = (trans - 0.5) * 128
+    trans = (trans - 0.5) * 240
 
     dist = dist.unsqueeze(1)
 
@@ -227,15 +238,14 @@ def predict(mymodel, predict_index, chamLoss, view_image):
 
 
 if __name__ == "__main__":
-    m, chamLoss = init()
-    # predict(m, 4419, chamLoss, True)
+    m, p, s, chamLoss = init()
     highestLoss = 0.0
     highestIndex = None
-    predict(m, 2356, chamLoss, False)
-    # for i in tqdm(range(5773)):
-    #    ch_loss = predict(m, i, chamLoss, False)
-    #    if ch_loss > highestLoss:
-    #        highestIndex = i
-    #        highestLoss = ch_loss
+    predict(m, p, s, 269, chamLoss, True)
+    # for i in tqdm(range(5000)):
+    #     ch_loss = predict(m, p, s, i, chamLoss, False)
+    #     if ch_loss > highestLoss:
+    #         highestIndex = i
+    #         highestLoss = ch_loss
     # print("worst case: ", highestIndex)
 

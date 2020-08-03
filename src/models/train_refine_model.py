@@ -1,5 +1,5 @@
 from src.common.DataLoader import Refine_data
-from models.model import Refine_Net
+from models.model import Refine_Net, PSPNet
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -18,9 +18,16 @@ import wandb
 
 wandb.init(project="wrc-pose-refinement")
 
+##########init PSPNet #####################
+PSPmodel = PSPNet().cuda()
+PSPmodel = nn.DataParallel(PSPmodel)
+PSPmodel = torch.load("best_model_psp.pth")
+PSPmodel.eval()
+###########################################
+
 LOG_INTERVAL = 1
 
-batch_size = 64
+batch_size = 32
 epochs = 1200
 lr = 1e-6
 momentum = 0.9
@@ -28,8 +35,8 @@ w_decay = 18.0
 lambda_chamfer = 0.05
 lambda3d = 100.0
 
-train_dir = "data/processed/pulley/"
-val_dir = "data/processed/pulley/"
+train_dir = "data/processed/pulley_refine/"
+val_dir = "data/processed/pulley_refine/"
 
 num_images = 5773
 train_ratio = 0.8
@@ -88,6 +95,8 @@ NEG_ONE_PAIR = torch.tensor([[-1.0, -1.0]]).cuda()
 
 torch.autograd.set_detect_anomaly(True)
 
+softmax = nn.Softmax2d()
+
 
 def train():
     print("start training... Nahid habibi")
@@ -101,7 +110,6 @@ def train():
                 idx,
                 input_img,
                 edge_img,
-                bounding_img,
                 mask_img,
                 init3dPt,
                 initPose,
@@ -109,12 +117,20 @@ def train():
                 targetPose,
                 rescaleValue,
             ) = data
+
+            predictMask = PSPmodel(input_img.cuda().float())
+            predictMask = softmax(predictMask)
+            predictMask = predictMask[:, 1, :, :]
+            predictMask = predictMask.unsqueeze(1).detach()
+
             optimizer.zero_grad()
 
             # catenate image, edges, mask, and bounding box into one input
             # input order (edge, mask, bounding box, image)
-            inputData = torch.cat((edge_img, mask_img, bounding_img, input_img), 1)
-            input = Variable(inputData.cuda()).float()
+            inputData = torch.cat(
+                (edge_img.cuda(), mask_img.cuda(), predictMask, input_img.cuda()), 1
+            )
+            input = Variable(inputData).float()
 
             ################ test
             # testindex = 2
@@ -349,7 +365,6 @@ def val():
             idx,
             input_img,
             edge_img,
-            bounding_img,
             mask_img,
             init3dPt,
             initPose,
@@ -358,8 +373,15 @@ def val():
             rescaleValue,
         ) = data
 
-        inputData = torch.cat((edge_img, mask_img, bounding_img, input_img), 1)
-        input = Variable(inputData.cuda()).float()
+        predictMask = PSPmodel(input_img.cuda().float())
+        predictMask = softmax(predictMask)
+        predictMask = predictMask[:, 1, :, :]
+        predictMask = predictMask.unsqueeze(1).detach()
+
+        inputData = torch.cat(
+            (edge_img.cuda(), mask_img.cuda(), predictMask, input_img.cuda()), 1
+        )
+        input = Variable(inputData).float()
 
         # load data to cuda
         init3dPt = init3dPt.cuda().float()

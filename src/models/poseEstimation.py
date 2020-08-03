@@ -9,7 +9,7 @@ import torchgeometry as tgm
 import kornia
 
 from models.models import Darknet  # set ONNX_EXPORT in models.py
-from models.model import Magic_Net, Refine_Net
+from models.model import Magic_Net, Refine_Net, PSPNet
 
 from src.utils.utils import (
     load_classes,
@@ -29,7 +29,7 @@ CAMERA_MATRIX = np.array(
     dtype="double",
 )
 
-IMG_SIZE = 128
+IMG_SIZE = 240
 EXPAND_SIZE = 2.0
 
 if __name__ == "__main__":
@@ -78,6 +78,14 @@ if __name__ == "__main__":
     refine_model = nn.DataParallel(refine_model)
     refine_model = torch.load("best_model_refine.pth")
     refine_model.eval()
+
+    ################ PSP net ##################################
+    PSP_model = PSPNet().cuda()
+    PSP_model = nn.DataParallel(PSP_model)
+    PSP_model = torch.load("best_model_psp.pth")
+    PSP_model.eval()
+
+    softmax = nn.Softmax2d()
 
     # init camera
     cap = cv2.VideoCapture(4)
@@ -130,6 +138,7 @@ if __name__ == "__main__":
                 label = "%s %.2f" % (names[int(cls)], conf)
                 plot_one_box(xyxy, demo, label=label, color=colors[int(cls)])
                 if names[int(cls)] == "Pulley":
+                    print("found object")
                     foundObject = True
                     cropIndex = [
                         int(xyxy[1].cpu().detach().numpy()),
@@ -153,7 +162,7 @@ if __name__ == "__main__":
             if img_crop.shape[0] == 0 or img_crop.shape[1] == 0:
                 continue
 
-            img_crop = cv2.resize(img_crop, (240, 240))
+            img_crop = cv2.resize(img_crop, (IMG_SIZE, IMG_SIZE))
             cv2.imshow("crop", img_crop)
 
             img_crop = img_crop[:, :, :3].transpose(2, 0, 1)
@@ -222,11 +231,11 @@ if __name__ == "__main__":
             crop_edge = edge[ey : ey + eh, ex : ex + ew]
 
             # bounding box for target pose
-            crop_bounding = np.zeros((eh, ew), np.uint8)
-            crop_bounding[
-                max(0, cropIndex[0] - ey) : min(eh, cropIndex[1] - ey),
-                max(0, cropIndex[2] - ex) : min(ew, cropIndex[3] - ex),
-            ] = 255
+            # crop_bounding = np.zeros((eh, ew), np.uint8)
+            # crop_bounding[
+            #     max(0, cropIndex[0] - ey) : min(eh, cropIndex[1] - ey),
+            #     max(0, cropIndex[2] - ex) : min(ew, cropIndex[3] - ex),
+            # ] = 255
 
             # apply rotation on the initial pose to move to it to the center
             rough_pose_at_center = obj.rotatePoseWithAngle(
@@ -245,6 +254,12 @@ if __name__ == "__main__":
             crop_img = Variable(torch.from_numpy(crop_img).cuda()).float()
             crop_img = crop_img.unsqueeze(0)
 
+            # psp net semantic segmentation
+            predictMask = PSP_model(crop_img)
+            predictMask = softmax(predictMask)
+            predictMask = predictMask[:, 1, :, :]
+            predictMask = predictMask.unsqueeze(1)
+
             # load edge image
             edge_img = cv2.resize(
                 crop_edge, (IMG_SIZE, IMG_SIZE), interpolation=cv2.INTER_AREA
@@ -255,13 +270,13 @@ if __name__ == "__main__":
             edge_img = edge_img.unsqueeze(0)
 
             # load bounding image
-            bounding_img = cv2.resize(
-                crop_bounding, (IMG_SIZE, IMG_SIZE), interpolation=cv2.INTER_AREA
-            )
-            bounding_img = bounding_img[:, :, np.newaxis].transpose(2, 0, 1)
+            # bounding_img = cv2.resize(
+            #     crop_bounding, (IMG_SIZE, IMG_SIZE), interpolation=cv2.INTER_AREA
+            # )
+            # bounding_img = bounding_img[:, :, np.newaxis].transpose(2, 0, 1)
 
-            bounding_img = Variable(torch.from_numpy(bounding_img).cuda()).float()
-            bounding_img = bounding_img.unsqueeze(0)
+            # bounding_img = Variable(torch.from_numpy(bounding_img).cuda()).float()
+            # bounding_img = bounding_img.unsqueeze(0)
 
             # load the mask image
             mask_img = cv2.resize(
@@ -276,10 +291,8 @@ if __name__ == "__main__":
             initPose = Variable(torch.from_numpy(rough_pose_at_center).cuda()).float()
             initPose = initPose.unsqueeze(0)
 
-            inputData = torch.cat((edge_img, mask_img, bounding_img, crop_img), 1)
+            inputData = torch.cat((edge_img, mask_img, predictMask, crop_img), 1)
             rot, trans, dist = refine_model(inputData)
-
-            print(dist)
 
             trans = trans.unsqueeze(1)
             trans = (trans - 0.5) * IMG_SIZE
@@ -373,7 +386,7 @@ if __name__ == "__main__":
             print("Can't receive frame (stream end?). Exiting ...")
             break
         cv2.imshow("frame", demo)
-        if cv2.waitKey(1) == ord("q"):
+        if cv2.waitKey(100) == ord("q"):
             break
 
     cap.release()

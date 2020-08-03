@@ -1,6 +1,7 @@
 import numpy as np
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 import torchvision.models as models
 
 # from spatial_correlation_sampler import SpatialCorrelationSampler
@@ -178,3 +179,39 @@ class Refine_Net(nn.Module):
         model.add_module("relu2", nn.ReLU(inplace=True))
         model.add_module("bnd2", nn.BatchNorm2d(out_channels))
         return model
+
+
+class PSPNet(nn.Module):
+    def __init__(self):
+        super(PSPNet, self).__init__()
+        num_classes = 2
+        resnet = models.resnet50(pretrained=True)
+        self.layer0 = nn.Sequential(
+            resnet.conv1, resnet.bn1, resnet.relu, resnet.maxpool
+        )
+        self.layer1, self.layer2, self.layer3, self.layer4 = (
+            resnet.layer1,
+            resnet.layer2,
+            resnet.layer3,
+            resnet.layer4,
+        )
+        self.decov = nn.ConvTranspose2d(2048, 1024, 3, 2, 1)
+        self.final = nn.Sequential(
+            nn.Conv2d(2048, 512, kernel_size=3, padding=1, bias=False),
+            nn.BatchNorm2d(512, momentum=0.95),
+            nn.ReLU(inplace=True),
+            nn.Dropout(0.1),
+            nn.Conv2d(512, num_classes, kernel_size=1),
+        )
+
+    def forward(self, x):
+        x_size = x.size()
+        x = self.layer0(x)
+        x = self.layer1(x)
+        x = self.layer2(x)
+        x3 = self.layer3(x)
+        x4 = self.decov(self.layer4(x3))
+        x5 = torch.cat([x3, x4], 1)
+
+        x6 = self.final(x5)
+        return F.interpolate(x6, x_size[2:], mode="bilinear", align_corners=False)

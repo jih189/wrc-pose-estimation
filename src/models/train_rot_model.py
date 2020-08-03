@@ -42,15 +42,16 @@ w_decay = 1e-3
 viewpt_class = 64
 rot_class = 60
 
-train_dir = "data/processed/pulley_crop/"
-val_dir = "data/processed/pulley_crop/"
+train_dir = "data/processed/pulley_rot/"
+val_dir = "data/processed/pulley_rot/"
+raw_dir = "data/raw/pulley/"
 
-train_dataset = Rot_data(data_path=train_dir, isTrain=True)
+train_dataset = Rot_data(data_path=train_dir, pose_data_path=raw_dir, isTrain=True)
 train_loader = DataLoader(
     train_dataset, batch_size=batch_size, shuffle=True, num_workers=12
 )
 
-val_dataset = Rot_data(data_path=val_dir, isTrain=False)
+val_dataset = Rot_data(data_path=val_dir, pose_data_path=raw_dir, isTrain=False)
 val_loader = DataLoader(
     val_dataset, batch_size=batch_size, shuffle=True, num_workers=12
 )
