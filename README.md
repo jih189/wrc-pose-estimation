@@ -2,13 +2,13 @@
 ==============================
 ### Description
 Pose estimation of WRC objects. The pose estimation is splited into four sections.
-1. YOLO
+1. YOLO:<br/>
     we use yolo to detect the object in the image, and crop the object from the image.
-2. Rot-classifier
+2. Rot-classifier:<br/>
     this classifier will estimate the rough pose of the object.
-3. PSPNet
+3. PSPNet:<br/>
     from the crop image, it predicts the mask of the object in the image.
-4. RefineNet
+4. RefineNet:<br/>
     With the crop image, rendered mask-edge, and the predicted mask, this net will refine the pose estimation.
 
 ### Instruction
@@ -19,6 +19,8 @@ python setup.py install
 Modify file src/configuration.py
 
 #### YOLO setup
+
+todo<br/>
 
 #### Collect image and pose
 
@@ -34,7 +36,11 @@ python src/data/labelverifier.py
 The script to verify whether the pose and image collected from last step is correct. 
 Press s if the pose is correct; press n if the pose is not correct.
 
-#### Rot-classifier
+#### Preprocess data
+python src/data/make_rot_dataset.py
+
+python src/data/make_refine_dataset.py
+
 
 
 
