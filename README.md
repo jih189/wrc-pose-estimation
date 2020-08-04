@@ -1,7 +1,9 @@
-pose-refinement
+wrc-pose-estimation
 ==============================
 
-Pose refinement of WRC objects
+Pose estimation of WRC objects
+
+Author: Jiaming Hu
 
 Project Organization
 ------------
