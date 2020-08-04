@@ -11,6 +11,7 @@ CAMERA_MATRIX = np.array(
 )
 
 IMAGE_SAVE_PATH = "data/images/pulley/"
+VERIFY_IMAGE_PATH = "data/raw/pulley_verify/"
 
 CAD_MODEL = "data/mesh/MBRFA30-2-P6.obj"
 

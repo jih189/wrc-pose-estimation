@@ -25,7 +25,14 @@ Modify file src/configuration.py
 python src/data/getLabelFromImage.py
 
 This is a script to help you to collect the image with the object pose. Make the object in the image to align with the
-rendered red edge, and press 'c' to save the image. Press 'q' to quit the program. Update the datapoints if need. 
+rendered red edge, and press 'c' to save the image. Press 'q' to quit the program. Update the datapoints if need.
+
+#### Verify image and pose
+
+python src/data/labelverifier.py
+
+The script to verify whether the pose and image collected from last step is correct. 
+Press s if the pose is correct; press n if the pose is not correct.
 
 #### Rot-classifier
 
