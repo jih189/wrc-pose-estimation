@@ -8,27 +8,19 @@ from torch.utils.data import DataLoader
 from src.common.DataLoader import Rot_data
 from models.model import Magic_Net
 import src.common.object_model as OM
+import src.configuration as CFG
 import numpy as np
 import wandb
 
 wandb.init(project="wrc-rot-classifier")
 
-CAMERA_MATRIX = np.array(
-    [
-        [654.968116289191, 0, 322.67377109101744],
-        [0, 657.1436336052552, 248.70937432215163],
-        [0, 0, 1],
-    ],
-    dtype="double",
-)
+OM.setup(CFG.CAMERA_W, CFG.CAMERA_H)
 
-OM.setup(640, 480)
-
-OM.setProjectMatrixWithIntr(CAMERA_MATRIX, 640, 480)
+OM.setProjectMatrixWithIntr(CFG.CAMERA_MATRIX, CFG.CAMERA_W, CFG.CAMERA_H)
 
 obj = OM.ObjectModel()
-obj.loadObjectCADModel("MBRFA30-2-P6.obj")
-obj.setIntrinsicMatrix(CAMERA_MATRIX)
+obj.loadObjectCADModel(CFG.CAD_MODEL)
+obj.setIntrinsicMatrix(CFG.CAMERA_MATRIX)
 
 obj.determineSharpEdges(0.05)
 obj.generateSamplePoints(0.001, 0.001)

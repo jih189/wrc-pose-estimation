@@ -37,11 +37,12 @@ The script to verify whether the pose and image collected from last step is corr
 Press s if the pose is correct; press n if the pose is not correct.
 
 #### Preprocess data
-python src/data/make_rot_dataset.py
+python src/data/make_rot_dataset.py input_filepath=[input file path] output_filepath=[output file path] <br/><br/>
+python src/data/make_refine_dataset.py input_filepath=[input file path] output_filepath=[output file path] <br/><br/>
 
-python src/data/make_refine_dataset.py
+for different object, the random parameter should be different, so you may need to update the sample pose in object model file.
 
-
+#### Training
 
 
 ##### Author: Jiaming Hu
