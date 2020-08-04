@@ -10,11 +10,10 @@ CAMERA_MATRIX = np.array(
     dtype="double",
 )
 
-SAVE_PATH = "data/images/pulley/"
-
-CAMERA_ID = 4
+IMAGE_SAVE_PATH = "data/images/pulley/"
 
 CAD_MODEL = "data/mesh/MBRFA30-2-P6.obj"
 
+CAMERA_ID = 4
 CAMERA_W = 640
 CAMERA_H = 480

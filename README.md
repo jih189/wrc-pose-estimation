@@ -13,7 +13,19 @@ Pose estimation of WRC objects. The pose estimation is splited into four section
 
 ### Instruction
 
+#### Setup
+
+python setup.py install
+Modify file src/configuration.py
+
 #### YOLO setup
+
+#### Collect image and pose
+
+python src/data/getLabelFromImage.py
+
+This is a script to help you to collect the image with the object pose. Make the object in the image to align with the
+rendered red edge, and press 'c' to save the image. Press 'q' to quit the program. Update the datapoints if need. 
 
 #### Rot-classifier
 

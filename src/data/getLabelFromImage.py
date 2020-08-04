@@ -43,7 +43,7 @@ if __name__ == "__main__":
 
     current_index = 0
     try:
-        with open(CFG.SAVE_PATH + "current_index_cache.txt") as index_cache:
+        with open(CFG.IMAGE_SAVE_PATH + "current_index_cache.txt") as index_cache:
             current_index = int(index_cache.read())
     except FileNotFoundError:
         pass
@@ -160,13 +160,16 @@ if __name__ == "__main__":
             ch = cv2.waitKey(1)
             if ch & 0xFF == ord("c"):  # collect data
                 with open(
-                    CFG.SAVE_PATH + "current_index_cache.txt", "w"
+                    CFG.IMAGE_SAVE_PATH + "current_index_cache.txt", "w"
                 ) as index_cache:
                     print(current_index, file=index_cache)
                 cv2.imwrite(
-                    CFG.SAVE_PATH + "{:06d}".format(current_index) + ".png", originImg
+                    CFG.IMAGE_SAVE_PATH + "{:06d}".format(current_index) + ".png",
+                    originImg,
                 )
-                np.save(CFG.SAVE_PATH + "{:06d}".format(current_index) + ".npy", pose)
+                np.save(
+                    CFG.IMAGE_SAVE_PATH + "{:06d}".format(current_index) + ".npy", pose
+                )
                 current_index += 1
 
         else:
