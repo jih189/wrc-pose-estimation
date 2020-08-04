@@ -13,6 +13,7 @@ import torchgeometry as tgm
 import kornia
 import src.common.chamfer2D.dist_chamfer_2D as CHAMFER2D
 import src.common.fscore as FS
+import src.configuration as CFG
 
 import wandb
 
@@ -161,8 +162,16 @@ def train():
                 torch.tensor(
                     [
                         [
-                            [654.968116289191, 0.0, float(input_img.shape[-2]) / 2,],
-                            [0.0, 657.1436336052552, float(input_img.shape[-1]) / 2,],
+                            [
+                                CFG.CAMERA_MATRIX[0, 0],
+                                0.0,
+                                float(input_img.shape[-2]) / 2,
+                            ],
+                            [
+                                0.0,
+                                CFG.CAMERA_MATRIX[1, 1],
+                                float(input_img.shape[-1]) / 2,
+                            ],
                             [0.0, 0.0, 1.0],
                         ]
                     ]
@@ -190,7 +199,7 @@ def train():
 
             horizontalR = torch.atan2(
                 trans[:, :, 0].view(trans.shape[0]),
-                torch.tensor(654.968116289191).cuda() * rescaleValue,
+                torch.tensor(CFG.CAMERA_MATRIX[0, 0]).cuda() * rescaleValue,
             )
 
             verticalR = -torch.atan2(
@@ -198,11 +207,15 @@ def train():
                 torch.sqrt(
                     trans[:, :, 0].view(trans.shape[0])
                     * trans[:, :, 0].view(trans.shape[0])
-                    + torch.tensor(657.1436336052552 * 657.1436336052552).cuda()
+                    + torch.tensor(
+                        CFG.CAMERA_MATRIX[1, 1] * CFG.CAMERA_MATRIX[1, 1]
+                    ).cuda()
                     * rescaleValue
                     * rescaleValue
                 )
-                * torch.tensor(657.1436336052552 / 654.968116289191).cuda(),
+                * torch.tensor(
+                    CFG.CAMERA_MATRIX[1, 1] / CFG.CAMERA_MATRIX[1, 1]
+                ).cuda(),
             )
 
             ch = torch.cos(horizontalR)
@@ -406,8 +419,8 @@ def val():
             torch.tensor(
                 [
                     [
-                        [654.968116289191, 0.0, float(input_img.shape[-2]) / 2,],
-                        [0.0, 657.1436336052552, float(input_img.shape[-1]) / 2,],
+                        [CFG.CAMERA_MATRIX[0, 0], 0.0, float(input_img.shape[-2]) / 2,],
+                        [0.0, CFG.CAMERA_MATRIX[1, 1], float(input_img.shape[-1]) / 2,],
                         [0.0, 0.0, 1.0],
                     ]
                 ]
@@ -436,7 +449,7 @@ def val():
 
         horizontalR = torch.atan2(
             trans[:, :, 0].view(trans.shape[0]),
-            torch.tensor(654.968116289191).cuda() * rescaleValue,
+            torch.tensor(CFG.CAMERA_MATRIX[0, 0]).cuda() * rescaleValue,
         )
 
         verticalR = -torch.atan2(
@@ -444,11 +457,11 @@ def val():
             torch.sqrt(
                 trans[:, :, 0].view(trans.shape[0])
                 * trans[:, :, 0].view(trans.shape[0])
-                + torch.tensor(657.1436336052552 * 657.1436336052552).cuda()
+                + torch.tensor(CFG.CAMERA_MATRIX[1, 1] * CFG.CAMERA_MATRIX[1, 1]).cuda()
                 * rescaleValue
                 * rescaleValue
             )
-            * torch.tensor(657.1436336052552 / 654.968116289191).cuda(),
+            * torch.tensor(CFG.CAMERA_MATRIX[1, 1] / CFG.CAMERA_MATRIX[0, 0]).cuda(),
         )
 
         ch = torch.cos(horizontalR)

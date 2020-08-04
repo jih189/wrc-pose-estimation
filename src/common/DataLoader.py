@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 import torch
 from torch.utils.data import Dataset, DataLoader
 import src.common.object_model as OM
+import src.configuration as CFG
 from torchvision import utils
 import random
 
@@ -37,24 +38,13 @@ class Rot_data(Dataset):
         self.resX = resX
         self.resY = resY
 
-        camera_matrix = np.array(
-            [
-                [654.968116289191, 0, 322.67377109101744],
-                [0, 657.1436336052552, 248.70937432215163],
-                [0, 0, 1],
-            ],
-            dtype="double",
-        )
+        OM.setup(CFG.CAMERA_W, CFG.CAMERA_H)
 
-        dist_coefs = np.zeros((4, 1))
-
-        OM.setup(640, 480)
-
-        OM.setProjectMatrixWithIntr(camera_matrix, 640, 480)
+        OM.setProjectMatrixWithIntr(CFG.CAMERA_MATRIX, CFG.CAMERA_W, CFG.CAMERA_H)
 
         self.obj = OM.ObjectModel()
-        self.obj.loadObjectCADModel("MBRFA30-2-P6.obj")
-        self.obj.setIntrinsicMatrix(camera_matrix)
+        self.obj.loadObjectCADModel(CFG.CAD_MODEL)
+        self.obj.setIntrinsicMatrix(CFG.CAMERA_MATRIX)
 
         self.obj.determineSharpEdges(0.05)
         self.obj.generateSamplePoints(0.001, 0.001)

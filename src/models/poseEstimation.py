@@ -4,6 +4,7 @@ import torch.nn as nn
 from torch.autograd import Variable
 import numpy as np
 import random
+import src.configuration as CFG
 
 import torchgeometry as tgm
 import kornia
@@ -20,26 +21,17 @@ from src.utils.utils import (
 
 import cv2
 
-CAMERA_MATRIX = np.array(
-    [
-        [654.968116289191, 0, 322.67377109101744],
-        [0, 657.1436336052552, 248.70937432215163],
-        [0, 0, 1],
-    ],
-    dtype="double",
-)
-
 IMG_SIZE = 240
 EXPAND_SIZE = 2.0
 
 if __name__ == "__main__":
 
-    OM.setup(640, 480)
-    OM.setProjectMatrixWithIntr(CAMERA_MATRIX, 640, 480)
+    OM.setup(CFG.CAMERA_W, CFG.CAMERA_H)
+    OM.setProjectMatrixWithIntr(CFG.CAMERA_MATRIX, CFG.CAMERA_W, CFG.CAMERA_H)
 
     obj = OM.ObjectModel()
-    obj.loadObjectCADModel("MBRFA30-2-P6.obj")
-    obj.setIntrinsicMatrix(CAMERA_MATRIX)
+    obj.loadObjectCADModel(CFG.CAD_MODEL)
+    obj.setIntrinsicMatrix(CFG.CAMERA_MATRIX)
 
     obj.determineSharpEdges(0.05)
     obj.generateSamplePoints(0.001, 0.001)
@@ -89,8 +81,8 @@ if __name__ == "__main__":
 
     # init camera
     cap = cv2.VideoCapture(4)
-    cap.set(3, 640)
-    cap.set(4, 480)
+    cap.set(3, CFG.CAMERA_W)
+    cap.set(4, CFG.CAMERA_H)
 
     if not cap.isOpened():
         print("can't open")
@@ -138,7 +130,6 @@ if __name__ == "__main__":
                 label = "%s %.2f" % (names[int(cls)], conf)
                 plot_one_box(xyxy, demo, label=label, color=colors[int(cls)])
                 if names[int(cls)] == "Pulley":
-                    print("found object")
                     foundObject = True
                     cropIndex = [
                         int(xyxy[1].cpu().detach().numpy()),
@@ -179,7 +170,7 @@ if __name__ == "__main__":
             rot = np.argmax(rot, axis=1)
             rot = rot[0] * np.pi / 30
 
-            principle_pt = np.array([CAMERA_MATRIX[0, 2], CAMERA_MATRIX[1, 2]])
+            principle_pt = np.array([CFG.CAMERA_MATRIX[0, 2], CFG.CAMERA_MATRIX[1, 2]])
 
             position = (
                 torch.sigmoid(output[:, viewpt_class + rot_class :]).data.cpu().numpy()
@@ -307,13 +298,13 @@ if __name__ == "__main__":
                 [
                     [
                         [
-                            654.968116289191 * rescaleValue,
+                            CFG.CAMERA_MATRIX[0, 0] * rescaleValue,
                             0.0,
                             float(crop_img.shape[-2]) / 2,
                         ],
                         [
                             0.0,
-                            657.1436336052552 * rescaleValue,
+                            CFG.CAMERA_MATRIX[1, 1] * rescaleValue,
                             float(crop_img.shape[-1]) / 2,
                         ],
                         [0.0, 0.0, 1.0],
@@ -325,7 +316,8 @@ if __name__ == "__main__":
             dist_pose[:, 2, 3] = pred_rot_pose[:, 2, 3] / dist[:, 0, 0]
 
             horizontalR = torch.atan2(
-                trans[:, :, 0], torch.tensor(654.968116289191 * rescaleValue).cuda()
+                trans[:, :, 0],
+                torch.tensor(CFG.CAMERA_MATRIX[0, 0] * rescaleValue).cuda(),
             )
 
             verticalR = -torch.atan2(
@@ -333,13 +325,15 @@ if __name__ == "__main__":
                 torch.sqrt(
                     trans[:, :, 0] * trans[:, :, 0]
                     + torch.tensor(
-                        657.1436336052552
-                        * 657.1436336052552
+                        CFG.CAMERA_MATRIX[1, 1]
+                        * CFG.CAMERA_MATRIX[1, 1]
                         * rescaleValue
                         * rescaleValue
                     ).cuda()
                 )
-                * torch.tensor(657.1436336052552 / 654.968116289191).cuda(),
+                * torch.tensor(
+                    CFG.CAMERA_MATRIX[1, 1] / CFG.CAMERA_MATRIX[0, 0]
+                ).cuda(),
             )
 
             ch = torch.cos(horizontalR)
