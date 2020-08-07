@@ -40,7 +40,7 @@ if __name__ == "__main__":
     webcam = "4"
     cfg = "cfg/yolov3-tiny3.cfg"
     weights = "best_model_yolo.pth"
-    conf_thres = 0.8
+    conf_thres = 0.3
     iou_thres = 0.2
     device = "cuda"
     obj_names = "data/wrs.names"
@@ -154,7 +154,7 @@ if __name__ == "__main__":
                 continue
 
             img_crop = cv2.resize(img_crop, (IMG_SIZE, IMG_SIZE))
-            cv2.imshow("crop", img_crop)
+            # cv2.imshow("crop", img_crop)
 
             img_crop = img_crop[:, :, :3].transpose(2, 0, 1)
             img_crop = img_crop[np.newaxis, ...]
@@ -186,12 +186,17 @@ if __name__ == "__main__":
             depth = 0.4
             rough_pred_pose = obj.label2pose(viewpt, rot, offset, depth)
 
+
+
             # pose refinement
             horizontalR_ori, verticalR_ori = obj.getCenterAngle(rough_pred_pose)
 
             obj.setModelviewMatrix(rough_pred_pose)
             obj.findVisibleSamplePoint()
-
+            # draw init pose
+            # for p in obj.sharp_2d_pts:
+            #    demo = cv2.circle(demo, p, radius=2, color=(0, 255, 0), thickness=-1)
+            
             # generate preprocessed data
             # inital pose mask
             mask = obj.getVisibleArea(refine_frame)
@@ -240,6 +245,10 @@ if __name__ == "__main__":
             crop_img = cv2.resize(
                 crop_img, (IMG_SIZE, IMG_SIZE), interpolation=cv2.INTER_AREA
             )
+
+            # ori_crop_image = crop_img.copy()
+            # result_demo = np.zeros_like(crop_img)
+
             crop_img = crop_img[:, :, :3].transpose(2, 0, 1)
 
             crop_img = Variable(torch.from_numpy(crop_img).cuda()).float()
@@ -247,9 +256,15 @@ if __name__ == "__main__":
 
             # psp net semantic segmentation
             predictMask = PSP_model(crop_img)
-            predictMask = softmax(predictMask)
-            predictMask = predictMask[:, 1, :, :]
-            predictMask = predictMask.unsqueeze(1)
+
+            predictMask = torch.argmax(predictMask, 1, keepdim=True).float()
+            predictMask = (predictMask == 1).float().detach()
+
+            # result_demo[pred] = ori_crop_image[pred]
+            # result_demo = cv2.resize(result_demo, (800, 800), interpolation=cv2.INTER_AREA)
+            # cv2.imshow("pred mask", result_demo)
+
+            
 
             # load edge image
             edge_img = cv2.resize(
@@ -365,9 +380,6 @@ if __name__ == "__main__":
             pred_pose = obj.rotatePoseWithAngle(
                 pred_pose.cpu().detach().numpy(), -horizontalR_ori, -verticalR_ori
             )
-            # draw init pose
-            for p in obj.sharp_2d_pts:
-                demo = cv2.circle(demo, p, radius=2, color=(0, 255, 0), thickness=-1)
 
             obj.setModelviewMatrix(pred_pose)
             obj.findVisibleSamplePoint()
@@ -375,6 +387,7 @@ if __name__ == "__main__":
             # draw image
             for p in obj.sharp_2d_pts:
                 demo = cv2.circle(demo, p, radius=2, color=(0, 0, 255), thickness=-1)
+            
 
         if not ret:
             print("Can't receive frame (stream end?). Exiting ...")

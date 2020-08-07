@@ -10,7 +10,7 @@ import kornia
 import torch
 import torch.nn as nn
 from torchvision import utils
-import src.common.chamfer2D.dist_chamfer_2D as CHAMFER2D
+import chamfer2D.dist_chamfer_2D as CHAMFER2D
 
 from torch.autograd import Variable
 from tqdm import tqdm
@@ -67,9 +67,8 @@ def predict(mymodel, pspmodel, softmax, predict_index, chamLoss, view_image):
     edge_img = edge_img.unsqueeze(0)
 
     predictMask = pspmodel(img)
-    predictMask = softmax(predictMask)
-    predictMask = predictMask[:, 1, :, :]
-    predictMask = predictMask.unsqueeze(1)
+    predictMask = torch.argmax(predictMask, 1, keepdim=True).float()
+    predictMask = (predictMask == 1).float().detach()
 
     # load bounding image
     # bounding_path = processed_data_dir + numForTest + "bounding.png"

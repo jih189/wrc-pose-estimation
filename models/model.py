@@ -14,23 +14,74 @@ def weights_init(m):
             torch.nn.init.zeros_(m.bias)
 
 
+# class PyramidPoolingModule(nn.Module):
+#     def __init__(self, in_dim, reduction_dim, setting):
+#         self.features = []
+#         for s in setting:
+#             self.features.append(nn.Sequential(
+#                 nn.AdaptiveAvgPool2d(s)
+#                 nn.Conv2d(in_dim, reduction_dim, kernel_size=1,bias=False),
+#                 nn.BatchNorm2d(reduction_dim, momentum=0.95),
+#                 nn.ReLU(inplace=True)
+#             ))
+
+#     def forward(self, x):
+#         x_size = x.size()
+#         out = [x]
+#         for f in self.features:
+#             out.append(F.interpolate(f(x), x_size[2:], mode="bilinear", align_corners=False))
+#         out = torch.cat(out, 1)
+#         return out
+
+
 class Magic_Net(nn.Module):
-    def __init__(self, viewpt_class=7, rot_class=10):
+    def __init__(self, viewpt_class=64, rot_class=60):
         super(Magic_Net, self).__init__()
         self.viewpt_class = viewpt_class
         self.rot_class = rot_class
 
-        self.resnet = models.resnet50(pretrained=True)
-        self.resnet.layer4[1].conv2 = nn.Conv2d(
+        resnet = models.resnet34(pretrained=True)
+        # self.resnet.layer4[1].conv2 = nn.Conv2d(
+        #     512, 512, kernel_size=15, stride=1, padding=7
+        # )
+        # self.resnet.layer4[2].conv2 = nn.Conv2d(
+        #     512, 512, kernel_size=15, stride=1, padding=7
+        # )
+
+        # self.resnet.avgpool = nn.AdaptiveAvgPool2d((1, 1))
+        # self.resnet.fc = nn.Linear(2048, self.viewpt_class + self.rot_class + 2)
+
+        
+        self.layer0 = nn.Sequential(
+            resnet.conv1, resnet.bn1, resnet.relu, resnet.maxpool
+        )
+        
+        self.layer1, self.layer2, self.layer3, self.layer4 = (
+            resnet.layer1,
+            resnet.layer2,
+            resnet.layer3,
+            resnet.layer4,
+        )
+
+        self.layer4[2].conv2 = nn.Conv2d(
             512, 512, kernel_size=15, stride=1, padding=7
         )
 
-        self.resnet.avgpool = nn.AdaptiveAvgPool2d((1, 1))
-        self.resnet.fc = nn.Linear(2048, self.viewpt_class + self.rot_class + 2)
+        self.avgpool1 = nn.AdaptiveAvgPool2d(1)
+        self.fc = nn.Linear(512, self.viewpt_class + self.rot_class + 2)
 
     def forward(self, x):
-        x1 = self.resnet(x)
-        return x1
+        # x = self.resnet(x)
+        # return x
+        x = self.layer0(x)
+        x = self.layer1(x)
+        x = self.layer2(x)
+        x = self.layer3(x)
+        x = self.layer4(x)
+        x = self.avgpool1(x)
+        x = torch.flatten(x, 1)
+        x = self.fc(x)
+        return x
 
 
 class Refine_Net(nn.Module):
@@ -152,33 +203,33 @@ class Refine_Net(nn.Module):
         x15 = torch.sigmoid(x12)
         return x11, x15, x14
 
-    @staticmethod
-    def create_stage(out_channels):
-        kernel = 3
-        padding = 1
-        num_feature = 32
-        model = nn.Sequential()
-        model.add_module(
-            "conv0",
-            nn.Conv2d(out_channels, num_feature, kernel_size=1, stride=1, padding=0),
-        )
-        model.add_module("relu0", nn.ReLU(inplace=True))
-        model.add_module("bnd0", nn.BatchNorm2d(num_feature))
-        model.add_module(
-            "conv1",
-            nn.Conv2d(
-                num_feature, num_feature, kernel_size=kernel, stride=1, padding=padding
-            ),
-        )
-        model.add_module("relu1", nn.ReLU(inplace=True))
-        model.add_module("bnd1", nn.BatchNorm2d(num_feature))
-        model.add_module(
-            "conv2",
-            nn.Conv2d(num_feature, out_channels, kernel_size=1, stride=1, padding=0),
-        )
-        model.add_module("relu2", nn.ReLU(inplace=True))
-        model.add_module("bnd2", nn.BatchNorm2d(out_channels))
-        return model
+    # @staticmethod
+    # def create_stage(out_channels):
+    #     kernel = 3
+    #     padding = 1
+    #     num_feature = 32
+    #     model = nn.Sequential()
+    #     model.add_module(
+    #         "conv0",
+    #         nn.Conv2d(out_channels, num_feature, kernel_size=1, stride=1, padding=0),
+    #     )
+    #     model.add_module("relu0", nn.ReLU(inplace=True))
+    #     model.add_module("bnd0", nn.BatchNorm2d(num_feature))
+    #     model.add_module(
+    #         "conv1",
+    #         nn.Conv2d(
+    #             num_feature, num_feature, kernel_size=kernel, stride=1, padding=padding
+    #         ),
+    #     )
+    #     model.add_module("relu1", nn.ReLU(inplace=True))
+    #     model.add_module("bnd1", nn.BatchNorm2d(num_feature))
+    #     model.add_module(
+    #         "conv2",
+    #         nn.Conv2d(num_feature, out_channels, kernel_size=1, stride=1, padding=0),
+    #     )
+    #     model.add_module("relu2", nn.ReLU(inplace=True))
+    #     model.add_module("bnd2", nn.BatchNorm2d(out_channels))
+    #     return model
 
 
 class PSPNet(nn.Module):

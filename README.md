@@ -43,7 +43,7 @@ python src/data/make_refine_dataset.py input_filepath=[input file path] output_f
 for different object, the random parameter should be different, so you may need to update the sample pose in object model file.
 
 #### Training
-
+yolo https://github.com/minar09/yolov3-pytorch
 
 ##### Author: Jiaming Hu
 

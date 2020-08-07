@@ -8,7 +8,7 @@ from torch.autograd import Variable
 from models.model import PSPNet
 import torch.nn.functional as F
 
-test_file = "004810"
+test_file = "004000"
 
 img_path = "data/processed/pulley_refine/" + test_file + "img.png"
 img = cv2.imread(img_path)
@@ -26,12 +26,11 @@ model.eval()
 
 output = model(input)
 
-m = nn.Softmax2d()
-output = m(output)
-result = output[0, 1, :, :].cpu().detach().numpy()
+pred = torch.argmax(output, 1, keepdim=True).float().squeeze(1).cpu().detach().numpy()
+print("pred size", pred.shape)
 
 demo = cv2.resize(demo, (800, 800), interpolation=cv2.INTER_AREA)
-result_demo = cv2.resize(result, (800, 800), interpolation=cv2.INTER_AREA)
+result_demo = cv2.resize(pred[0], (800, 800), interpolation=cv2.INTER_AREA)
 
 cv2.imshow("view", demo)
 cv2.imshow("result", result_demo)

@@ -10,9 +10,9 @@ from models.model import Magic_Net
 import src.common.object_model as OM
 import src.configuration as CFG
 import numpy as np
-import wandb
+# import wandb
 
-wandb.init(project="wrc-rot-classifier")
+# wandb.init(project="wrc-rot-classifier")
 
 OM.setup(CFG.CAMERA_W, CFG.CAMERA_H)
 
@@ -27,7 +27,7 @@ obj.generateSamplePoints(0.001, 0.001)
 
 
 batch_size = 64
-epochs = 1000
+epochs = 300
 lr = 1e-5
 momentum = 0.9
 w_decay = 1e-3
@@ -179,16 +179,16 @@ def train():
 
         val_loss, val_rot_loss, val_offset_loss, view_acc, rot_acc = val()
 
-        wandb.log(
-            {
-                "train loss": tem,
-                "val loss": val_loss,
-                "val offset loss": val_offset_loss,
-                "val rot loss": val_rot_loss,
-                "view point acc": view_acc,
-                "rotation acc": rot_acc,
-            }
-        )
+        # wandb.log(
+        #     {
+        #         "train loss": tem,
+        #         "val loss": val_loss,
+        #         "val offset loss": val_offset_loss,
+        #         "val rot loss": val_rot_loss,
+        #         "view point acc": view_acc,
+        #         "rotation acc": rot_acc,
+        #     }
+        # )
         if pre_loss == None:
             torch.save(model, "best_model_rot.pth")
             pre_loss = val_loss

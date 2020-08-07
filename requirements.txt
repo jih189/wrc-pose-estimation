@@ -15,3 +15,5 @@ PyOpenGL
 opencv-python
 opencv-contrib-python
 scipy
+matplotlib
+pyglet

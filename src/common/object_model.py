@@ -105,7 +105,7 @@ class ObjectModel:
         fy = self.intrinsic[1, 1]
         ux = self.intrinsic[0, 2]
         uy = self.intrinsic[1, 2]
-        return (fx * pt3_cam[0] / pt3_cam[2] + ux, fy * pt3_cam[1] / pt3_cam[2] + uy)
+        return ((fx * pt3_cam[0] / pt3_cam[2] + ux)[0], (fy * pt3_cam[1] / pt3_cam[2] + uy)[0])
 
     # load the object CAD model
     def loadObjectCADModel(self, file_name):
@@ -302,6 +302,7 @@ class ObjectModel:
     def getEdge(self, height, width):
         edgeImg = np.zeros((height, width), np.uint8)
         for p in self.sharp_2d_pts:
+            p = (int(p[0]), int(p[1]))
             edgeImg = cv2.circle(edgeImg, p, radius=0, color=(255), thickness=-1)
         return edgeImg
 

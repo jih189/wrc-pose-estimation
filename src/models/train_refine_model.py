@@ -1,3 +1,4 @@
+import chamfer2D.dist_chamfer_2D as CHAMFER2D
 from src.common.DataLoader import Refine_data
 from models.model import Refine_Net, PSPNet
 import torch
@@ -11,13 +12,12 @@ import random
 
 import torchgeometry as tgm
 import kornia
-import src.common.chamfer2D.dist_chamfer_2D as CHAMFER2D
 import src.common.fscore as FS
 import src.configuration as CFG
 
-import wandb
+# import wandb
 
-wandb.init(project="wrc-pose-refinement")
+# wandb.init(project="wrc-pose-refinement")
 
 ##########init PSPNet #####################
 PSPmodel = PSPNet().cuda()
@@ -75,7 +75,7 @@ val_loader = DataLoader(
 mymodel = Refine_Net().cuda()
 mymodel = nn.DataParallel(mymodel)
 
-wandb.watch(mymodel)
+# wandb.watch(mymodel)
 
 # loss for chamfer
 chamLoss = CHAMFER2D.chamfer_2DDist()
@@ -120,18 +120,19 @@ def train():
             ) = data
 
             predictMask = PSPmodel(input_img.cuda().float())
-            predictMask = softmax(predictMask)
-            predictMask = predictMask[:, 1, :, :]
-            predictMask = predictMask.unsqueeze(1).detach()
+
+
+            predictMask = torch.argmax(predictMask, 1, keepdim=True)
+            predictMask = (predictMask == 1).detach()
 
             optimizer.zero_grad()
 
             # catenate image, edges, mask, and bounding box into one input
             # input order (edge, mask, bounding box, image)
             inputData = torch.cat(
-                (edge_img.cuda(), mask_img.cuda(), predictMask, input_img.cuda()), 1
+                (edge_img.cuda().float(), mask_img.cuda().float(), predictMask.float(), input_img.cuda().float()), 1
             )
-            input = Variable(inputData).float()
+            input = Variable(inputData)
 
             ################ test
             # testindex = 2
@@ -296,10 +297,10 @@ def train():
             # cv2.waitKey(0)
             #############################################################
 
-            wandb.log
+            # wandb.log
 
             # calculate the chamfer distance loss
-            dist1, dist2, idx1, idx2 = chamLoss(predict_2d_pts, target_2d_pts)
+            dist1, dist2, idx1, idx2 = chamLoss(predict_2d_pts.float(), target_2d_pts.float())
 
             # get distance between each point pairs in 3d
             targetFromInit3dPt = tgm.transform_points(targetPose, init3dPt)
@@ -346,16 +347,16 @@ def train():
 
         val_loss, val_f_score, val_chamfer_score = val()
 
-        wandb.log(
-            {
-                "Train loss": tem,
-                "Train F-score": tem_f_score,
-                "Val loss": val_loss,
-                "Val F-score": val_f_score,
-                "Train chamfer matching score": tem_chamfer_score,
-                "Val chamfer matching score": val_chamfer_score,
-            }
-        )
+        # wandb.log(
+        #     {
+        #         "Train loss": tem,
+        #         "Train F-score": tem_f_score,
+        #         "Val loss": val_loss,
+        #         "Val F-score": val_f_score,
+        #         "Train chamfer matching score": tem_chamfer_score,
+        #         "Val chamfer matching score": val_chamfer_score,
+        #     }
+        # )
 
         if pre_loss == None:
             torch.save(mymodel, "best_model_refine.pth")
@@ -364,7 +365,7 @@ def train():
             torch.save(mymodel, "best_model_refine.pth")
             pre_loss = val_loss
         mymodel.train()
-        if (epoch + 1) % 100 == 0:
+        if (epoch + 1) % 50 == 0:
             scheduler.step()
 
 
@@ -387,14 +388,14 @@ def val():
         ) = data
 
         predictMask = PSPmodel(input_img.cuda().float())
-        predictMask = softmax(predictMask)
-        predictMask = predictMask[:, 1, :, :]
-        predictMask = predictMask.unsqueeze(1).detach()
+
+        predictMask = torch.argmax(predictMask, 1, keepdim=True)
+        predictMask = (predictMask == 1).detach()
 
         inputData = torch.cat(
-            (edge_img.cuda(), mask_img.cuda(), predictMask, input_img.cuda()), 1
+            (edge_img.cuda().float(), mask_img.cuda().float(), predictMask.float(), input_img.cuda().float()), 1
         )
-        input = Variable(inputData).float()
+        input = Variable(inputData)
 
         # load data to cuda
         init3dPt = init3dPt.cuda().float()
@@ -516,7 +517,7 @@ def val():
         predict_2d_pts = torch.add(scaled_predict_2d_pts, trans)
 
         # calculate the chamfer distance loss
-        dist1, dist2, idx1, idx2 = chamLoss(predict_2d_pts, target_2d_pts)
+        dist1, dist2, idx1, idx2 = chamLoss(predict_2d_pts.float(), target_2d_pts.float())
 
         # get distance between each point pairs in 3d
         targetFromInit3dPt = tgm.transform_points(targetPose, init3dPt)
