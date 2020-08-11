@@ -63,6 +63,7 @@ if __name__ == "__main__":
             cv2.imwrite(output_path + "{:06d}".format(saveInx) + ".png", img)
             np.save(output_path + "{:06d}".format(saveInx) + ".npy", pose)
             saveInx += 1
+            currentInx += 1
         elif ch & 0xFF == ord("q"):
             break
         elif ch & 0xFF == ord("n"):

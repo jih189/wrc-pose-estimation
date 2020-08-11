@@ -5,19 +5,32 @@ from ar_markers import detect_markers
 import src.common.object_model as OM
 import src.configuration as CFG
 
-# for flat
+# ignore warming
+np.seterr(divide="ignore", invalid="ignore")
+
+# # for flat
 tablePoints = [
-    [-0.005, -0.0675, -0.0675],
-    [-0.005, -0.0675, 0.0675],
-    [-0.005, 0.0675, -0.0675],
-    [-0.005, 0.0675, 0.0675],
+    [-0.015, -0.0675, -0.0675],
+    [-0.015, -0.0675, 0.0675],
+    [-0.015, 0.0675, -0.0675],
+    [-0.015, 0.0675, 0.0675],
 ]
 
 # for vertical
-# tablePoints = [[-0.0675, -0.0675,-0.015],
-#                 [-0.0675, 0.0675,-0.015],
-#                 [0.0675,-0.0675,-0.015],
-#                 [0.0675, 0.0675,-0.015]]
+# tablePoints = [
+#     [-0.0675, -0.0675, -0.015],
+#     [-0.0675, 0.0675, -0.015],
+#     [0.0675, -0.0675, -0.015],
+#     [0.0675, 0.0675, -0.015],
+# ]
+
+# sideways housing
+# tablePoints = [
+#     [0.05679493, -0.0675, -0.03944092],
+#     [-0.06815391, -0.0675, 0.01167451],
+#     [0.05679493, 0.0675, -0.03944092],
+#     [-0.06815391, 0.0675, 0.01167451],
+# ]
 
 dist_coefs = np.zeros((4, 1))
 
@@ -99,10 +112,12 @@ if __name__ == "__main__":
             pose = obj.setModelviewMatrix(pose)
 
             upperleft, lowerright = obj.findVisibleSamplePoint()
+            if upperleft is None or lowerright is None:
+                continue
             upperleft = (int(upperleft[0]), int(upperleft[1]))
             lowerright = (int(lowerright[0]), int(lowerright[1]))
 
-            pose = OM.symmetricRemove(pose)
+            pose = OM.symmetricRemove_housing(pose)
             obj.setModelviewMatrix(pose)
             viewPoint, inplaneRotation, offsetFromCenter, depth = obj.getLabel()
             vpidx = OM.cal_idx(viewPoint)
@@ -118,6 +133,7 @@ if __name__ == "__main__":
             )
 
             for p in obj.sharp_2d_pts:
+                p = (int(p[0]), int(p[1]))
                 frame = cv2.circle(frame, p, radius=0, color=(0, 0, 255), thickness=-1)
 
             cropImg = frame[upperleft[1] : lowerright[1], upperleft[0] : lowerright[0]]

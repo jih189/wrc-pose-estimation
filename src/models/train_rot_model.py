@@ -10,6 +10,7 @@ from models.model import Magic_Net
 import src.common.object_model as OM
 import src.configuration as CFG
 import numpy as np
+
 # import wandb
 
 # wandb.init(project="wrc-rot-classifier")
@@ -27,16 +28,16 @@ obj.generateSamplePoints(0.001, 0.001)
 
 
 batch_size = 64
-epochs = 300
-lr = 1e-5
+epochs = 1000
+lr = 3e-5
 momentum = 0.9
-w_decay = 1e-3
+w_decay = 4e-3
 viewpt_class = 64
 rot_class = 60
 
-train_dir = "data/processed/pulley_rot/"
-val_dir = "data/processed/pulley_rot/"
-raw_dir = "data/raw/pulley/"
+train_dir = CFG.PROCESSED_DATA_PATH
+val_dir = CFG.PROCESSED_DATA_PATH
+raw_dir = CFG.VERIFY_IMAGE_PATH
 
 train_dataset = Rot_data(data_path=train_dir, pose_data_path=raw_dir, isTrain=True)
 train_loader = DataLoader(
@@ -74,28 +75,6 @@ weights = [
     1.0,
     1.0,
     1.0,
-    0.25,
-    1.0,
-    1.0,
-    1.0,
-    1.0,
-    1.0,
-    1.0,
-    1.0,
-    0.000864304235090752,
-    1.0,
-    1.0,
-    1.0,
-    1.0,
-    0.0017211703958691911,
-    1.0,
-    1.0,
-    0.001358695652173913,
-    1.0,
-    0.3333333333333333,
-    1.0,
-    1.0,
-    0.0022988505747126436,
     1.0,
     1.0,
     1.0,
@@ -104,23 +83,47 @@ weights = [
     1.0,
     1.0,
     1.0,
+    0.0055248618784530384,
     1.0,
     1.0,
     1.0,
     1.0,
+    0.004694835680751174,
     1.0,
     1.0,
+    0.0022935779816513763,
+    1.0,
+    0.02127659574468085,
     1.0,
     1.0,
+    0.0027100271002710027,
     1.0,
     1.0,
+    0.0045045045045045045,
+    1.0,
+    0.0045045045045045045,
     1.0,
     1.0,
+    0.002583979328165375,
+    1.0,
+    0.5,
     1.0,
     1.0,
+    0.008264462809917356,
     1.0,
     1.0,
+    0.004166666666666667,
+    1.0,
+    0.005376344086021506,
+    1.0,
+    1.0,
+    0.006802721088435374,
+    1.0,
+    1.0,
+    0.1,
 ]
+
+
 class_weights = torch.FloatTensor(weights).cuda()
 viewpt_criterion = nn.CrossEntropyLoss(weight=class_weights)
 rot_criterion = nn.CrossEntropyLoss()
@@ -198,7 +201,7 @@ def train():
 
         model.train()
 
-        if (epoch + 1) % 50 == 0:
+        if (epoch + 1) % 90 == 0:
             scheduler.step()
 
 

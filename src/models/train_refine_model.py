@@ -28,36 +28,36 @@ PSPmodel.eval()
 
 LOG_INTERVAL = 1
 
-batch_size = 32
+batch_size = 64
 epochs = 1200
-lr = 1e-6
+lr = 2e-6
 momentum = 0.9
 w_decay = 18.0
 lambda_chamfer = 0.05
 lambda3d = 100.0
 
-train_dir = "data/processed/pulley_refine/"
-val_dir = "data/processed/pulley_refine/"
+train_dir = CFG.REFINE_SATA_PATH
+val_dir = CFG.REFINE_SATA_PATH
 
-num_images = 5773
-train_ratio = 0.8
-num_train = int(train_ratio * num_images)
-num_val = num_images - num_train
+# num_images = 5773
+# train_ratio = 0.8
+# num_train = int(train_ratio * num_images)
+# num_val = num_images - num_train
 
-# use for spliting train and test
-val_list = random.sample(range(num_images), num_val)
-train_list = [i for i in range(num_images) if i not in val_list]
+# # use for spliting train and test
+# val_list = random.sample(range(num_images), num_val)
+# train_list = [i for i in range(num_images) if i not in val_list]
 
-f = open(train_dir + "train.txt", "w")
-for i in train_list:
-    f.write("{:06d}".format(i) + "\n")
-f.close()
+# f = open(train_dir + "train.txt", "w")
+# for i in train_list:
+#     f.write("{:06d}".format(i) + "\n")
+# f.close()
 
-f = open(val_dir + "val.txt", "w")
-for i in val_list:
-    f.write("{:06d}".format(i) + "\n")
-f.close()
-print("Split training and validation set done")
+# f = open(val_dir + "val.txt", "w")
+# for i in val_list:
+#     f.write("{:06d}".format(i) + "\n")
+# f.close()
+# print("Split training and validation set done")
 
 # build train data loader
 train_dataset = Refine_data(data_path=train_dir, isTrain=True)
@@ -121,7 +121,6 @@ def train():
 
             predictMask = PSPmodel(input_img.cuda().float())
 
-
             predictMask = torch.argmax(predictMask, 1, keepdim=True)
             predictMask = (predictMask == 1).detach()
 
@@ -130,7 +129,13 @@ def train():
             # catenate image, edges, mask, and bounding box into one input
             # input order (edge, mask, bounding box, image)
             inputData = torch.cat(
-                (edge_img.cuda().float(), mask_img.cuda().float(), predictMask.float(), input_img.cuda().float()), 1
+                (
+                    edge_img.cuda().float(),
+                    mask_img.cuda().float(),
+                    predictMask.float(),
+                    input_img.cuda().float(),
+                ),
+                1,
             )
             input = Variable(inputData)
 
@@ -300,7 +305,9 @@ def train():
             # wandb.log
 
             # calculate the chamfer distance loss
-            dist1, dist2, idx1, idx2 = chamLoss(predict_2d_pts.float(), target_2d_pts.float())
+            dist1, dist2, idx1, idx2 = chamLoss(
+                predict_2d_pts.float(), target_2d_pts.float()
+            )
 
             # get distance between each point pairs in 3d
             targetFromInit3dPt = tgm.transform_points(targetPose, init3dPt)
@@ -331,7 +338,8 @@ def train():
             normdist3d = torch.norm(distanceBetweenVec3d, p=2, dim=2)
 
             ch_loss = torch.mean(dist1, 1) + torch.mean(dist2, 1)
-            loss = torch.mean(normdist3d, 1) * lambda3d + torch.mean(normdist2d, 1)
+            # loss = torch.mean(normdist3d, 1) * lambda3d
+            loss = torch.mean(normdist2d, 1)
 
             loss.sum().backward()
             optimizer.step()
@@ -393,7 +401,13 @@ def val():
         predictMask = (predictMask == 1).detach()
 
         inputData = torch.cat(
-            (edge_img.cuda().float(), mask_img.cuda().float(), predictMask.float(), input_img.cuda().float()), 1
+            (
+                edge_img.cuda().float(),
+                mask_img.cuda().float(),
+                predictMask.float(),
+                input_img.cuda().float(),
+            ),
+            1,
         )
         input = Variable(inputData)
 
@@ -517,7 +531,9 @@ def val():
         predict_2d_pts = torch.add(scaled_predict_2d_pts, trans)
 
         # calculate the chamfer distance loss
-        dist1, dist2, idx1, idx2 = chamLoss(predict_2d_pts.float(), target_2d_pts.float())
+        dist1, dist2, idx1, idx2 = chamLoss(
+            predict_2d_pts.float(), target_2d_pts.float()
+        )
 
         # get distance between each point pairs in 3d
         targetFromInit3dPt = tgm.transform_points(targetPose, init3dPt)
@@ -533,7 +549,8 @@ def val():
         normdist3d = torch.norm(distanceBetweenVec3d, p=2, dim=2)
 
         ch_loss = torch.mean(dist1, 1) + torch.mean(dist2, 1)
-        loss = torch.mean(normdist3d, 1) * lambda3d + torch.mean(normdist2d, 1)
+        # loss = torch.mean(normdist3d, 1) * lambda3d #+
+        loss = torch.mean(normdist2d, 1)
 
         avg_loss.append(loss.data.cpu().numpy().sum())
         f_score, precision, recall = FS.fscore(dist1, dist2)

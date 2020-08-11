@@ -21,9 +21,9 @@ obj.setIntrinsicMatrix(CFG.CAMERA_MATRIX)
 obj.determineSharpEdges(0.05)
 obj.generateSamplePoints(0.001, 0.001)
 
-test_file = "001950"
-
-img_path = "data/processed/pulley_rot/crop" + test_file + ".png"
+test_file = "001510"
+img_path = CFG.PROCESSED_DATA_PATH + "crop" + test_file + ".png"
+# img_path = "data/processed/pulley_rot/crop"
 # img_path = "test0.png"
 img = cv2.imread(img_path)
 img = cv2.resize(img, (240, 240), interpolation=cv2.INTER_AREA)
@@ -57,7 +57,7 @@ rot = np.argmax(rot, axis=1)
 print("rot class index = ", rot[0])
 rot = rot[0] * np.pi / 30
 
-boundingbox = np.load("data/processed/pulley_rot/bounding" + test_file + ".npy")
+boundingbox = np.load(CFG.PROCESSED_DATA_PATH + "bounding" + test_file + ".npy")
 # boundingbox =np.load('bounding0.npy')
 
 upperleftx, upperlefty, lowerrightx, lowerrighty = (
@@ -78,13 +78,13 @@ offset = position[:, :2]
 offset = np.array([upperleftx, upperlefty]) + offset.reshape(2) - principle_pt
 
 
-pose_label = np.load("data/raw/pulley/" + test_file + ".npy")
+pose_label = np.load(CFG.VERIFY_IMAGE_PATH + test_file + ".npy")
 depth = np.linalg.norm(pose_label[:3, 3])
 
 pose = obj.label2pose(viewpt, rot, offset, depth)
 # print(pose)
 
-frame = cv2.imread("data/raw/pulley/" + test_file + ".png")
+frame = cv2.imread(CFG.VERIFY_IMAGE_PATH + test_file + ".png")
 # frame = cv2.imread("ori0.png")
 # frame = cv2.circle(frame, (upperleftx, upperlefty), radius=2, color=(0,0,255), thickness=-1)
 # frame = cv2.circle(frame, (lowerrightx, lowerrighty), radius=2, color=(0,0,255), thickness=-1)
@@ -92,6 +92,7 @@ frame = cv2.imread("data/raw/pulley/" + test_file + ".png")
 # pose = np.identity(4)
 # pose[2,3] = 0.5
 # display coordinate
+
 
 def mapt(f, *seq):
     return tuple(map(f, *seq))

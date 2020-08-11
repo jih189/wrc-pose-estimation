@@ -1,14 +1,11 @@
 # test
 import torch
 import torch.nn as nn
-from src.common.iou import iou_pytorch
 import numpy as np
+from models.model import Refine_Net
 
-output = np.array([
-    [[0,0,1],
-    [0,1,0],[1,0,0]]
-])
+input = torch.randn(1,6,240,240).cuda()
 
-output = torch.from_numpy(output)
-print(output)
-print(output.size())
+mymodel = Refine_Net().cuda()
+
+output = mymodel(input)

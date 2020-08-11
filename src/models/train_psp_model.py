@@ -10,14 +10,18 @@ from src.common.DataLoader import PSP_data
 from src.common.iou import iou
 from models.model import PSPNet
 import numpy as np
+import src.configuration as CFG
 
-batch_size = 32
-epochs = 300
-lr = 5e-4
+batch_size = 64
+epochs = 500
+lr = 5e-3
 class_weights = [0.1, 1.0]
 
-train_dir = "data/processed/pulley_refine/"
-val_dir = "data/processed/pulley_refine/"
+# train_dir = "data/processed/pulley_refine/"
+# val_dir = "data/processed/pulley_refine/"
+
+train_dir = CFG.REFINE_SATA_PATH
+val_dir = CFG.REFINE_SATA_PATH
 
 train_dataset = PSP_data(data_path=train_dir, isTrain=True)
 train_loader = DataLoader(
@@ -41,6 +45,7 @@ seg_criterion = nn.CrossEntropyLoss()
 optimizer = optim.Adam(model.parameters(), lr=lr)
 lmbda = lambda epoch: 0.5
 scheduler = lr_scheduler.MultiplicativeLR(optimizer, lr_lambda=lmbda)
+
 
 def train():
     print("start training:")
@@ -72,7 +77,6 @@ def train():
         val_loss, val_iou = val()
         print("val loss {} and iou {}".format(val_loss, val_iou))
 
-
         if pre_loss == None:
             torch.save(model, "best_model_psp.pth")
             pre_loss = val_loss
@@ -82,7 +86,7 @@ def train():
 
         model.train()
 
-        if (epoch + 1) % 15 == 0:
+        if (epoch + 1) % 50 == 0:
             scheduler.step()
 
 

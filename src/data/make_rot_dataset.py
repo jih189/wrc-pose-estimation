@@ -45,10 +45,10 @@ def get_centered_crop(topleft, botright):
 
 @click.command()
 @click.argument(
-    "input_filepath", default="data/raw/pulley/", type=click.Path(exists=True)
+    "input_filepath", default="data/raw/housing/", type=click.Path(exists=True)
 )
 @click.argument(
-    "output_filepath", default="data/processed/pulley_rot/", type=click.Path()
+    "output_filepath", default="data/processed/housing_rot/", type=click.Path()
 )
 def main(input_filepath, output_filepath):
     """ Runs data processing scripts to turn raw data from (../raw) into

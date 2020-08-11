@@ -194,8 +194,8 @@ if __name__ == "__main__":
             obj.setModelviewMatrix(rough_pred_pose)
             obj.findVisibleSamplePoint()
             # draw init pose
-            # for p in obj.sharp_2d_pts:
-            #    demo = cv2.circle(demo, p, radius=2, color=(0, 255, 0), thickness=-1)
+            for p in obj.sharp_2d_pts:
+               demo = cv2.circle(demo, (int(p[0]), int(p[1])), radius=2, color=(0, 255, 0), thickness=-1)
             
             # generate preprocessed data
             # inital pose mask

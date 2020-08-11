@@ -10,10 +10,15 @@ CAMERA_MATRIX = np.array(
     dtype="double",
 )
 
-IMAGE_SAVE_PATH = "data/images/pulley/"
-VERIFY_IMAGE_PATH = "data/raw/pulley_verify/"
+# IMAGE_SAVE_PATH = "data/images/pulley/"
+# VERIFY_IMAGE_PATH = "data/raw/pulley_verify/"
+# CAD_MODEL = "data/mesh/MBRFA30-2-P6.obj"
 
-CAD_MODEL = "data/mesh/MBRFA30-2-P6.obj"
+IMAGE_SAVE_PATH = "data/images/housing/"
+VERIFY_IMAGE_PATH = "data/raw/housing/"
+PROCESSED_DATA_PATH = "data/processed/housing_rot/"
+REFINE_SATA_PATH = "data/processed/housing_refine/"
+CAD_MODEL = "data/mesh/SBARB6200ZZ-30.obj"
 
 CAMERA_ID = 4
 CAMERA_W = 640

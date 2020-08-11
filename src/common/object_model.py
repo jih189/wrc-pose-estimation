@@ -20,6 +20,13 @@ def symmetricRemove(pose_input):
     return pose_input
 
 
+def symmetricRemove_housing(pose_input):
+    eulerVec = (R.from_matrix(pose_input[:3, :3])).as_euler("ZYX")
+    eulerVec[2] = eulerVec[2] % (np.pi / 2)
+    pose_input[:3, :3] = (R.from_euler("ZYX", eulerVec)).as_matrix()
+    return pose_input
+
+
 def py_ang(v1, v2):
     """ Returns the angle in radians between vectors 'v1' and 'v2'    """
     cosang = np.dot(v1, v2)
@@ -105,7 +112,15 @@ class ObjectModel:
         fy = self.intrinsic[1, 1]
         ux = self.intrinsic[0, 2]
         uy = self.intrinsic[1, 2]
-        return ((fx * pt3_cam[0] / pt3_cam[2] + ux)[0], (fy * pt3_cam[1] / pt3_cam[2] + uy)[0])
+        return (
+            (fx * pt3_cam[0] / pt3_cam[2] + ux),
+            (fy * pt3_cam[1] / pt3_cam[2] + uy),
+        )
+
+        # return (
+        #     int((fx * pt3_cam[0] / pt3_cam[2] + ux)[0]),
+        #     int((fy * pt3_cam[1] / pt3_cam[2] + uy)[0]),
+        # )
 
     # load the object CAD model
     def loadObjectCADModel(self, file_name):
@@ -306,16 +321,33 @@ class ObjectModel:
             edgeImg = cv2.circle(edgeImg, p, radius=0, color=(255), thickness=-1)
         return edgeImg
 
+    # this resample will generate random pose in roughly translation and rotation
     def resample(self, pose, numOfPose):
 
         # generate random value for rotation and translation
-        xRot = np.random.normal(0, 0.2, numOfPose)
-        yRot = np.random.normal(0, 0.2, numOfPose)
-        zRot = np.random.normal(0, 0.2, numOfPose)
+        xRot_1 = np.random.normal(0, 0.08, int(numOfPose / 2))
+        yRot_1 = np.random.normal(0, 0.08, int(numOfPose / 2))
+        zRot_1 = np.random.normal(0, 0.08, int(numOfPose / 2))
 
-        xTrans = np.random.normal(0, 0.006, numOfPose)
-        yTrans = np.random.normal(0, 0.006, numOfPose)
-        zTrans = np.random.normal(0, 0.12, numOfPose)
+        xTrans_1 = np.random.normal(0, 0.03, int(numOfPose / 2))
+        yTrans_1 = np.random.normal(0, 0.03, int(numOfPose / 2))
+        zTrans_1 = np.random.normal(0, 0.08, int(numOfPose / 2))
+
+        xRot_2 = np.random.normal(0, 0.3, numOfPose - int(numOfPose / 2))
+        yRot_2 = np.random.normal(0, 0.3, numOfPose - int(numOfPose / 2))
+        zRot_2 = np.random.normal(0, 0.3, numOfPose - int(numOfPose / 2))
+
+        xTrans_2 = np.random.normal(0, 0.005, numOfPose - int(numOfPose / 2))
+        yTrans_2 = np.random.normal(0, 0.005, numOfPose - int(numOfPose / 2))
+        zTrans_2 = np.random.normal(0, 0.005, numOfPose - int(numOfPose / 2))
+
+        xRot = np.concatenate((xRot_1, xRot_2))
+        yRot = np.concatenate((yRot_1, yRot_2))
+        zRot = np.concatenate((zRot_1, zRot_2))
+
+        xTrans = np.concatenate((xTrans_1, xTrans_2))
+        yTrans = np.concatenate((yTrans_1, yTrans_2))
+        zTrans = np.concatenate((zTrans_1, zTrans_2))
 
         # rotate it to the center
         horizontalR = np.arctan2(pose[0, 3], pose[2, 3])
@@ -335,9 +367,7 @@ class ObjectModel:
 
         for i in range(numOfPose):
             tempPose = np.identity(4)
-            tempPose[:3, :3] = center_pose[:3, :3]
             Rmatrix = np.identity(4)
-
             r = R.from_euler("X", xRot[i])
             Rmatrix[:3, :3] = r.as_matrix()
             tempPose = np.dot(Rmatrix, tempPose)
@@ -350,14 +380,14 @@ class ObjectModel:
             Rmatrix[:3, :3] = r.as_matrix()
             tempPose = np.dot(Rmatrix, tempPose)
 
-            center_pose[0, 3] += xTrans[i]
-            center_pose[1, 3] += yTrans[i]
-            center_pose[2, 3] += zTrans[i]
+            tempPose = np.dot(center_pose, tempPose)
+
+            tempPose[0, 3] += xTrans[i]
+            tempPose[1, 3] += yTrans[i]
+            tempPose[2, 3] += zTrans[i]
 
             # to ensure that the object doesn't go behind the camera
-            center_pose[2, 3] = max(center_pose[2, 3], 0.1)
-
-            tempPose[:3, 3] = center_pose[:3, 3]
+            tempPose[2, 3] = max(tempPose[2, 3], 0.1)
 
             # rotate it back
             r = R.from_euler("Y", horizontalR)

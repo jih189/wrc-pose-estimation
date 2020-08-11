@@ -11,7 +11,10 @@ import src.common.object_model as OM
 import src.configuration as CFG
 
 EXPAND_SIZE = 2.0
-RANDOM_NUM = 2
+RANDOM_NUM = 4
+
+# ignore warming
+np.seterr(divide="ignore", invalid="ignore")
 
 
 def init():
@@ -30,10 +33,10 @@ def init():
 
 @click.command()
 @click.argument(
-    "input_filepath", default="data/raw/pulley/", type=click.Path(exists=True)
+    "input_filepath", default="data/raw/housing/", type=click.Path(exists=True)
 )
 @click.argument(
-    "output_filepath", default="data/processed/pulley_refine/", type=click.Path()
+    "output_filepath", default="data/processed/housing_refine/", type=click.Path()
 )
 def main(input_filepath, output_filepath):
     """ Runs data processing scripts to turn raw data from (../raw) into

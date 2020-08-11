@@ -11,9 +11,11 @@ import torch
 import torch.nn as nn
 from torchvision import utils
 import chamfer2D.dist_chamfer_2D as CHAMFER2D
+import chamfer3D.dist_chamfer_3D as CHAMFER3D
 
 from torch.autograd import Variable
 from tqdm import tqdm
+import src.configuration as CFG
 
 IMG_SIZE = 240
 
@@ -31,15 +33,18 @@ def init():
     PSPmodel = torch.load("best_model_psp.pth")
     PSPmodel.eval()
 
-    chamLoss = CHAMFER2D.chamfer_2DDist()
+    chamLoss2d = CHAMFER2D.chamfer_2DDist()
+    chamLoss3d = CHAMFER3D.chamfer_3DDist()
     softmax = nn.Softmax2d()
 
-    return mymodel, PSPmodel, softmax, chamLoss
+    return mymodel, PSPmodel, softmax, chamLoss2d, chamLoss3d
 
 
-def predict(mymodel, pspmodel, softmax, predict_index, chamLoss, view_image):
+def predict(
+    mymodel, pspmodel, softmax, predict_index, chamLoss2d, chamLoss3d, view_image
+):
     numForTest = "{:06d}".format(predict_index)
-    processed_data_dir = "data/processed/pulley_refine/"
+    processed_data_dir = CFG.REFINE_SATA_PATH
 
     # load rgb image
     img_path = processed_data_dir + numForTest + "img.png"
@@ -119,7 +124,6 @@ def predict(mymodel, pspmodel, softmax, predict_index, chamLoss, view_image):
     # running model
     inputData = torch.cat((edge_img, mask_img, predictMask, img), 1)
     rot, trans, dist = mymodel(inputData)
-    print("dist", dist)
 
     trans = trans.unsqueeze(1)
     trans = (trans - 0.5) * 240
@@ -231,20 +235,29 @@ def predict(mymodel, pspmodel, softmax, predict_index, chamLoss, view_image):
         cv2.waitKey(0)
         return None
     else:
-        dist1, dist2, idx1, idx2 = chamLoss(predict_2d_pts, label_2d_pts)
-        ch_loss = torch.mean(dist1, 1) + torch.mean(dist2, 1)
-        return ch_loss.cpu().detach().numpy()[0]
+        dist1, dist2, idx1, idx2 = chamLoss2d(predict_2d_pts, label_2d_pts)
+        ch_loss2d = torch.mean(dist1, 1) + torch.mean(dist2, 1)
+        dist1, dist2, idx1, idx2 = chamLoss2d(predict3dpt, label3dpt)
+        ch_loss3d = torch.mean(dist1, 1)  # + torch.mean(dist2, 1)
+
+        return ch_loss2d.cpu().detach().numpy()[0], ch_loss3d.cpu().detach().numpy()[0]
 
 
 if __name__ == "__main__":
-    m, p, s, chamLoss = init()
+    m, p, s, chamLoss2d, chamLoss3d = init()
     highestLoss = 0.0
     highestIndex = None
-    predict(m, p, s, 269, chamLoss, True)
-    # for i in tqdm(range(5000)):
-    #     ch_loss = predict(m, p, s, i, chamLoss, False)
-    #     if ch_loss > highestLoss:
+    diagonalDist = 0.0335 * 1 * 0.1
+    correct = 0
+
+    predict(m, p, s, 2734, chamLoss2d, chamLoss3d, True)
+    # for i in tqdm(range(9000)):
+    #     ch_loss2d, ch_loss3d = predict(m, p, s, i, chamLoss2d, chamLoss3d, False)
+    #     if ch_loss3d < diagonalDist:
+    #         correct += 1
+    #     if ch_loss2d > highestLoss:
     #         highestIndex = i
-    #         highestLoss = ch_loss
+    #         highestLoss = ch_loss2d
+    # print("add-s: ", correct / 9000)
     # print("worst case: ", highestIndex)
 
