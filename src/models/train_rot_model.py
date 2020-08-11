@@ -11,6 +11,9 @@ import src.common.object_model as OM
 import src.configuration as CFG
 import numpy as np
 
+# ignore warming
+np.seterr(divide="ignore", invalid="ignore")
+
 # import wandb
 
 # wandb.init(project="wrc-rot-classifier")

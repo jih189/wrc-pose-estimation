@@ -104,10 +104,14 @@ class ObjectModel:
         self.kernelSize = None
 
     # project a 3d point to a 2d point with pose
+    # input: (3,) numpy matrix
+    # output: (2,) numpy matrix
     def project3Dto2D(self, pt3, pose):
+        if type(pt3) != tuple:
+            raise Exception("Error: 3d point should be tuple ", pt3)
         # convert to numpy
         pt3 = np.array([[pt3[0], pt3[1], pt3[2], 1]]).T
-        pt3_cam = (np.dot(pose, pt3))[:3, :]
+        pt3_cam = (np.dot(pose, pt3))[:3, 0]
         fx = self.intrinsic[0, 0]
         fy = self.intrinsic[1, 1]
         ux = self.intrinsic[0, 2]
@@ -116,11 +120,6 @@ class ObjectModel:
             (fx * pt3_cam[0] / pt3_cam[2] + ux),
             (fy * pt3_cam[1] / pt3_cam[2] + uy),
         )
-
-        # return (
-        #     int((fx * pt3_cam[0] / pt3_cam[2] + ux)[0]),
-        #     int((fy * pt3_cam[1] / pt3_cam[2] + uy)[0]),
-        # )
 
     # load the object CAD model
     def loadObjectCADModel(self, file_name):
@@ -484,7 +483,7 @@ class ObjectModel:
                 self.visible_sharpedge_samplepoint_edge_membership.append(
                     self.sharp_sample_points_edge_indices[i]
                 )
-                pt2 = self.project3Dto2D(self.sharp_sample_points[i], self.pose)
+                pt2 = self.project3Dto2D(tuple(self.sharp_sample_points[i]), self.pose)
                 self.sharp_2d_pts.append(pt2)
                 if boundingbuttonright == None:
                     boundingbuttonright = list(pt2)

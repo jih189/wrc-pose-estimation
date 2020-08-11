@@ -129,7 +129,7 @@ if __name__ == "__main__":
             for *xyxy, conf, cls in pred:
                 label = "%s %.2f" % (names[int(cls)], conf)
                 plot_one_box(xyxy, demo, label=label, color=colors[int(cls)])
-                if names[int(cls)] == "Pulley":
+                if names[int(cls)] == "Large Bolt":
                     foundObject = True
                     cropIndex = [
                         int(xyxy[1].cpu().detach().numpy()),
@@ -186,17 +186,21 @@ if __name__ == "__main__":
             depth = 0.4
             rough_pred_pose = obj.label2pose(viewpt, rot, offset, depth)
 
-
-
             # pose refinement
             horizontalR_ori, verticalR_ori = obj.getCenterAngle(rough_pred_pose)
 
             obj.setModelviewMatrix(rough_pred_pose)
             obj.findVisibleSamplePoint()
             # draw init pose
-            for p in obj.sharp_2d_pts:
-               demo = cv2.circle(demo, (int(p[0]), int(p[1])), radius=2, color=(0, 255, 0), thickness=-1)
-            
+            # for p in obj.sharp_2d_pts:
+            #     demo = cv2.circle(
+            #         demo,
+            #         (int(p[0]), int(p[1])),
+            #         radius=2,
+            #         color=(0, 255, 0),
+            #         thickness=-1,
+            #     )
+
             # generate preprocessed data
             # inital pose mask
             mask = obj.getVisibleArea(refine_frame)
@@ -263,8 +267,6 @@ if __name__ == "__main__":
             # result_demo[pred] = ori_crop_image[pred]
             # result_demo = cv2.resize(result_demo, (800, 800), interpolation=cv2.INTER_AREA)
             # cv2.imshow("pred mask", result_demo)
-
-            
 
             # load edge image
             edge_img = cv2.resize(
@@ -387,7 +389,6 @@ if __name__ == "__main__":
             # draw image
             for p in obj.sharp_2d_pts:
                 demo = cv2.circle(demo, p, radius=2, color=(0, 0, 255), thickness=-1)
-            
 
         if not ret:
             print("Can't receive frame (stream end?). Exiting ...")

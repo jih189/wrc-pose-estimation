@@ -62,7 +62,7 @@ class Rot_data(Dataset):
         viewPoint, inplaneRotation, offsetFromCenter, depth = self.obj.getLabel()
         vpidx = OM.cal_idx(viewPoint)
 
-        center_pt = np.array(self.obj.project3Dto2D([0, 0, 0], pose))
+        center_pt = self.obj.project3Dto2D((0, 0, 0), pose)
 
         # (upperleftx, upperlefty, lowerrightx, lowerrighty)
         boundingbox = np.load(self.dataPath + "bounding" + self.dataNames[idx] + ".npy")
@@ -76,7 +76,7 @@ class Rot_data(Dataset):
         l = lowerrightx - upperleftx
 
         offset = np.array(
-            [(center_pt[0, 0] - upperleftx) / l, (center_pt[1, 0] - upperlefty) / l]
+            [(center_pt[0] - upperleftx) / l, (center_pt[1] - upperlefty) / l]
         )
 
         img_path = self.dataPath + "crop" + self.dataNames[idx] + ".png"

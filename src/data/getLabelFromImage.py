@@ -147,16 +147,22 @@ if __name__ == "__main__":
             viewWindow = np.zeros(frame.shape, np.uint8)
             # display coordinate
             originPoint = obj.project3Dto2D((0.0, 0.0, 0.0), pose)
+            originPoint = tuple(map(int, originPoint))
             xaxis = obj.project3Dto2D((0.05, 0.0, 0.0), pose)
+            xaxis = tuple(map(int, xaxis))
             frame = cv2.line(frame, originPoint, xaxis, (255, 0, 0), 1)
             yaxis = obj.project3Dto2D((0.0, 0.05, 0.0), pose)
+            yaxis = tuple(map(int, yaxis))
             frame = cv2.line(frame, originPoint, yaxis, (0, 255, 0), 1)
             zaxis = obj.project3Dto2D((0.0, 0.0, 0.05), pose)
+            zaxis = tuple(map(int, zaxis))
             frame = cv2.line(frame, originPoint, zaxis, (0, 0, 255), 1)
 
             viewpoint = obj.getViewPoints(pose)
             viewpoint /= 10.0
+            viewpoint = tuple(viewpoint)
             viewpoint2d = obj.project3Dto2D(viewpoint, pose)
+            viewpoint2d = tuple(map(int, viewpoint2d))
             frame = cv2.circle(
                 frame, viewpoint2d, radius=1, color=(255, 255, 255), thickness=-1
             )
