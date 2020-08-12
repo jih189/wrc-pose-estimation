@@ -101,8 +101,11 @@ def main(input_filepath, output_filepath):
 
             boundingsize = max(w, h) * EXPAND_SIZE
 
-            ex = int(x + (w - boundingsize) / 2)
-            ey = int(y + (h - boundingsize) / 2)
+            # get center point from pose
+            centerPoint = self.obj.project3Dto2D((0, 0, 0), random_pose)
+
+            ex = int(centerPoint[0] - boundingsize / 2)  # here is wrong
+            ey = int(centerPoint[1] - boundingsize / 2)
             ew = int(boundingsize)
             eh = int(boundingsize)
 

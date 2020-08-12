@@ -25,12 +25,12 @@ def init():
     mymodel = Refine_Net().cuda()
 
     mymodel = nn.DataParallel(mymodel)
-    mymodel = torch.load("best_model_refine.pth")
+    mymodel = torch.load("best_model_refine_housing.pth")
     mymodel.eval()
 
     PSPmodel = PSPNet().cuda()
     PSPmodel = nn.DataParallel(PSPmodel)
-    PSPmodel = torch.load("best_model_psp.pth")
+    PSPmodel = torch.load("best_model_psp_housing.pth")
     PSPmodel.eval()
 
     chamLoss2d = CHAMFER2D.chamfer_2DDist()
@@ -137,8 +137,8 @@ def predict(
     camera_matrix = torch.tensor(
         [
             [
-                [654.968116289191 * rescaleValue, 0.0, float(img.shape[-2]) / 2],
-                [0.0, 657.1436336052552 * rescaleValue, float(img.shape[-1]) / 2],
+                [CFG.CAMERA_MATRIX[0, 0] * rescaleValue, 0.0, float(img.shape[-2]) / 2],
+                [0.0, CFG.CAMERA_MATRIX[1, 1] * rescaleValue, float(img.shape[-1]) / 2],
                 [0.0, 0.0, 1.0],
             ]
         ]
@@ -212,16 +212,16 @@ def predict(
     label_2d_pts = kornia.project_points(label3dpt, camera_matrix)
 
     # # edge of init pose
-    for p in origin_2d_pts.cpu().detach().numpy()[0]:
-        preimg = cv2.circle(
-            preimg, (int(p[0]), int(p[1])), radius=0, color=(255, 0, 0), thickness=-1
-        )
+    # for p in origin_2d_pts.cpu().detach().numpy()[0]:
+    #     preimg = cv2.circle(
+    #         preimg, (int(p[0]), int(p[1])), radius=0, color=(255, 0, 0), thickness=-1
+    #     )
 
     # edge of predicted pose
-    for p in predict_2d_pts.cpu().detach().numpy()[0]:
-        preimg = cv2.circle(
-            preimg, (int(p[0]), int(p[1])), radius=0, color=(0, 255, 0), thickness=-1
-        )
+    # for p in predict_2d_pts.cpu().detach().numpy()[0]:
+    #     preimg = cv2.circle(
+    #         preimg, (int(p[0]), int(p[1])), radius=0, color=(0, 255, 0), thickness=-1
+    #     )
 
     # # edge of label pose
     for p in label_2d_pts.cpu().detach().numpy()[0]:

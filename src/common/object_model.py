@@ -405,7 +405,7 @@ class ObjectModel:
         buffer = glReadPixels(
             0, 0, image.shape[1], image.shape[0], GL_RGB, GL_UNSIGNED_BYTE
         )
-        ret = np.fromstring(buffer, dtype="ubyte").reshape(
+        ret = np.frombuffer(buffer, dtype="ubyte").reshape(
             image.shape[0], image.shape[1], image.shape[2]
         )
         ret = cv2.flip(ret, 0)
