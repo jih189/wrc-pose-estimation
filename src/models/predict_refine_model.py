@@ -131,7 +131,14 @@ def predict(
     dist = dist.unsqueeze(1)
 
     # generate the rotation pose
-    pose = torch.bmm(initPose, tgm.angle_axis_to_rotation_matrix(rot))
+    # pose = torch.bmm(initPose, tgm.angle_axis_to_rotation_matrix(rot))
+
+    initPoseRot = torch.eye(4).repeat(trans.shape[0], 1, 1).cuda().float()
+    initPoseRot[:, :3, :3] = initPose[:, :3, :3]
+
+    # generate the rotation pose
+    pose = torch.bmm(tgm.angle_axis_to_rotation_matrix(rot), initPoseRot)
+    pose[:, :3, 3] = initPose[:, :3, 3]
 
     # update the camera matrix because the input image is resize
     camera_matrix = torch.tensor(
@@ -211,23 +218,23 @@ def predict(
     label3dpt = tgm.transform_points(targetPose, target3dPt)
     label_2d_pts = kornia.project_points(label3dpt, camera_matrix)
 
-    # # edge of init pose
-    # for p in origin_2d_pts.cpu().detach().numpy()[0]:
-    #     preimg = cv2.circle(
-    #         preimg, (int(p[0]), int(p[1])), radius=0, color=(255, 0, 0), thickness=-1
-    #     )
+    # edge of init pose
+    for p in origin_2d_pts.cpu().detach().numpy()[0]:
+        preimg = cv2.circle(
+            preimg, (int(p[0]), int(p[1])), radius=0, color=(255, 0, 0), thickness=-1
+        )
 
     # edge of predicted pose
-    # for p in predict_2d_pts.cpu().detach().numpy()[0]:
-    #     preimg = cv2.circle(
-    #         preimg, (int(p[0]), int(p[1])), radius=0, color=(0, 255, 0), thickness=-1
-    #     )
+    for p in predict_2d_pts.cpu().detach().numpy()[0]:
+        preimg = cv2.circle(
+            preimg, (int(p[0]), int(p[1])), radius=0, color=(0, 255, 0), thickness=-1
+        )
 
     # # edge of label pose
-    for p in label_2d_pts.cpu().detach().numpy()[0]:
-        preimg = cv2.circle(
-            preimg, (int(p[0]), int(p[1])), radius=0, color=(0, 0, 255), thickness=-1
-        )
+    # for p in label_2d_pts.cpu().detach().numpy()[0]:
+    #     preimg = cv2.circle(
+    #         preimg, (int(p[0]), int(p[1])), radius=0, color=(0, 0, 255), thickness=-1
+    #     )
 
     if view_image:
         preimg = cv2.resize(preimg, (0, 0), fx=5, fy=5)
@@ -235,7 +242,9 @@ def predict(
         cv2.waitKey(0)
         return None
     else:
-        dist1, dist2, idx1, idx2 = chamLoss2d(predict_2d_pts, label_2d_pts)
+        dist1, dist2, idx1, idx2 = chamLoss2d(
+            predict_2d_pts.float(), label_2d_pts.float()
+        )
         ch_loss2d = torch.mean(dist1, 1) + torch.mean(dist2, 1)
         dist1, dist2, idx1, idx2 = chamLoss2d(predict3dpt, label3dpt)
         ch_loss3d = torch.mean(dist1, 1)  # + torch.mean(dist2, 1)
@@ -250,8 +259,8 @@ if __name__ == "__main__":
     diagonalDist = 0.0335 * 1 * 0.1
     correct = 0
 
-    predict(m, p, s, 2734, chamLoss2d, chamLoss3d, True)
-    # for i in tqdm(range(9000)):
+    predict(m, p, s, 375, chamLoss2d, chamLoss3d, True)
+    # for i in tqdm(range(2400)):
     #     ch_loss2d, ch_loss3d = predict(m, p, s, i, chamLoss2d, chamLoss3d, False)
     #     if ch_loss3d < diagonalDist:
     #         correct += 1

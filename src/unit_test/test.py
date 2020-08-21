@@ -3,14 +3,18 @@ import unittest
 import src.common.object_model as OM
 import src.configuration as CFG
 import numpy as np
-import cv2
 from numpy.testing import assert_array_almost_equal
+from scipy.spatial.transform import Rotation as R
 
 import torch
 import torch.nn as nn
 from torch.autograd import Variable
 import torchgeometry as tgm
 import kornia
+
+import open3d as o3d
+
+import cv2
 
 # ignore warming
 np.seterr(divide="ignore", invalid="ignore")
@@ -31,6 +35,7 @@ class test_object_model(unittest.TestCase):
         cls.obj.generateSamplePoints(0.0001, 0.001)
 
     #
+    """
     def test_project3Dto2D(self):
         pose = np.array(
             [
@@ -78,7 +83,7 @@ class test_object_model(unittest.TestCase):
         random_poses = self.obj.resample(pose, 1)
 
         # mask bit
-        target_mask = self.obj.getVisibleArea(img)
+        target_mask = self.obj.getVisibleArea()
 
         for random_pose in random_poses:
             # get current pose if it is moved to the center
@@ -92,7 +97,7 @@ class test_object_model(unittest.TestCase):
 
             # generate preprocessed data
             # inital pose mask
-            mask = self.obj.getVisibleArea(img)
+            mask = self.obj.getVisibleArea()
 
             # find the crop size
             [_, _, w, h] = cv2.boundingRect(mask)
@@ -153,7 +158,16 @@ class test_object_model(unittest.TestCase):
             # print("before destory windows")
 
             # cv2.destroyAllWindows()
-            print("done")
+    """
+
+    def test_depth(self):
+
+        # test = self.obj.getOptFlowWithPoses(480, 640, newpose)
+        mesh = o3d.io.read_triangle_mesh(CFG.CAD_MODEL)
+        pcd = o3d.geometry.PointCloud()
+        pcd.points = mesh.vertices
+
+        o3d.visualization.draw_geometries([pcd])
 
     @classmethod
     def tearDownClass(cls):

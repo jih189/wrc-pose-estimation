@@ -36,8 +36,6 @@ val_loader = DataLoader(
 model = PSPNet().cuda()
 model = nn.DataParallel(model)
 
-softmax = nn.Softmax2d()
-
 model.train()
 
 seg_criterion = nn.CrossEntropyLoss()

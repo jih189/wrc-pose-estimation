@@ -73,7 +73,7 @@ def main(input_filepath, output_filepath):
         obj.findVisibleSamplePoint()
 
         # mask bit
-        target_mask = obj.getVisibleArea(img)
+        target_mask = obj.getVisibleArea()
 
         # find the crop size
         # [rx, ry, rw, rh] = cv2.boundingRect(target_mask)
@@ -91,18 +91,18 @@ def main(input_filepath, output_filepath):
 
             # generate preprocessed data
             # inital pose mask
-            mask = obj.getVisibleArea(img)
+            mask = obj.getVisibleArea()
 
             # get edge img
             edge = obj.getEdge(img.shape[0], img.shape[1])
 
             # find the crop size
-            [x, y, w, h] = cv2.boundingRect(mask)
+            [_, _, w, h] = cv2.boundingRect(mask)
 
             boundingsize = max(w, h) * EXPAND_SIZE
 
             # get center point from pose
-            centerPoint = self.obj.project3Dto2D((0, 0, 0), random_pose)
+            centerPoint = obj.project3Dto2D((0, 0, 0), random_pose)
 
             ex = int(centerPoint[0] - boundingsize / 2)  # here is wrong
             ey = int(centerPoint[1] - boundingsize / 2)
@@ -117,6 +117,10 @@ def main(input_filepath, output_filepath):
                 logger.warn(f"Bounding box out of image. Continuing...")
                 continue
 
+            # generate opt flow
+            flowImg = obj.getOptFlowWithPoses(boundingsize, boundingsize, pose)
+            crop_flowImg = flowImg[ey : ey + eh, ex : ex + ew]
+
             # crop_img = img[ey : ey + eh, ex : ex + ew].copy()
             # cropped image with initial pose as center
             crop_img = img[ey : ey + eh, ex : ex + ew]
@@ -124,13 +128,6 @@ def main(input_filepath, output_filepath):
             crop_mask = mask[ey : ey + eh, ex : ex + ew]
             # cropped edges for initial pose
             crop_edge = edge[ey : ey + eh, ex : ex + ew]
-
-            # bounding box for target pose
-            # crop_bounding = np.zeros((eh, ew), np.uint8)
-            # crop_bounding[
-            #     max(0, ry - ey) : min(eh, ry - ey + rh),
-            #     max(0, rx - ex) : min(ew, rx - ex + rw),
-            # ] = 255
 
             # target mask
             crop_label_mask = target_mask[ey : ey + eh, ex : ex + ew]
@@ -166,6 +163,12 @@ def main(input_filepath, output_filepath):
             cv2.imwrite(
                 output_filepath + "{:06d}".format(current_index) + "img.png", crop_img,
             )
+
+            cv2.imwrite(
+                output_filepath + "{:06d}".format(current_index) + "flow.png",
+                crop_flowImg,
+            )
+
             cv2.imwrite(
                 output_filepath + "{:06d}".format(current_index) + "mask.png",
                 crop_mask,

@@ -10,7 +10,7 @@ import torchgeometry as tgm
 import kornia
 
 from models.models import Darknet  # set ONNX_EXPORT in models.py
-from models.model import Magic_Net, FlowNet
+from models.model import Magic_Net, Refine_Net, PSPNet
 
 from src.utils.utils import (
     load_classes,
@@ -27,8 +27,8 @@ EXPAND_SIZE = 2.0
 # ignore warming
 np.seterr(divide="ignore", invalid="ignore")
 
-if __name__ == "__main__":
 
+def init():
     OM.setup(CFG.CAMERA_W, CFG.CAMERA_H)
     OM.setProjectMatrixWithIntr(CFG.CAMERA_MATRIX, CFG.CAMERA_W, CFG.CAMERA_H)
 
@@ -68,24 +68,19 @@ if __name__ == "__main__":
     rot_model.eval()
 
     ################# refine net ###########################
-    # refine_model = Refine_Net().cuda()
+    refine_model = Refine_Net().cuda()
 
-    # refine_model = nn.DataParallel(refine_model)
-    # refine_model = torch.load("best_model_refine_housing.pth")
-    # refine_model.eval()
+    refine_model = nn.DataParallel(refine_model)
+    refine_model = torch.load("best_model_refine_housing.pth")
+    refine_model.eval()
 
     ################ PSP net ##################################
-    # PSP_model = PSPNet().cuda()
-    # PSP_model = nn.DataParallel(PSP_model)
-    # PSP_model = torch.load("best_model_psp_housing.pth")
-    # PSP_model.eval()
+    PSP_model = PSPNet().cuda()
+    PSP_model = nn.DataParallel(PSP_model)
+    PSP_model = torch.load("best_model_psp_housing.pth")
+    PSP_model.eval()
 
-    ################ Flow net ###################################
-    flow_model = FlowNet().cuda()
-
-    flow_model = nn.DataParallel(flow_model)
-    flow_model = torch.load("best_model_flownet.pth")
-    flow_model.eval()
+    softmax = nn.Softmax2d()
 
     # init camera
     cap = cv2.VideoCapture(4)
@@ -95,6 +90,13 @@ if __name__ == "__main__":
     if not cap.isOpened():
         print("can't open")
         exit()
+
+
+def detect(object_id):
+    print("hello ", object_id)
+
+
+if __name__ == "__main__":
 
     while True:
         # read image
@@ -201,14 +203,14 @@ if __name__ == "__main__":
             obj.findVisibleSamplePoint()
 
             # draw init pose
-            for p in obj.sharp_2d_pts:
-                demo = cv2.circle(
-                    demo,
-                    (int(p[0]), int(p[1])),
-                    radius=2,
-                    color=(0, 255, 0),
-                    thickness=-1,
-                )
+            # for p in obj.sharp_2d_pts:
+            #     demo = cv2.circle(
+            #         demo,
+            #         (int(p[0]), int(p[1])),
+            #         radius=2,
+            #         color=(0, 255, 0),
+            #         thickness=-1,
+            #     )
 
             # generate preprocessed data
             # inital pose mask
@@ -255,8 +257,6 @@ if __name__ == "__main__":
                 crop_img, (IMG_SIZE, IMG_SIZE), interpolation=cv2.INTER_AREA
             )
 
-            oriimg = crop_img.copy()
-
             # ori_crop_image = crop_img.copy()
             # result_demo = np.zeros_like(crop_img)
 
@@ -264,6 +264,12 @@ if __name__ == "__main__":
 
             crop_img = Variable(torch.from_numpy(crop_img).cuda()).float()
             crop_img = crop_img.unsqueeze(0)
+
+            # psp net semantic segmentation
+            predictMask = PSP_model(crop_img)
+
+            predictMask = torch.argmax(predictMask, 1, keepdim=True).float()
+            predictMask = (predictMask == 1).float().detach()
 
             # load edge image
             edge_img = cv2.resize(
@@ -283,166 +289,100 @@ if __name__ == "__main__":
             mask_img = Variable(torch.from_numpy(mask_img).cuda()).float()
             mask_img = mask_img.unsqueeze(0)
 
-            # running model
-            inputData = torch.cat(
-                (mask_img.cuda().float(), edge_img.cuda().float(), crop_img.cuda().float(),), 1,
-            )
-            input = Variable(inputData)
-            output, segoutput = flow_model(input)
-            predictflow = torch.sigmoid(output)
+            # load init pose
+            initPose = Variable(torch.from_numpy(rough_pose_at_center).cuda()).float()
+            initPose = initPose.unsqueeze(0)
 
-            padding = Variable(
-                torch.zeros(predictflow.shape[0], 1, predictflow.shape[2], predictflow.shape[3])
+            inputData = torch.cat((edge_img, mask_img, predictMask, crop_img), 1)
+            rot, trans, dist = refine_model(inputData)
+
+            trans = trans.unsqueeze(1)
+            trans = (trans - 0.5) * IMG_SIZE
+
+            dist = dist.unsqueeze(1)
+
+            # generate the rotation pose
+            pred_rot_pose = torch.bmm(initPose, tgm.angle_axis_to_rotation_matrix(rot))
+
+            # update the camera matrix because the input image is resize
+            refine_camera_matrix = torch.tensor(
+                [
+                    [
+                        [
+                            CFG.CAMERA_MATRIX[0, 0] * rescaleValue,
+                            0.0,
+                            float(crop_img.shape[-2]) / 2,
+                        ],
+                        [
+                            0.0,
+                            CFG.CAMERA_MATRIX[1, 1] * rescaleValue,
+                            float(crop_img.shape[-1]) / 2,
+                        ],
+                        [0.0, 0.0, 1.0],
+                    ]
+                ]
             ).cuda()
 
-            predictflow = torch.cat((predictflow, padding), 1)
+            dist_pose = pred_rot_pose.clone()
+            dist_pose[:, 2, 3] = pred_rot_pose[:, 2, 3] / dist[:, 0, 0]
 
-            mask = mask_img == 255.0
+            horizontalR = torch.atan2(
+                trans[:, :, 0],
+                torch.tensor(CFG.CAMERA_MATRIX[0, 0] * rescaleValue).cuda(),
+            )
 
-            predictflow = predictflow * mask
+            verticalR = -torch.atan2(
+                trans[:, :, 1],
+                torch.sqrt(
+                    trans[:, :, 0] * trans[:, :, 0]
+                    + torch.tensor(
+                        CFG.CAMERA_MATRIX[1, 1]
+                        * CFG.CAMERA_MATRIX[1, 1]
+                        * rescaleValue
+                        * rescaleValue
+                    ).cuda()
+                )
+                * torch.tensor(
+                    CFG.CAMERA_MATRIX[1, 1] / CFG.CAMERA_MATRIX[0, 0]
+                ).cuda(),
+            )
 
+            ch = torch.cos(horizontalR)
+            sh = torch.sin(horizontalR)
+            ca = torch.cos(torch.tensor([[0.0]]).cuda())  # not this
+            sa = torch.sin(torch.tensor([[0.0]]).cuda())  # not this
+            cb = torch.cos(verticalR)
+            sb = torch.sin(verticalR)
 
-            # for y in range(IMG_SIZE):
-            #     for x in range(IMG_SIZE):
-            #         [mx, my] = predictflow[0, :2, y, x].cpu().detach().numpy()
-            #         if mx != 0.0 or my != 0.0:
-            #             mx = int((mx - 0.5) * IMG_SIZE)
-            #             my = int((my - 0.5) * IMG_SIZE)
-            #             if x + mx >= 0 and x + mx < oriimg.shape[0] and y + my >= 0 and y + my < oriimg.shape[1]:
+            m00 = ch * ca
+            m01 = sh * sb - ch * sa * cb
+            m02 = ch * sa * sb + sh * cb
+            m10 = sa
+            m11 = ca * cb
+            m12 = -ca * sb
+            m20 = -sh * ca
+            m21 = sh * sa * cb + ch * sb
+            m22 = -sh * sa * sb + ch * cb
 
-            #                 if x % 10 == 0 and y % 10 == 0:
+            rotation_matrix = torch.eye(4).repeat(trans.shape[0], 1, 1).cuda()
+            rotation_matrix[..., :3, :3] = torch.cat(
+                [m00, m01, m02, m10, m11, m12, m20, m21, m22], dim=1
+            ).view(-1, 3, 3)
 
-            #                     oriimg = cv2.line(oriimg, (x, y), (x + mx, y + my), color=(0,255,0), thickness = 1)
-            #                     oriimg = cv2.circle(
-            #                         oriimg,
-            #                         (x + mx, y + my),
-            #                         radius=0,
-            #                         color=(255, 0, 0),
-            #                         thickness=-1,
-            #                     )
-            # oriimg = cv2.resize(
-            #     oriimg, (IMG_SIZE * 5, IMG_SIZE * 5), interpolation=cv2.INTER_AREA
-            # )
-            cv2.imshow("flow", oriimg)
+            pred_pose = torch.bmm(rotation_matrix, dist_pose)
 
-            # # psp net semantic segmentation
-            # predictMask = PSP_model(crop_img)
+            # apply rotation on the initial pose to move to it to the center
 
-            # predictMask = torch.argmax(predictMask, 1, keepdim=True).float()
-            # predictMask = (predictMask == 1).float().detach()
+            pred_pose = obj.rotatePoseWithAngle(
+                pred_pose.cpu().detach().numpy(), -horizontalR_ori, -verticalR_ori
+            )
 
-            # # load edge image
-            # edge_img = cv2.resize(
-            #     crop_edge, (IMG_SIZE, IMG_SIZE), interpolation=cv2.INTER_AREA
-            # )
-            # edge_img = edge_img[:, :, np.newaxis].transpose(2, 0, 1)
+            obj.setModelviewMatrix(pred_pose)
+            obj.findVisibleSamplePoint()
 
-            # edge_img = Variable(torch.from_numpy(edge_img).cuda()).float()
-            # edge_img = edge_img.unsqueeze(0)
-
-            # # load the mask image
-            # mask_img = cv2.resize(
-            #     crop_mask, (IMG_SIZE, IMG_SIZE), interpolation=cv2.INTER_AREA
-            # )
-            # mask_img = mask_img[:, :, np.newaxis].transpose(2, 0, 1)
-
-            # mask_img = Variable(torch.from_numpy(mask_img).cuda()).float()
-            # mask_img = mask_img.unsqueeze(0)
-
-            # # load init pose
-            # initPose = Variable(torch.from_numpy(rough_pose_at_center).cuda()).float()
-            # initPose = initPose.unsqueeze(0)
-
-            # inputData = torch.cat((edge_img, mask_img, predictMask, crop_img), 1)
-            # rot, trans, dist = refine_model(inputData)
-
-            # trans = trans.unsqueeze(1)
-            # trans = (trans - 0.5) * IMG_SIZE
-
-            # dist = dist.unsqueeze(1)
-
-            # # generate the rotation pose
-            # pred_rot_pose = torch.bmm(initPose, tgm.angle_axis_to_rotation_matrix(rot))
-
-            # # update the camera matrix because the input image is resize
-            # refine_camera_matrix = torch.tensor(
-            #     [
-            #         [
-            #             [
-            #                 CFG.CAMERA_MATRIX[0, 0] * rescaleValue,
-            #                 0.0,
-            #                 float(crop_img.shape[-2]) / 2,
-            #             ],
-            #             [
-            #                 0.0,
-            #                 CFG.CAMERA_MATRIX[1, 1] * rescaleValue,
-            #                 float(crop_img.shape[-1]) / 2,
-            #             ],
-            #             [0.0, 0.0, 1.0],
-            #         ]
-            #     ]
-            # ).cuda()
-
-            # dist_pose = pred_rot_pose.clone()
-            # dist_pose[:, 2, 3] = pred_rot_pose[:, 2, 3] / dist[:, 0, 0]
-
-            # horizontalR = torch.atan2(
-            #     trans[:, :, 0],
-            #     torch.tensor(CFG.CAMERA_MATRIX[0, 0] * rescaleValue).cuda(),
-            # )
-
-            # verticalR = -torch.atan2(
-            #     trans[:, :, 1],
-            #     torch.sqrt(
-            #         trans[:, :, 0] * trans[:, :, 0]
-            #         + torch.tensor(
-            #             CFG.CAMERA_MATRIX[1, 1]
-            #             * CFG.CAMERA_MATRIX[1, 1]
-            #             * rescaleValue
-            #             * rescaleValue
-            #         ).cuda()
-            #     )
-            #     * torch.tensor(
-            #         CFG.CAMERA_MATRIX[1, 1] / CFG.CAMERA_MATRIX[0, 0]
-            #     ).cuda(),
-            # )
-
-            # ch = torch.cos(horizontalR)
-            # sh = torch.sin(horizontalR)
-            # ca = torch.cos(torch.tensor([[0.0]]).cuda())  # not this
-            # sa = torch.sin(torch.tensor([[0.0]]).cuda())  # not this
-            # cb = torch.cos(verticalR)
-            # sb = torch.sin(verticalR)
-
-            # m00 = ch * ca
-            # m01 = sh * sb - ch * sa * cb
-            # m02 = ch * sa * sb + sh * cb
-            # m10 = sa
-            # m11 = ca * cb
-            # m12 = -ca * sb
-            # m20 = -sh * ca
-            # m21 = sh * sa * cb + ch * sb
-            # m22 = -sh * sa * sb + ch * cb
-
-            # rotation_matrix = torch.eye(4).repeat(trans.shape[0], 1, 1).cuda()
-            # rotation_matrix[..., :3, :3] = torch.cat(
-            #     [m00, m01, m02, m10, m11, m12, m20, m21, m22], dim=1
-            # ).view(-1, 3, 3)
-
-            # pred_pose = torch.bmm(rotation_matrix, dist_pose)
-
-            # # apply rotation on the initial pose to move to it to the center
-
-            # pred_pose = obj.rotatePoseWithAngle(
-            #     pred_pose.cpu().detach().numpy(), -horizontalR_ori, -verticalR_ori
-            # )
-
-            # obj.setModelviewMatrix(pred_pose)
-            # obj.findVisibleSamplePoint()
-
-            # # draw image
-            # for p in obj.sharp_2d_pts:
-            #     demo = cv2.circle(demo, p, radius=2, color=(0, 0, 255), thickness=-1)
+            # draw image
+            for p in obj.sharp_2d_pts:
+                demo = cv2.circle(demo, p, radius=2, color=(0, 0, 255), thickness=-1)
 
         if not ret:
             print("Can't receive frame (stream end?). Exiting ...")

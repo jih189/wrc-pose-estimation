@@ -12,6 +12,8 @@ from scipy.spatial.transform import Rotation as R
 import torch
 from torch.nn import functional as F
 
+import sys
+
 # map the pose to the pose which has the same shape, so it can avoid the symetric issue
 def symmetricRemove(pose_input):
     eulerVec = (R.from_matrix(pose_input[:3, :3])).as_euler("ZYX")
@@ -102,6 +104,9 @@ class ObjectModel:
         self.sharp_2d_pts = []
         self.templateKernel = None
         self.kernelSize = None
+        self.pointcloud = []
+        self.height = 480
+        self.width = 640
 
     # project a 3d point to a 2d point with pose
     # input: (3,) numpy matrix
@@ -212,6 +217,7 @@ class ObjectModel:
             glEnd()
 
         glPopMatrix()
+        glFlush()
 
     def determineSharpEdges(self, th_sharp):
         self.sharp_edges.clear()
@@ -324,9 +330,9 @@ class ObjectModel:
     def resample(self, pose, numOfPose):
 
         # generate random value for rotation and translation
-        xRot_1 = np.random.normal(0, 0.08, int(numOfPose / 2))
-        yRot_1 = np.random.normal(0, 0.08, int(numOfPose / 2))
-        zRot_1 = np.random.normal(0, 0.08, int(numOfPose / 2))
+        xRot_1 = np.random.normal(0, 0.15, int(numOfPose / 2))
+        yRot_1 = np.random.normal(0, 0.15, int(numOfPose / 2))
+        zRot_1 = np.random.normal(0, 0.15, int(numOfPose / 2))
 
         xTrans_1 = np.random.normal(0, 0.03, int(numOfPose / 2))
         yTrans_1 = np.random.normal(0, 0.03, int(numOfPose / 2))
@@ -401,15 +407,59 @@ class ObjectModel:
 
         return poses
 
-    def getVisibleArea(self, image):
-        buffer = glReadPixels(
-            0, 0, image.shape[1], image.shape[0], GL_RGB, GL_UNSIGNED_BYTE
-        )
-        ret = np.frombuffer(buffer, dtype="ubyte").reshape(
-            image.shape[0], image.shape[1], image.shape[2]
-        )
+    def getVisibleArea(self):
+        buffer = glReadPixels(0, 0, self.width, self.height, GL_RGB, GL_UNSIGNED_BYTE)
+        ret = np.frombuffer(buffer, dtype="ubyte").reshape(self.height, self.width, 3)
         ret = cv2.flip(ret, 0)
         return ret[:, :, 0]
+
+    def getVisiblePointCloud(self):
+        self.pointcloud.clear()
+        model = glGetDoublev(GL_MODELVIEW_MATRIX)
+        proj = glGetDoublev(GL_PROJECTION_MATRIX)
+        view = glGetIntegerv(GL_VIEWPORT)
+        z = glReadPixels(0, 0, self.width, self.height, GL_DEPTH_COMPONENT, GL_FLOAT)
+
+        z = np.frombuffer(z, np.float32).reshape(self.height, self.width, 1)
+
+        result = np.zeros((self.height, self.width, 3))  # x y z
+        for x in range(self.width):
+            for y in range(self.height):
+                x3d, y3d, z3d = gluUnProject(x, y, z[y, x], model, proj, view)
+                result[y, x, 0] = x3d
+                result[y, x, 1] = y3d
+                result[y, x, 2] = z3d
+
+        result = cv2.flip(result, 0)
+        for x in range(self.width):
+            for y in range(self.height):
+                if (
+                    result[y, x, 0] > -3.0
+                    and result[y, x, 0] < 3.0
+                    and result[y, x, 1] > -3.0
+                    and result[y, x, 1] < 3.0
+                    and result[y, x, 2] > -3.0
+                    and result[y, x, 2] < 3.0
+                ):
+                    self.pointcloud.append(
+                        (y, x, result[y, x, 0], result[y, x, 1], result[y, x, 2])
+                    )
+
+    def getOptFlowWithPoses(self, height, width, targetpose):
+
+        # do not need if object is already rendered
+        # self.setModelviewMatrix(initpose)
+        # self.findVisibleSamplePoint()
+
+        img = np.zeros((self.height, self.width, 3), dtype=np.uint8)
+        self.getVisiblePointCloud()
+        for i in range(len(self.pointcloud)):
+            y2d, x2d, x3d, y3d, z3d = self.pointcloud[i]
+            (xn, yn) = self.project3Dto2D((x3d, y3d, z3d), targetpose)
+            img[int(y2d), int(x2d), 0] = int(((xn - x2d) / width + 0.5) * 255)
+            img[int(y2d), int(x2d), 1] = int(((yn - y2d) / height + 0.5) * 255)
+
+        return img
 
     def findVisibleSamplePoint(self):
         boundingtopleft, boundingbuttonright = None, None

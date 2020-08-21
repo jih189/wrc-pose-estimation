@@ -9,11 +9,14 @@ from torch.autograd import Variable
 from torch.utils.data import DataLoader
 import os
 import random
+import numpy as np
 
 import torchgeometry as tgm
 import kornia
 import src.common.fscore as FS
 import src.configuration as CFG
+
+import cv2
 
 # import wandb
 
@@ -29,35 +32,16 @@ PSPmodel.eval()
 LOG_INTERVAL = 1
 
 batch_size = 64
-epochs = 1200
-lr = 2e-6
+epochs = 1000
+lr = 1e-5
 momentum = 0.9
-w_decay = 18.0
+w_decay = 20.0
 lambda_chamfer = 0.05
-lambda3d = 100.0
+lambda3d = 10.0
+rot_lambda = 6.0
 
 train_dir = CFG.REFINE_SATA_PATH
 val_dir = CFG.REFINE_SATA_PATH
-
-# num_images = 5773
-# train_ratio = 0.8
-# num_train = int(train_ratio * num_images)
-# num_val = num_images - num_train
-
-# # use for spliting train and test
-# val_list = random.sample(range(num_images), num_val)
-# train_list = [i for i in range(num_images) if i not in val_list]
-
-# f = open(train_dir + "train.txt", "w")
-# for i in train_list:
-#     f.write("{:06d}".format(i) + "\n")
-# f.close()
-
-# f = open(val_dir + "val.txt", "w")
-# for i in val_list:
-#     f.write("{:06d}".format(i) + "\n")
-# f.close()
-# print("Split training and validation set done")
 
 # build train data loader
 train_dataset = Refine_data(data_path=train_dir, isTrain=True)
@@ -104,6 +88,8 @@ def train():
     pre_loss = None
     for epoch in range(epochs):
         avg_loss = []
+        avg_rot_loss = []
+        avg_tran_loss = []
         avg_f_score = []
         avg_chamfer_score = []
         for data in train_loader:
@@ -140,7 +126,7 @@ def train():
             input = Variable(inputData)
 
             ################ test
-            # testindex = 2
+            # testindex = 0
             # testimg = np.transpose(input_img[testindex].numpy(), (1, 2, 0)).copy()
             ################
 
@@ -160,8 +146,12 @@ def train():
             # convert the shift to right format
             trans = (trans - 0.5) * input_img.shape[-1]
 
+            initPoseRot = torch.eye(4).repeat(trans.shape[0], 1, 1).cuda().float()
+            initPoseRot[:, :3, :3] = initPose[:, :3, :3]
+
             # generate the rotation pose
-            rot_pose = torch.bmm(initPose, tgm.angle_axis_to_rotation_matrix(rot))
+            rot_pose = torch.bmm(tgm.angle_axis_to_rotation_matrix(rot), initPoseRot)
+            rot_pose[:, :3, 3] = initPose[:, :3, 3]
 
             # update the camera matrix because the input image is resize
             camera_matrix_original = (
@@ -189,6 +179,18 @@ def train():
             camera_matrix[:, 0, 0] = camera_matrix_original[:, 0, 0] * rescaleValue
             camera_matrix[:, 1, 1] = camera_matrix_original[:, 1, 1] * rescaleValue
             camera_matrix.unsqueeze_(1)
+
+            ###### get real scale and offset #######
+            real_scale = initPose[:, 2, 3] / torch.norm(
+                targetPose[:, :3, 3], p=2, dim=1
+            )
+
+            real_scale = real_scale.unsqueeze(1)
+            real_scale = real_scale.unsqueeze(1)
+
+            real_offset = kornia.project_points(
+                targetPose[:, :3, 3].unsqueeze(1), camera_matrix
+            )
 
             # get the target 2d points
             target3dPt = tgm.transform_points(targetPose, target3dPt)
@@ -264,11 +266,11 @@ def train():
 
             ############################################# test
             # test_2d_pts = kornia.project_points(predict3dpts, camera_matrix)
-            # for p in test_2d_pts.cpu().detach().numpy()[testindex]:
+            # for p in real_offset.cpu().detach().numpy()[testindex]:
             #     testimg = cv2.circle(
             #         testimg,
             #         (int(p[0]), int(p[1])),
-            #         radius=0,
+            #         radius=4,
             #         color=(0, 255, 0),
             #         thickness=-1,
             #     )
@@ -286,11 +288,19 @@ def train():
                 torch.add(predict_2d_pts, center * NEG_ONE_PAIR) * dist, center
             )
 
+            # real_scaled_predict_2d_pts = torch.add(
+            #     torch.add(predict_2d_pts, center * NEG_ONE_PAIR) * real_scale, center
+            # )
+
             # shift the 2d points with trans
             predict_2d_pts = torch.add(scaled_predict_2d_pts, trans)
 
+            real_offset = real_offset - center
+
+            # real_predict_2d_pts = torch.add(real_scaled_predict_2d_pts, real_offset)
+
             ######################################################## test predict 2d pts
-            # for p in predict_2d_pts.cpu().detach().numpy()[testindex]:
+            # for p in real_predict_2d_pts.cpu().detach().numpy()[testindex]:
             #     testimg = cv2.circle(
             #         testimg,
             #         (int(p[0]), int(p[1])),
@@ -333,22 +343,33 @@ def train():
 
             distanceBetweenVec = predict_2d_pts - target_2d_pts_init
 
+            # rot_distanceBetweenVec = real_predict_2d_pts - target_2d_pts_init
+
             # get normal distance
             normdist2d = torch.norm(distanceBetweenVec, p=1, dim=2)
             normdist3d = torch.norm(distanceBetweenVec3d, p=2, dim=2)
+            # normdistrot = torch.norm(rot_distanceBetweenVec, p=1, dim=2)
 
             ch_loss = torch.mean(dist1, 1) + torch.mean(dist2, 1)
             # loss = torch.mean(normdist3d, 1) * lambda3d
-            loss = torch.mean(normdist2d, 1)
+            loss = torch.mean(
+                normdist2d, 1
+            )  # + rot_lambda * torch.mean(normdistrot, 1)
 
             loss.sum().backward()
             optimizer.step()
             avg_loss.append(loss.data.cpu().numpy().sum())
+            avg_tran_loss.append(torch.mean(normdist2d, 1).data.cpu().numpy().sum())
+            # avg_rot_loss.append(
+            #     rot_lambda * torch.mean(normdistrot, 1).data.cpu().numpy().sum()
+            # )
             f_score, precision, recall = FS.fscore(dist1, dist2)
             avg_f_score.append(f_score.data.cpu().numpy().sum())
             avg_chamfer_score.append(ch_loss.data.cpu().numpy().sum())
 
         tem = sum(avg_loss) / len(train_dataset)
+        # rot_tem = sum(avg_rot_loss) / len(train_dataset)
+        # tran_tem = sum(avg_tran_loss) / len(train_dataset)
         tem_f_score = sum(avg_f_score) / len(train_dataset)
         tem_chamfer_score = sum(avg_chamfer_score) / len(train_dataset)
         print("Finish epoch {}, loss {}, f score {}".format(epoch, tem, tem_f_score))
@@ -367,10 +388,10 @@ def train():
         # )
 
         if pre_loss == None:
-            torch.save(mymodel, "best_model_refine.pth")
+            torch.save(mymodel, "best_model_refine_housing.pth")
             pre_loss = val_loss
         elif pre_loss > val_loss:
-            torch.save(mymodel, "best_model_refine.pth")
+            torch.save(mymodel, "best_model_refine_housing.pth")
             pre_loss = val_loss
         mymodel.train()
         if (epoch + 1) % 50 == 0:
@@ -426,8 +447,12 @@ def val():
 
         trans = (trans - 0.5) * input_img.shape[-1]
 
+        initPoseRot = torch.eye(4).repeat(trans.shape[0], 1, 1).cuda().float()
+        initPoseRot[:, :3, :3] = initPose[:, :3, :3]
+
         # generate the rotation pose
-        rot_pose = torch.bmm(initPose, tgm.angle_axis_to_rotation_matrix(rot))
+        rot_pose = torch.bmm(tgm.angle_axis_to_rotation_matrix(rot), initPoseRot)
+        rot_pose[:, :3, 3] = initPose[:, :3, 3]
 
         # update the camera matrix because the input image is resize
         camera_matrix_original = (
@@ -448,6 +473,16 @@ def val():
         camera_matrix[:, 0, 0] = camera_matrix_original[:, 0, 0] * rescaleValue
         camera_matrix[:, 1, 1] = camera_matrix_original[:, 1, 1] * rescaleValue
         camera_matrix.unsqueeze_(1)
+
+        ###### get real scale and offset #######
+        real_scale = initPose[:, 2, 3] / torch.norm(targetPose[:, :3, 3], p=2, dim=1)
+
+        real_scale = real_scale.unsqueeze(1)
+        real_scale = real_scale.unsqueeze(1)
+
+        real_offset = kornia.project_points(
+            targetPose[:, :3, 3].unsqueeze(1), camera_matrix
+        )
 
         # get the target 2d points
         target3dPt = tgm.transform_points(targetPose, target3dPt)
@@ -527,8 +562,16 @@ def val():
             torch.add(predict_2d_pts, center * NEG_ONE_PAIR) * dist, center
         )
 
+        # real_scaled_predict_2d_pts = torch.add(
+        #     torch.add(predict_2d_pts, center * NEG_ONE_PAIR) * real_scale, center
+        # )
+
         # shift the 2d points with trans
         predict_2d_pts = torch.add(scaled_predict_2d_pts, trans)
+
+        real_offset = real_offset - center
+
+        # real_predict_2d_pts = torch.add(real_scaled_predict_2d_pts, real_offset)
 
         # calculate the chamfer distance loss
         dist1, dist2, idx1, idx2 = chamLoss(
@@ -543,14 +586,16 @@ def val():
         target_2d_pts_init = kornia.project_points(targetFromInit3dPt, camera_matrix)
 
         distanceBetweenVec = predict_2d_pts - target_2d_pts_init
+        # rot_distanceBetweenVec = real_predict_2d_pts - target_2d_pts_init
 
         # get normal distance
         normdist2d = torch.norm(distanceBetweenVec, p=1, dim=2)
         normdist3d = torch.norm(distanceBetweenVec3d, p=2, dim=2)
+        # normdistrot = torch.norm(rot_distanceBetweenVec, p=1, dim=2)
 
         ch_loss = torch.mean(dist1, 1) + torch.mean(dist2, 1)
-        # loss = torch.mean(normdist3d, 1) * lambda3d #+
-        loss = torch.mean(normdist2d, 1)
+        # loss = torch.mean(normdist3d, 1) * lambda3d
+        loss = torch.mean(normdist2d, 1)  # + rot_lambda * torch.mean(normdistrot, 1)
 
         avg_loss.append(loss.data.cpu().numpy().sum())
         f_score, precision, recall = FS.fscore(dist1, dist2)
