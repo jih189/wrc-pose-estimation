@@ -33,10 +33,10 @@ def init():
 
 @click.command()
 @click.argument(
-    "input_filepath", default="data/raw/housing/", type=click.Path(exists=True)
+    "input_filepath", default=CFG.VERIFY_IMAGE_PATH, type=click.Path(exists=True)
 )
 @click.argument(
-    "output_filepath", default="data/processed/housing_refine/", type=click.Path()
+    "output_filepath", default=CFG.REFINE_SATA_PATH, type=click.Path()
 )
 def main(input_filepath, output_filepath):
     """ Runs data processing scripts to turn raw data from (../raw) into
@@ -121,6 +121,10 @@ def main(input_filepath, output_filepath):
             flowImg = obj.getOptFlowWithPoses(boundingsize, boundingsize, pose)
             crop_flowImg = flowImg[ey : ey + eh, ex : ex + ew]
 
+            # generate 3d image
+            imgFor3d = obj.get3dimage(boundingsize, boundingsize)
+            crop_3dImg = imgFor3d[ey : ey + eh, ex : ex + ew]
+
             # crop_img = img[ey : ey + eh, ex : ex + ew].copy()
             # cropped image with initial pose as center
             crop_img = img[ey : ey + eh, ex : ex + ew]
@@ -167,6 +171,11 @@ def main(input_filepath, output_filepath):
             cv2.imwrite(
                 output_filepath + "{:06d}".format(current_index) + "flow.png",
                 crop_flowImg,
+            )
+
+            cv2.imwrite(
+                output_filepath + "{:06d}".format(current_index) + "3d.png",
+                crop_3dImg,
             )
 
             cv2.imwrite(

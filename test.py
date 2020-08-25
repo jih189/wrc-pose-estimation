@@ -8,6 +8,5 @@ model = FlowNet()
 
 input = torch.randn(1, 5, 240, 240).float()
 
-output, psp = model(input)
-print(output.shape)
-print(psp.shape)
+output1,out2,out3 = model(input)
+print(out3.shape)

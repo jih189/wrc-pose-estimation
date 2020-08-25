@@ -124,6 +124,9 @@ def predict(
     # running model
     inputData = torch.cat((edge_img, mask_img, predictMask, img), 1)
     rot, trans, dist = mymodel(inputData)
+    rot[0,0] = 1.57
+
+    print(rot)
 
     trans = trans.unsqueeze(1)
     trans = (trans - 0.5) * 240

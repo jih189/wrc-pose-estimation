@@ -173,6 +173,22 @@ class Refine_data(Dataset):
         targetPose_path = self.dataNames[idx] + "targetPose.npy"
         targetPose = np.load(targetPose_path)
 
+        # load label mask image
+        labelmask_path = self.dataNames[idx] + "labelmask.png"
+        labelmask_img = cv2.imread(labelmask_path)
+        labelmask_img = cv2.resize(
+            labelmask_img, (self.imgSize, self.imgSize), interpolation=cv2.INTER_AREA
+        )
+        labelmask_img = labelmask_img[:, :, :1].transpose(2, 0, 1) / 255.0
+
+        # load optical flow
+        optflow_path = self.dataNames[idx] + "flow.png"
+        flow_img = cv2.imread(optflow_path)
+        flow_img = cv2.resize(
+            flow_img, (self.imgSize, self.imgSize), interpolation=cv2.INTER_AREA
+        )
+        flow_img = flow_img[:, :, :].transpose(2, 0, 1) / 255.0
+
         return (
             idx,
             img,
@@ -183,6 +199,8 @@ class Refine_data(Dataset):
             target3dPt,
             targetPose,
             rescaleValue,
+            labelmask_img,
+            flow_img,
         )
 
 
@@ -294,5 +312,13 @@ class FlowNet_data(Dataset):
         )
         flow_img = flow_img[:, :, :].transpose(2, 0, 1) / 255.0
 
-        return (idx, img, edge_img, mask_img, labelmask_img, flow_img)
+        # load 3d position image
+        # threeD_path = self.dataNames[idx] + "3d.png"
+        # threeD_img = cv2.imread(threeD_path)
+        # threeD_img = cv2.resize(
+        #     threeD_img, (self.imgSize, self.imgSize), interpolation=cv2.INTER_AREA
+        # )
+        # threeD_img = threeD_img[:, :, :].transpose(2, 0, 1) / 255.0
+
+        return (idx, img, edge_img, mask_img, labelmask_img, flow_img)  # , threeD_img)
 

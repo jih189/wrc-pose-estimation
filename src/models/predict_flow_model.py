@@ -71,10 +71,10 @@ def predict(mymodel, predict_index, view_image):
 
     # running model
     inputData = torch.cat(
-        (mask_img.cuda().float(), edge_img.cuda().float(), img.cuda().float(),), 1,
+        (mask_img.cuda().float() / 255.0, edge_img.cuda().float() / 255.0, img.cuda().float() / 255.0,), 1,
     )
     input = Variable(inputData)
-    output, segoutput = mymodel(input)
+    output, segoutput, _ = mymodel(input)
     predictflow = torch.sigmoid(output)
 
     padding = Variable(
@@ -98,6 +98,8 @@ def predict(mymodel, predict_index, view_image):
 
 
     seg_pred = torch.argmax(segoutput, 1, keepdim=True).float().squeeze(1).cpu().detach().numpy()
+
+    cv2.imshow("mask", seg_pred[0])
 
     for y in range(flow_img.shape[0]):
         for x in range(flow_img.shape[1]):
@@ -123,7 +125,7 @@ def predict(mymodel, predict_index, view_image):
                         thickness=-1,
                     )
 
-                    if x % 10 == 0 and y % 10 == 0:
+                    if x % 20 == 0 and y % 20 == 0:
 
                         oriimg = cv2.line(oriimg, (x, y), (x + mx, y + my), color=(0,255,0), thickness = 1)
                         oriimg = cv2.circle(
@@ -149,4 +151,4 @@ def predict(mymodel, predict_index, view_image):
 
 if __name__ == "__main__":
     m = init()
-    predict(m, 7176, True)
+    predict(m, 3176, True)

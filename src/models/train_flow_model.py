@@ -19,6 +19,7 @@ epochs = 1000
 lr = 3e-4
 momentum = 0.9
 w_decay = 2.0
+seglambda = 1000.0
 
 train_dir = CFG.REFINE_SATA_PATH
 val_dir = CFG.REFINE_SATA_PATH
@@ -37,7 +38,7 @@ val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=True, num_wo
 mymodel = FlowNet().cuda()
 mymodel = nn.DataParallel(mymodel)
 
-seg_criterion = nn.CrossEntropyLoss()
+seg_criterion = nn.CrossEntropyLoss(reduce=False)
 
 # wandb.watch(mymodel)
 
@@ -57,23 +58,26 @@ def train():
     pre_loss = None
     for epoch in range(epochs):
         avg_loss = []
-        avg_shiftloss = []
+        avg_flowloss = []
         avg_segloss = []
         for data in train_loader:
             (idx, img, edge_img, mask_img, labelmask_img, flow_img) = data
+
+            mask_img = mask_img.cuda().float() / 255.0
+            edge_img = edge_img.cuda().float() / 255.0
+            img = img.cuda().float() / 255.0
+            labelflow = flow_img[:, :2, :, :].cuda().float()
 
             optimizer.zero_grad()
 
             # catenate image, edges, mask, and bounding box into one input
             # input order (edge, mask, bounding box, image)
-            inputData = torch.cat(
-                (mask_img.cuda().float(), edge_img.cuda().float(), img.cuda().float(),),
-                1,
-            )
+            inputData = torch.cat((mask_img, edge_img, img), 1,)
+
             input = Variable(inputData)
 
-            label = Variable(labelmask_img).cuda().long()
-            label = label.squeeze(1)
+            labelmask_img = Variable(labelmask_img).cuda().long()
+            labelmask_img = labelmask_img.squeeze(1)
 
             ################ test
             # testindex = 0
@@ -81,33 +85,37 @@ def train():
             ################
 
             # predict the rotation, translation, and depth in image view
-            output, psp_out = mymodel(input)
-            predictflow = torch.sigmoid(output)
-            labelflow = flow_img[:, :2, :, :].cuda()
+            opticalFlow, segmentMask, _ = mymodel(input)
+            opticalFlow = torch.sigmoid(opticalFlow)
 
-            psp_out = psp_out.squeeze(1)
+            segmentMask = segmentMask.squeeze(1)
 
-            segloss = seg_criterion(psp_out, label) * 1000
+            segloss = seg_criterion(segmentMask, labelmask_img)
+            segloss = torch.mean(segloss.view(segloss.shape[0], -1), dim=1)
+            segloss = segloss.sum() * seglambda
 
-            # invalid flow is defined with both flow coordinates to be exactly 0
-            mask = (labelflow[:, 0] == 0) & (labelflow[:, 1] == 0)
+            maskarea = torch.sum(mask_img.view(mask_img.shape[0], -1), dim=1)
 
-            shiftLoss = torch.norm(predictflow - labelflow, 2, 1)
+            flowloss = torch.norm(opticalFlow - labelflow, p=1, dim=1)
+            flowloss = flowloss.unsqueeze(1)
+            flowloss = flowloss * mask_img
+            flowloss = torch.sum(flowloss.view(flowloss.shape[0], -1), dim=1)
+            flowloss = flowloss / maskarea
 
-            shiftLoss = shiftLoss[~mask]
-            shiftLoss = shiftLoss.sum() / labelflow.size(0)
-            loss = shiftLoss + segloss
+            flowloss = flowloss.sum()
+            loss = flowloss + segloss
             loss.backward()
             optimizer.step()
             avg_loss.append(loss.data.cpu().numpy())
-            avg_shiftloss.append(shiftLoss.data.cpu().numpy())
+            avg_flowloss.append(flowloss.data.cpu().numpy())
             avg_segloss.append(segloss.data.cpu().numpy())
         tem = sum(avg_loss) / len(train_dataset)
-        shift_tem = sum(avg_shiftloss) / len(train_dataset)
+        flow_tem = sum(avg_flowloss) / len(train_dataset)
         seg_tem = sum(avg_segloss) / len(train_dataset)
+
         print(
             "Finish epoch {}, loss {}, flow loss {} seg loss {}".format(
-                epoch, tem, shift_tem, seg_tem
+                epoch, tem, flow_tem, seg_tem
             )
         )
 
@@ -132,39 +140,43 @@ def val():
     for data in val_loader:
         (idx, img, edge_img, mask_img, labelmask_img, flow_img) = data
 
-        inputData = torch.cat(
-            (mask_img.cuda().float(), edge_img.cuda().float(), img.cuda().float(),), 1,
-        )
+        mask_img = mask_img.cuda().float() / 255.0
+        edge_img = edge_img.cuda().float() / 255.0
+        img = img.cuda().float() / 255.0
+        labelflow = flow_img[:, :2, :, :].cuda().float()
+
+        inputData = torch.cat((mask_img, edge_img, img), 1,)
         input = Variable(inputData)
 
-        label = Variable(labelmask_img).cuda().long()
-        label = label.squeeze(1)
+        labelmask_img = Variable(labelmask_img).cuda().long()
+        labelmask_img = labelmask_img.squeeze(1)
 
         with torch.no_grad():
-            output, psp_out = mymodel(input)
+            opticalFlow, segmentMask, _ = mymodel(input)
 
-        predictflow = torch.sigmoid(output)
-        labelflow = flow_img[:, :2, :, :].cuda()
+        predictflow = torch.sigmoid(opticalFlow)
 
-        psp_out = psp_out.squeeze(1)
+        segmentMask = segmentMask.squeeze(1)
 
-        segloss = seg_criterion(psp_out, label) * 1000
+        segloss = seg_criterion(segmentMask, labelmask_img)
+        segloss = torch.mean(segloss.view(segloss.shape[0], -1), dim=1)
+        segloss = segloss.sum() * seglambda
 
-        iou_value = iou(label, psp_out, 1)
+        maskarea = torch.sum(mask_img.view(mask_img.shape[0], -1), dim=1)
 
-        # invalid flow is defined with both flow coordinates to be exactly 0
-        mask = (labelflow[:, 0] == 0) & (labelflow[:, 1] == 0)
+        flowloss = torch.norm(opticalFlow - labelflow, p=1, dim=1)
+        flowloss = flowloss.unsqueeze(1)
+        flowloss = flowloss * mask_img
+        flowloss = torch.sum(flowloss.view(flowloss.shape[0], -1), dim=1)
+        flowloss = flowloss / maskarea
 
-        shiftLoss = torch.norm(predictflow - labelflow, 2, 1)
-
-        shiftLoss = shiftLoss[~mask]
-        # confidLoss = confidLoss[~mask]
-        shiftLoss = shiftLoss.sum() / labelflow.size(0)
-        loss = shiftLoss + segloss
+        flowloss = flowloss.sum()
+        loss = flowloss + segloss
+        iou_value = iou(labelmask_img, segmentMask, 1)
         avg_loss.append(loss.data.cpu().numpy())
         avg_iou.append(iou_value.data.cpu().numpy())
     tem = sum(avg_loss) / len(val_dataset)
-    ioutem = sum(avg_iou) / len(val_loader)
+    ioutem = sum(avg_iou) / len(val_dataset)
     return tem, ioutem
 
 

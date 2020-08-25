@@ -326,6 +326,13 @@ class ObjectModel:
             edgeImg = cv2.circle(edgeImg, p, radius=0, color=(255), thickness=-1)
         return edgeImg
 
+    # get the max distance from center to each point
+    def getMaxDis2Point(self):
+        result = 0
+        for l in self.mesh_obj.vertices:
+            result = max(np.linalg.norm(l), result)
+        return result
+
     # this resample will generate random pose in roughly translation and rotation
     def resample(self, pose, numOfPose):
 
@@ -334,17 +341,17 @@ class ObjectModel:
         yRot_1 = np.random.normal(0, 0.15, int(numOfPose / 2))
         zRot_1 = np.random.normal(0, 0.15, int(numOfPose / 2))
 
-        xTrans_1 = np.random.normal(0, 0.03, int(numOfPose / 2))
-        yTrans_1 = np.random.normal(0, 0.03, int(numOfPose / 2))
-        zTrans_1 = np.random.normal(0, 0.08, int(numOfPose / 2))
+        xTrans_1 = np.random.normal(0, 0.01, int(numOfPose / 2))
+        yTrans_1 = np.random.normal(0, 0.01, int(numOfPose / 2))
+        zTrans_1 = np.random.normal(0, 0.06, int(numOfPose / 2))
 
         xRot_2 = np.random.normal(0, 0.3, numOfPose - int(numOfPose / 2))
         yRot_2 = np.random.normal(0, 0.3, numOfPose - int(numOfPose / 2))
         zRot_2 = np.random.normal(0, 0.3, numOfPose - int(numOfPose / 2))
 
-        xTrans_2 = np.random.normal(0, 0.005, numOfPose - int(numOfPose / 2))
-        yTrans_2 = np.random.normal(0, 0.005, numOfPose - int(numOfPose / 2))
-        zTrans_2 = np.random.normal(0, 0.005, numOfPose - int(numOfPose / 2))
+        xTrans_2 = np.random.normal(0, 0.001, numOfPose - int(numOfPose / 2))
+        yTrans_2 = np.random.normal(0, 0.001, numOfPose - int(numOfPose / 2))
+        zTrans_2 = np.random.normal(0, 0.001, numOfPose - int(numOfPose / 2))
 
         xRot = np.concatenate((xRot_1, xRot_2))
         yRot = np.concatenate((yRot_1, yRot_2))
@@ -458,6 +465,20 @@ class ObjectModel:
             (xn, yn) = self.project3Dto2D((x3d, y3d, z3d), targetpose)
             img[int(y2d), int(x2d), 0] = int(((xn - x2d) / width + 0.5) * 255)
             img[int(y2d), int(x2d), 1] = int(((yn - y2d) / height + 0.5) * 255)
+
+        return img
+
+    def get3dimage(self, height, width):
+
+        maxDistance = self.getMaxDis2Point()
+
+        img = np.zeros((self.height, self.width, 3), dtype=np.uint8)
+        self.getVisiblePointCloud()
+        for i in range(len(self.pointcloud)):
+            y2d, x2d, x3d, y3d, z3d = self.pointcloud[i]
+            img[int(y2d), int(x2d), 0] = int((x3d + maxDistance) / (2 * maxDistance) * 255)
+            img[int(y2d), int(x2d), 1] = int((y3d + maxDistance) / (2 * maxDistance) * 255)
+            img[int(y2d), int(x2d), 2] = int((z3d + maxDistance) / (2 * maxDistance) * 255)
 
         return img
 

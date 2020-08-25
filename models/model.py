@@ -81,13 +81,39 @@ class Magic_Net(nn.Module):
         return x
 
 
+class DeepIM(nn.Module):
+    def __init__(self):
+        super().__init__()
+
+        self.flownet = FlowNet()
+        self.fc1 = nn.Linear(1024 * 4 * 4, 256)
+        self.fc2 = nn.Linear(256, 256)
+
+        self.fcrotation = nn.Linear(256, 3)
+        self.fctraslation = nn.Linear(256, 2)
+        self.fcdist = nn.Linear(256, 1)
+        self.distPlus = nn.Softplus(threshold=1.0)
+
+    def forward(self, x):
+
+        opticalFlow, segmentMask, x2 = self.flownet(x)
+        x3 = self.fc1(x2.view(-1, 1024 * 4 * 4))
+        x4 = self.fc2(x3)
+        x11 = self.fcrotation(x4)
+        x12 = self.fctraslation(x4)
+        x13 = self.fcdist(x4)
+        x14 = self.distPlus(x13)
+        x15 = torch.sigmoid(x12)
+        return x11, x15, x14, opticalFlow, segmentMask
+
+
 class Refine_Net(nn.Module):
     def __init__(self):
         super().__init__()
 
         self.resnet = models.resnet34(pretrained=True)
         self.resnet.conv1 = nn.Conv2d(
-            6, 64, kernel_size=(7, 7), stride=(2, 2), padding=(3, 3), bias=False
+            7, 64, kernel_size=(7, 7), stride=(2, 2), padding=(3, 3), bias=False
         )
         self.resnet.layer4[2].conv2 = nn.Conv2d(
             512, 512, kernel_size=15, stride=1, padding=7
@@ -109,7 +135,8 @@ class Refine_Net(nn.Module):
         x13 = self.fcdist(x2)
         x14 = self.distPlus(x13)
         x15 = torch.sigmoid(x12)
-        return x11, x15, x14
+        x16 = torch.sigmoid(x11)
+        return x16, x15, x14
 
 
 class PSPNet(nn.Module):
@@ -294,5 +321,5 @@ class FlowNet(nn.Module):
 
         out = torch.cat(out, 1)
         out = self.combineFlow(out)
-        return out, psp_out
+        return out, psp_out, out_conv6
 

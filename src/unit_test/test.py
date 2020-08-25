@@ -163,11 +163,13 @@ class test_object_model(unittest.TestCase):
     def test_depth(self):
 
         # test = self.obj.getOptFlowWithPoses(480, 640, newpose)
-        mesh = o3d.io.read_triangle_mesh(CFG.CAD_MODEL)
-        pcd = o3d.geometry.PointCloud()
-        pcd.points = mesh.vertices
+        # mesh = o3d.io.read_triangle_mesh(CFG.CAD_MODEL)
+        # pcd = o3d.geometry.PointCloud()
+        # pcd.points = mesh.vertices
 
-        o3d.visualization.draw_geometries([pcd])
+        # o3d.visualization.draw_geometries([pcd])
+
+        print(self.obj.getMaxDis2Point())
 
     @classmethod
     def tearDownClass(cls):
