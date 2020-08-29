@@ -255,13 +255,13 @@ class ObjectModel:
                     p1 = np.array(self.mesh_obj.vertices[tripoints1[1]])
                     p2 = np.array(self.mesh_obj.vertices[tripoints1[2]])
                     N1 = np.cross(p1 - p0, p2 - p1)
-                    N1 = N1 / N1.sum()
+                    N1 = N1 / np.linalg.norm(N1)
 
                     p0 = np.array(self.mesh_obj.vertices[tripoints2[0]])
                     p1 = np.array(self.mesh_obj.vertices[tripoints2[1]])
                     p2 = np.array(self.mesh_obj.vertices[tripoints2[2]])
                     N2 = np.cross(p1 - p0, p2 - p1)
-                    N2 = N2 / N2.sum()
+                    N2 = N2 / np.linalg.norm(N2)
                     inner_prod = np.inner(N1, N2)
                     if -th_sharp <= inner_prod and inner_prod <= th_sharp:
                         self.sharp_edges.append(
@@ -476,9 +476,15 @@ class ObjectModel:
         self.getVisiblePointCloud()
         for i in range(len(self.pointcloud)):
             y2d, x2d, x3d, y3d, z3d = self.pointcloud[i]
-            img[int(y2d), int(x2d), 0] = int((x3d + maxDistance) / (2 * maxDistance) * 255)
-            img[int(y2d), int(x2d), 1] = int((y3d + maxDistance) / (2 * maxDistance) * 255)
-            img[int(y2d), int(x2d), 2] = int((z3d + maxDistance) / (2 * maxDistance) * 255)
+            img[int(y2d), int(x2d), 0] = int(
+                (x3d + maxDistance) / (2 * maxDistance) * 255
+            )
+            img[int(y2d), int(x2d), 1] = int(
+                (y3d + maxDistance) / (2 * maxDistance) * 255
+            )
+            img[int(y2d), int(x2d), 2] = int(
+                (z3d + maxDistance) / (2 * maxDistance) * 255
+            )
 
         return img
 

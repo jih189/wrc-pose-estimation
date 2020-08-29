@@ -11,6 +11,7 @@ import os
 import random
 import numpy as np
 from src.common.iou import iou
+from chamfer2D.dist_chamfer_2D import chamfer_2DDist
 
 import torchgeometry as tgm
 import kornia
@@ -44,8 +45,8 @@ epochs = 1000
 lr = 1e-5
 momentum = 0.9
 w_decay = 0.1
-seglambda = 10.0
-flowlambda = 1.0
+seglambda = 2.0
+flowlambda = 1.5
 
 train_dir = CFG.REFINE_SATA_PATH
 val_dir = CFG.REFINE_SATA_PATH
@@ -74,6 +75,7 @@ mymodel.module.flownet.eval()
 # wandb.watch(mymodel)
 
 seg_criterion = nn.CrossEntropyLoss(reduce=False)
+cham_criterion = chamfer_2DDist()
 
 # optimizer = optim.SGD(
 #     list(mymodel.module.fc1.parameters()) + list(mymodel.module.fc2.parameters()) + list(mymodel.module.fcrotation.parameters())+
@@ -91,9 +93,6 @@ optimizer = optim.Adam(
 
 lmbda = lambda epoch: 0.5
 scheduler = lr_scheduler.MultiplicativeLR(optimizer, lr_lambda=lmbda)
-
-# negative pair
-NEG_ONE_PAIR = torch.tensor([[-1.0, -1.0]]).cuda()
 
 torch.autograd.set_detect_anomaly(True)
 
@@ -318,15 +317,15 @@ def train():
         val_loss = val()
         mymodel.train()
 
-        # if pre_loss == None:
-        #     torch.save(mymodel, "best_model_refine_housing.pth")
-        #     pre_loss = val_loss
-        # elif pre_loss > val_loss:
-        #     torch.save(mymodel, "best_model_refine_housing.pth")
-        #     pre_loss = val_loss
-        # mymodel.train()
-        # if (epoch + 1) % 50 == 0:
-        #     scheduler.step()
+        if pre_loss == None:
+            torch.save(mymodel, "best_model_refine_housing.pth")
+            pre_loss = val_loss
+        elif pre_loss > val_loss:
+            torch.save(mymodel, "best_model_refine_housing.pth")
+            pre_loss = val_loss
+        mymodel.train()
+        if (epoch + 1) % 50 == 0:
+            scheduler.step()
 
 
 def val():
@@ -339,6 +338,7 @@ def val():
     avg_dist3d_loss = []
     avg_flow_loss = []
     avg_seg_loss = []
+    avg_chamfer_loss = []
     for data in val_loader:
         (
             idx,
@@ -425,6 +425,15 @@ def val():
         targetFromInit3dPt = tgm.transform_points(targetPose, init3dPt)
         distanceBetweenVec3d = predict3dpts - targetFromInit3dPt
 
+        # get chamfer distance between predict and label
+        predict_2d_pts = kornia.project_points(predict3dpts, camera_matrix)
+        target_2d_pts = kornia.project_points(targetFromInit3dPt, camera_matrix)
+        dist1, dist2, idx1, idx2 = cham_criterion(
+            predict_2d_pts.float(), target_2d_pts.float()
+        )
+        ch_loss = torch.mean(dist1, 1) + torch.mean(dist2, 1)
+        ch_loss = ch_loss.sum()
+
         # rotation error
         rotError = getRotationError(pred_pose, targetPose)
 
@@ -446,6 +455,7 @@ def val():
         avg_dist3d_loss.append(dist3dloss.data.cpu().numpy().sum())
         avg_flow_loss.append(flowloss.data.cpu().numpy())
         avg_seg_loss.append(segloss.data.cpu().numpy())
+        avg_chamfer_loss.append(ch_loss.data.cpu().numpy())
 
     tem = sum(avg_loss) / len(val_dataset)
     tem_rot_error = sum(avg_rot_error) / len(val_dataset)
@@ -454,9 +464,10 @@ def val():
     dist3dlosstem = sum(avg_dist3d_loss) / len(val_dataset)
     flowlosstem = sum(avg_flow_loss) / len(val_dataset)
     seglosstem = sum(avg_seg_loss) / len(val_dataset)
+    chamferlosstem = sum(avg_chamfer_loss) / len(val_dataset)
     print(
-        "val loss {}, rot_error {}, trans_error {} iou {}".format(
-            tem, tem_rot_error, tem_trans_error, ioutem
+        "val loss {}, rot_error {}, trans_error {} iou {} chamfer_loss {}".format(
+            tem, tem_rot_error, tem_trans_error, ioutem, chamferlosstem
         )
     )
     print(

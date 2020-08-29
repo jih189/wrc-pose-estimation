@@ -2,8 +2,9 @@
 import numpy as np
 import cv2
 import matplotlib.pyplot as plt
+from src.models.train_refine_model import getPredictPose
 
-from models.model import Refine_Net, PSPNet
+from models.model import Refine_Net
 import torchgeometry as tgm
 import kornia
 
@@ -28,16 +29,11 @@ def init():
     mymodel = torch.load("best_model_refine_housing.pth")
     mymodel.eval()
 
-    PSPmodel = PSPNet().cuda()
-    PSPmodel = nn.DataParallel(PSPmodel)
-    PSPmodel = torch.load("best_model_psp_housing.pth")
-    PSPmodel.eval()
-
     chamLoss2d = CHAMFER2D.chamfer_2DDist()
     chamLoss3d = CHAMFER3D.chamfer_3DDist()
     softmax = nn.Softmax2d()
 
-    return mymodel, PSPmodel, softmax, chamLoss2d, chamLoss3d
+    return mymodel, softmax, chamLoss2d, chamLoss3d
 
 
 def predict(
@@ -121,142 +117,40 @@ def predict(
     targetPose = Variable(torch.from_numpy(targetPose).cuda()).float()
     targetPose = targetPose.unsqueeze(0)
 
-    # running model
-    inputData = torch.cat((edge_img, mask_img, predictMask, img), 1)
-    rot, trans, dist = mymodel(inputData)
-    rot[0,0] = 1.57
+    flow_inputData = torch.cat((mask_img, edge_img, input_img), 1,)
+    flow_input = Variable(flow_inputData)
 
-    print(rot)
-
-    trans = trans.unsqueeze(1)
-    trans = (trans - 0.5) * 240
-
-    dist = dist.unsqueeze(1)
-
-    # generate the rotation pose
-    # pose = torch.bmm(initPose, tgm.angle_axis_to_rotation_matrix(rot))
-
-    initPoseRot = torch.eye(4).repeat(trans.shape[0], 1, 1).cuda().float()
-    initPoseRot[:, :3, :3] = initPose[:, :3, :3]
-
-    # generate the rotation pose
-    pose = torch.bmm(tgm.angle_axis_to_rotation_matrix(rot), initPoseRot)
-    pose[:, :3, 3] = initPose[:, :3, 3]
+    rot, trans, dist, opticalFlow, segmentMask = mymodel(flow_input)
+    pred_pose = getPredictPose(
+        initPose, rot, trans, dist, input_img.shape[-2], rescaleValue
+    )
 
     # update the camera matrix because the input image is resize
-    camera_matrix = torch.tensor(
-        [
+    camera_matrix_original = (
+        torch.tensor(
             [
-                [CFG.CAMERA_MATRIX[0, 0] * rescaleValue, 0.0, float(img.shape[-2]) / 2],
-                [0.0, CFG.CAMERA_MATRIX[1, 1] * rescaleValue, float(img.shape[-1]) / 2],
-                [0.0, 0.0, 1.0],
+                [
+                    [CFG.CAMERA_MATRIX[0, 0], 0.0, float(input_img.shape[-2]) / 2,],
+                    [0.0, CFG.CAMERA_MATRIX[1, 1], float(input_img.shape[-2]) / 2,],
+                    [0.0, 0.0, 1.0],
+                ]
             ]
-        ]
-    ).cuda()
-
-    # get the predict 2d points
-    predict3dpt = tgm.transform_points(pose, init3dPt)
-
-    #############################################################
-    dist_pose = pose.clone()
-    dist_pose[:, 2, 3] = pose[:, 2, 3] / dist[:, 0, 0]
-
-    horizontalR = torch.atan2(
-        trans[:, :, 0], torch.tensor(654.968116289191 * rescaleValue).cuda()
+        )
+        .repeat(trans.shape[0], 1, 1)
+        .cuda()
     )
-    verticalR = -torch.atan2(
-        trans[:, :, 1],
-        torch.sqrt(
-            trans[:, :, 0] * trans[:, :, 0]
-            + torch.tensor(
-                657.1436336052552 * 657.1436336052552 * rescaleValue * rescaleValue
-            ).cuda()
-        )
-        * torch.tensor(657.1436336052552 / 654.968116289191).cuda(),
-    )
+    camera_matrix = camera_matrix_original.clone()
+    camera_matrix[:, 0, 0] = camera_matrix_original[:, 0, 0] * rescaleValue
+    camera_matrix[:, 1, 1] = camera_matrix_original[:, 1, 1] * rescaleValue
+    camera_matrix.unsqueeze_(1)
 
-    ch = torch.cos(horizontalR)
-    sh = torch.sin(horizontalR)
-    ca = torch.cos(torch.tensor([[0.0]]).cuda())  # not this
-    sa = torch.sin(torch.tensor([[0.0]]).cuda())  # not this
-    cb = torch.cos(verticalR)
-    sb = torch.sin(verticalR)
-
-    m00 = ch * ca
-    m01 = sh * sb - ch * sa * cb
-    m02 = ch * sa * sb + sh * cb
-    m10 = sa
-    m11 = ca * cb
-    m12 = -ca * sb
-    m20 = -sh * ca
-    m21 = sh * sa * cb + ch * sb
-    m22 = -sh * sa * sb + ch * cb
-
-    rotation_matrix = torch.eye(4).repeat(trans.shape[0], 1, 1).cuda()
-    rotation_matrix[..., :3, :3] = torch.cat(
-        [m00, m01, m02, m10, m11, m12, m20, m21, m22], dim=1
-    ).view(-1, 3, 3)
-
-    rot_pose = torch.bmm(rotation_matrix, dist_pose)
-
-    predict3dpt_real_rot = tgm.transform_points(rot_pose, init3dPt)
-
-    test_2d_pts = kornia.project_points(predict3dpt_real_rot, camera_matrix)
-
-    #############################################
-
-    predict_2d_pts = kornia.project_points(predict3dpt, camera_matrix)
-
-    center = torch.tensor([[float(img.shape[-2]) / 2, float(img.shape[-1]) / 2]]).cuda()
-
-    neg_one_pair = torch.tensor([[-1.0, -1.0]]).cuda()
-    scaled_predict_2d_pts = torch.add(
-        torch.add(predict_2d_pts, center * neg_one_pair) * dist, center
-    )
-    predict_2d_pts = torch.add(scaled_predict_2d_pts, trans)
-
-    origin3dpt = tgm.transform_points(initPose, init3dPt)
-    origin_2d_pts = kornia.project_points(origin3dpt, camera_matrix)
-
-    label3dpt = tgm.transform_points(targetPose, target3dPt)
-    label_2d_pts = kornia.project_points(label3dpt, camera_matrix)
-
-    # edge of init pose
-    for p in origin_2d_pts.cpu().detach().numpy()[0]:
-        preimg = cv2.circle(
-            preimg, (int(p[0]), int(p[1])), radius=0, color=(255, 0, 0), thickness=-1
-        )
-
-    # edge of predicted pose
-    for p in predict_2d_pts.cpu().detach().numpy()[0]:
-        preimg = cv2.circle(
-            preimg, (int(p[0]), int(p[1])), radius=0, color=(0, 255, 0), thickness=-1
-        )
-
-    # # edge of label pose
-    # for p in label_2d_pts.cpu().detach().numpy()[0]:
-    #     preimg = cv2.circle(
-    #         preimg, (int(p[0]), int(p[1])), radius=0, color=(0, 0, 255), thickness=-1
-    #     )
-
-    if view_image:
-        preimg = cv2.resize(preimg, (0, 0), fx=5, fy=5)
-        cv2.imshow("test", preimg)
-        cv2.waitKey(0)
-        return None
-    else:
-        dist1, dist2, idx1, idx2 = chamLoss2d(
-            predict_2d_pts.float(), label_2d_pts.float()
-        )
-        ch_loss2d = torch.mean(dist1, 1) + torch.mean(dist2, 1)
-        dist1, dist2, idx1, idx2 = chamLoss2d(predict3dpt, label3dpt)
-        ch_loss3d = torch.mean(dist1, 1)  # + torch.mean(dist2, 1)
-
-        return ch_loss2d.cpu().detach().numpy()[0], ch_loss3d.cpu().detach().numpy()[0]
+    # predict 3d pts
+    predict3dpts = tgm.transform_points(pred_pose, init3dPt)
+    predict_2d_pts = kornia.project_points(predict3dpts, camera_matrix)
 
 
 if __name__ == "__main__":
-    m, p, s, chamLoss2d, chamLoss3d = init()
+    m, s, chamLoss2d, chamLoss3d = init()
     highestLoss = 0.0
     highestIndex = None
     diagonalDist = 0.0335 * 1 * 0.1

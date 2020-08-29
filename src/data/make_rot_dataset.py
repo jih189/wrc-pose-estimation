@@ -9,13 +9,16 @@ from tqdm import tqdm
 import random
 import src.common.object_model as OM
 import src.configuration as CFG
+from multiprocessing import Pool, Value, cpu_count
+
+counter = Value("i", 0)
+output_counter = Value("i", 0)
 
 
 def init():
     # load the object mesh
     OM.setup(CFG.CAMERA_W, CFG.CAMERA_H)
     OM.setProjectMatrixWithIntr(CFG.CAMERA_MATRIX, CFG.CAMERA_W, CFG.CAMERA_H)
-
     obj = OM.ObjectModel()
     obj.setIntrinsicMatrix(CFG.CAMERA_MATRIX)
     obj.loadObjectCADModel(CFG.CAD_MODEL)
@@ -43,48 +46,37 @@ def get_centered_crop(topleft, botright):
     return topleft_new, botright_new
 
 
-@click.command()
-@click.argument(
-    "input_filepath", default="data/raw/housing/", type=click.Path(exists=True)
-)
-@click.argument(
-    "output_filepath", default="data/processed/housing_rot/", type=click.Path()
-)
-def main(input_filepath, output_filepath):
-    """ Runs data processing scripts to turn raw data from (../raw) into
-        cleaned data ready to be analyzed (saved in ../processed).
-    """
-    logger = logging.getLogger(__name__)
-    logger.info("making final data set from raw data")
-    logger.info(f"Input directory: {input_filepath}")
-    logger.info(f"Output directory: {output_filepath}")
+def process_data(args):
+    global counter
+    global output_counter
 
-    input_path = Path(input_filepath)
-    image_names, pose_names = [], []
-    for f in input_path.iterdir():
-        if f.match("*.png"):
-            image_names.append(str(f))
-        if f.match("*.npy"):
-            pose_names.append(str(f))
-    image_names.sort()
-    pose_names.sort()
+    output_filepath = CFG.PROCESSED_DATA_PATH
 
     obj = init()
 
-    current_index = 0
-    for img_name, pose_name in tqdm(zip(image_names, pose_names)):
+    # parse input
+    (id, datalist) = args
+    (img_names, pose_names) = list(zip(*datalist))
+
+    while True:
+        with counter.get_lock():
+            current_index = counter.value
+            counter.value += 1
+        if current_index >= len(datalist):
+            return
 
         # read image and pose
-        img = cv2.imread(img_name)
+        img = cv2.imread(img_names[current_index])
         img = np.array(img)
 
-        pose = np.load(pose_name)
+        pose = np.load(pose_names[current_index])
         depth = pose[2, 3]
 
         # generate the real bounding box for object
         obj.setModelviewMatrix(pose)
 
         upperleft, lowerright = obj.findVisibleSamplePoint()
+
         upperleft, lowerright = (
             np.array(upperleft).reshape(2),
             np.array(lowerright).reshape(2),
@@ -104,43 +96,110 @@ def main(input_filepath, output_filepath):
             crop_upperleft, crop_lowerright
         )
 
-        try:
-            cropImg = img[
-                int(upperleft_rand[1]) : int(lowerright_rand[1]),
-                int(upperleft_rand[0]) : int(lowerright_rand[0]),
-            ]
-            np.save(
-                output_filepath + "bounding" + "{:06d}".format(current_index) + ".npy",
-                np.array(
-                    [
-                        int(upperleft_rand[0]),
-                        int(upperleft_rand[1]),
-                        int(lowerright_rand[0]),
-                        int(lowerright_rand[1]),
-                    ]
-                ),
-            )
-        except IndexError:
-            cropImg = img[
-                int(upperleft_nonrand[1]) : int(lowerright_nonrand[1]),
-                int(upperleft_nonrand[0]) : int(lowerright_nonrand[0]),
-            ]
-            np.save(
-                output_filepath + "bounding" + "{:06d}".format(current_index) + ".npy",
-                np.array(
-                    [
-                        int(upperleft_nonrand[0]),
-                        int(upperleft_nonrand[1]),
-                        int(lowerright_nonrand[0]),
-                        int(lowerright_nonrand[1]),
-                    ]
-                ),
-            )
+        if (
+            int(upperleft_nonrand[1]) < 0
+            or int(lowerright_nonrand[1]) >= img.shape[0]
+            or int(upperleft_nonrand[0]) < 0
+            or int(lowerright_nonrand[0]) > img.shape[1]
+        ):
+            continue
 
-        cv2.imwrite(
-            output_filepath + "crop" + "{:06d}".format(current_index) + ".png", cropImg
+        with output_counter.get_lock():
+            current_output_index = output_counter.value
+            output_counter.value += 1
+
+        # try:
+        #     cropImg = img[
+        #         int(upperleft_rand[1]) : int(lowerright_rand[1]),
+        #         int(upperleft_rand[0]) : int(lowerright_rand[0]),
+        #     ]
+
+        #     np.save(
+        #         output_filepath
+        #         + "bounding"
+        #         + "{:06d}".format(current_output_index)
+        #         + ".npy",
+        #         np.array(
+        #             [
+        #                 int(upperleft_rand[0]),
+        #                 int(upperleft_rand[1]),
+        #                 int(lowerright_rand[0]),
+        #                 int(lowerright_rand[1]),
+        #             ]
+        #         ),
+        #     )
+        # except IndexError:
+        cropImg = img[
+            int(upperleft_nonrand[1]) : int(lowerright_nonrand[1]),
+            int(upperleft_nonrand[0]) : int(lowerright_nonrand[0]),
+        ]
+
+        np.save(
+            output_filepath
+            + "bounding"
+            + "{:06d}".format(current_output_index)
+            + ".npy",
+            np.array(
+                [
+                    int(upperleft_nonrand[0]),
+                    int(upperleft_nonrand[1]),
+                    int(lowerright_nonrand[0]),
+                    int(lowerright_nonrand[1]),
+                ]
+            ),
         )
-        current_index += 1
+        cv2.imwrite(
+            output_filepath + "crop" + "{:06d}".format(current_output_index) + ".png",
+            cropImg,
+        )
+
+
+@click.command()
+@click.argument(
+    "input_filepath", default=CFG.VERIFY_IMAGE_PATH, type=click.Path(exists=True)
+)
+@click.argument("output_filepath", default=CFG.PROCESSED_DATA_PATH, type=click.Path())
+def main(input_filepath, output_filepath):
+    global output_counter
+    """ Runs data processing scripts to turn raw data from (../raw) into
+        cleaned data ready to be analyzed (saved in ../processed).
+    """
+    logger = logging.getLogger(__name__)
+    logger.info("making final data set from raw data")
+    logger.info(f"Input directory: {input_filepath}")
+    logger.info(f"Output directory: {output_filepath}")
+
+    # read images and poses
+    input_path = Path(input_filepath)
+    image_names, pose_names = [], []
+    for f in input_path.iterdir():
+        if f.match("*.png"):
+            image_names.append(str(f))
+        if f.match("*.npy"):
+            pose_names.append(str(f))
+    image_names.sort()
+    pose_names.sort()
+
+    # image_names = image_names[655:656]
+    # pose_names = pose_names[655:656]
+
+    # generate input for function
+    datalist = list(zip(image_names, pose_names))
+
+    inputP = []
+    for o in range(cpu_count()):
+        inputP.append((o, list(datalist)))
+
+    # current_index = 0
+    # # for img_name, pose_name in tqdm(zip(image_names, pose_names)):
+
+    with Pool() as p:
+        for _ in tqdm(p.imap_unordered(process_data, inputP), total=len(inputP)):
+            pass
+        p.close()
+        p.join()
+
+    current_index = output_counter.value
 
     logger.info(f"Number of images generated = {current_index}")
 
