@@ -5,14 +5,15 @@ from pathlib import Path
 from dotenv import find_dotenv, load_dotenv
 import numpy as np
 import cv2
-from tqdm import tqdm
 import random
 import src.common.object_model as OM
 import src.configuration as CFG
-from multiprocessing import Pool, Value, cpu_count
+from multiprocessing import Pool, Value, cpu_count, Array
 
 counter = Value("i", 0)
 output_counter = Value("i", 0)
+vparr = Array("i", [0] * 64)
+rotarr = Array("i", [0] * 60)
 
 
 def init():
@@ -49,6 +50,8 @@ def get_centered_crop(topleft, botright):
 def process_data(args):
     global counter
     global output_counter
+    global vparr
+    global rotarr
 
     output_filepath = CFG.PROCESSED_DATA_PATH
 
@@ -62,8 +65,23 @@ def process_data(args):
         with counter.get_lock():
             current_index = counter.value
             counter.value += 1
+
         if current_index >= len(datalist):
             return
+
+        # update the progress bar
+        progress = int(50.0 * current_index / len(datalist))
+        rest_progress = 50 - progress
+        print(
+            "Progress: ["
+            + "=" * progress
+            + " " * rest_progress
+            + "]"
+            + str(100.0 * current_index / len(datalist))
+            + "%",
+            end="\r",
+            flush=True,
+        )
 
         # read image and pose
         img = cv2.imread(img_names[current_index])
@@ -97,41 +115,25 @@ def process_data(args):
         )
 
         if (
-            int(upperleft_nonrand[1]) < 0
-            or int(lowerright_nonrand[1]) >= img.shape[0]
-            or int(upperleft_nonrand[0]) < 0
-            or int(lowerright_nonrand[0]) > img.shape[1]
+            int(upperleft_rand[1]) < 0
+            or int(lowerright_rand[1]) >= img.shape[0]
+            or int(upperleft_rand[0]) < 0
+            or int(lowerright_rand[0]) > img.shape[1]
         ):
+            continue
+
+        viewPoint, inplaneRotation, offsetFromCenter, depth = obj.getLabel()
+        inplaneRotation = inplaneRotation % (2 * np.pi) / (2 * np.pi / 60)
+        if np.isnan(inplaneRotation):
             continue
 
         with output_counter.get_lock():
             current_output_index = output_counter.value
             output_counter.value += 1
 
-        # try:
-        #     cropImg = img[
-        #         int(upperleft_rand[1]) : int(lowerright_rand[1]),
-        #         int(upperleft_rand[0]) : int(lowerright_rand[0]),
-        #     ]
-
-        #     np.save(
-        #         output_filepath
-        #         + "bounding"
-        #         + "{:06d}".format(current_output_index)
-        #         + ".npy",
-        #         np.array(
-        #             [
-        #                 int(upperleft_rand[0]),
-        #                 int(upperleft_rand[1]),
-        #                 int(lowerright_rand[0]),
-        #                 int(lowerright_rand[1]),
-        #             ]
-        #         ),
-        #     )
-        # except IndexError:
         cropImg = img[
-            int(upperleft_nonrand[1]) : int(lowerright_nonrand[1]),
-            int(upperleft_nonrand[0]) : int(lowerright_nonrand[0]),
+            int(upperleft_rand[1]) : int(lowerright_rand[1]),
+            int(upperleft_rand[0]) : int(lowerright_rand[0]),
         ]
 
         np.save(
@@ -141,17 +143,35 @@ def process_data(args):
             + ".npy",
             np.array(
                 [
-                    int(upperleft_nonrand[0]),
-                    int(upperleft_nonrand[1]),
-                    int(lowerright_nonrand[0]),
-                    int(lowerright_nonrand[1]),
+                    int(upperleft_rand[0]),
+                    int(upperleft_rand[1]),
+                    int(lowerright_rand[0]),
+                    int(lowerright_rand[1]),
                 ]
             ),
         )
+
+        np.save(
+            output_filepath + "{:06d}".format(current_output_index) + ".npy", pose,
+        )
+
         cv2.imwrite(
             output_filepath + "crop" + "{:06d}".format(current_output_index) + ".png",
             cropImg,
         )
+
+        cv2.imwrite(
+            output_filepath + "{:06d}".format(current_output_index) + ".png", img,
+        )
+
+        inplaneRotation = int(inplaneRotation)
+        vpidx = OM.cal_idx(viewPoint)
+
+        with vparr.get_lock():
+            vparr[vpidx] += 1
+
+        with rotarr.get_lock():
+            rotarr[inplaneRotation] += 1
 
 
 @click.command()
@@ -161,6 +181,8 @@ def process_data(args):
 @click.argument("output_filepath", default=CFG.PROCESSED_DATA_PATH, type=click.Path())
 def main(input_filepath, output_filepath):
     global output_counter
+    global vparr
+    global rotarr
     """ Runs data processing scripts to turn raw data from (../raw) into
         cleaned data ready to be analyzed (saved in ../processed).
     """
@@ -180,8 +202,8 @@ def main(input_filepath, output_filepath):
     image_names.sort()
     pose_names.sort()
 
-    # image_names = image_names[655:656]
-    # pose_names = pose_names[655:656]
+    # image_names = image_names[:10]
+    # pose_names = pose_names[:10]
 
     # generate input for function
     datalist = list(zip(image_names, pose_names))
@@ -190,17 +212,14 @@ def main(input_filepath, output_filepath):
     for o in range(cpu_count()):
         inputP.append((o, list(datalist)))
 
-    # current_index = 0
-    # # for img_name, pose_name in tqdm(zip(image_names, pose_names)):
-
     with Pool() as p:
-        for _ in tqdm(p.imap_unordered(process_data, inputP), total=len(inputP)):
-            pass
+        p.imap_unordered(process_data, inputP)
         p.close()
         p.join()
 
     current_index = output_counter.value
 
+    print("")
     logger.info(f"Number of images generated = {current_index}")
 
     # update the train.txt and val.txt output_filepath
@@ -216,6 +235,29 @@ def main(input_filepath, output_filepath):
     for i in val_list:
         f.write("{:06d}".format(i) + "\n")
     f.close()
+
+    # calculate the weight of the dataset
+    vp_weight_balance = []
+    for i in range(64):
+        if vparr[i] != 0:
+            vp_weight_balance.append(1.0 / vparr[i])
+        else:
+            vp_weight_balance.append(1.0)
+
+    np.save(
+        output_filepath + "vp_weight.npy", vp_weight_balance,
+    )
+
+    rot_weight_balance = []
+    for i in range(60):
+        if rotarr[i] != 0:
+            rot_weight_balance.append(1.0 / rotarr[i])
+        else:
+            rot_weight_balance.append(1.0)
+
+    np.save(
+        output_filepath + "rot_weight.npy", rot_weight_balance,
+    )
 
 
 if __name__ == "__main__":

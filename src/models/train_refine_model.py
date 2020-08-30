@@ -97,6 +97,13 @@ scheduler = lr_scheduler.MultiplicativeLR(optimizer, lr_lambda=lmbda)
 torch.autograd.set_detect_anomaly(True)
 
 
+# shape of inputs:
+# inputPose (_,4,4)
+# rot (_,3)
+# trans(_,1,2)
+# dist(_,1,1)
+# imageSize 1
+# rescaleValue(_)
 def getPredictPose(initPose, rot, trans, dist, imagesize, rescaleValue):
     # convert the shift to right format
     trans = (trans - 0.5) * imagesize
@@ -479,8 +486,8 @@ def val():
 
 
 if __name__ == "__main__":
-    # val()
-    train()
+    val()
+    # train()
     print("done")
     # initPose rot error = 0.35
 

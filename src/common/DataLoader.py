@@ -57,7 +57,7 @@ class Rot_data(Dataset):
         label_path = self.poseDataPath + self.dataNames[idx] + ".npy"
         pose = np.load(label_path)
         # remove the symmetry
-        pose = OM.symmetricRemove(pose)
+        # pose = OM.symmetricRemove(pose)
         self.obj.setModelviewMatrix(pose)
         viewPoint, inplaneRotation, offsetFromCenter, depth = self.obj.getLabel()
         vpidx = OM.cal_idx(viewPoint)
@@ -96,7 +96,7 @@ class Refine_data(Dataset):
         if isTrain:
             trainOrVal = "train.txt"
         else:
-            trainOrVal = "val.txt"
+            trainOrVal = "val1.txt"
         self.dataNames = []
         with open(data_path + trainOrVal, "r") as reader:
             for line in reader.readlines():

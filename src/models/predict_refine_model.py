@@ -29,16 +29,10 @@ def init():
     mymodel = torch.load("best_model_refine_housing.pth")
     mymodel.eval()
 
-    chamLoss2d = CHAMFER2D.chamfer_2DDist()
-    chamLoss3d = CHAMFER3D.chamfer_3DDist()
-    softmax = nn.Softmax2d()
-
-    return mymodel, softmax, chamLoss2d, chamLoss3d
+    return mymodel
 
 
-def predict(
-    mymodel, pspmodel, softmax, predict_index, chamLoss2d, chamLoss3d, view_image
-):
+def predict(mymodel, predict_index, view_image):
     numForTest = "{:06d}".format(predict_index)
     processed_data_dir = CFG.REFINE_SATA_PATH
 
@@ -47,16 +41,15 @@ def predict(
     img = cv2.imread(img_path)
 
     # calculate the resize scale
-    rescaleValue = float(IMG_SIZE) / img.shape[0]
+    rescaleValue = Variable(torch.Tensor([float(IMG_SIZE) / img.shape[0]])).cuda()
 
     # resize rgb image
     img = cv2.resize(img, (IMG_SIZE, IMG_SIZE), interpolation=cv2.INTER_AREA)
     testimg = img.copy()
-    preimg = img.copy()
     img = img[:, :, :3].transpose(2, 0, 1)
 
-    img = Variable(torch.from_numpy(img).cuda()).float()
-    img = img.unsqueeze(0)
+    img = Variable(torch.from_numpy(img).cuda()).float() / 255.0
+    input_img = img.unsqueeze(0)
 
     # load edge image
     edge_path = processed_data_dir + numForTest + "edge.png"
@@ -64,23 +57,8 @@ def predict(
     edge_img = cv2.resize(edge_img, (IMG_SIZE, IMG_SIZE), interpolation=cv2.INTER_AREA)
     edge_img = edge_img[:, :, :1].transpose(2, 0, 1)
 
-    edge_img = Variable(torch.from_numpy(edge_img).cuda()).float()
+    edge_img = Variable(torch.from_numpy(edge_img).cuda()).float() / 255.0
     edge_img = edge_img.unsqueeze(0)
-
-    predictMask = pspmodel(img)
-    predictMask = torch.argmax(predictMask, 1, keepdim=True).float()
-    predictMask = (predictMask == 1).float().detach()
-
-    # load bounding image
-    # bounding_path = processed_data_dir + numForTest + "bounding.png"
-    # bounding_img = cv2.imread(bounding_path)
-    # bounding_img = cv2.resize(
-    #     bounding_img, (IMG_SIZE, IMG_SIZE), interpolation=cv2.INTER_AREA
-    # )
-    # bounding_img = bounding_img[:, :, :1].transpose(2, 0, 1)
-
-    # bounding_img = Variable(torch.from_numpy(bounding_img).cuda()).float()
-    # bounding_img = bounding_img.unsqueeze(0)
 
     # load the mask image
     mask_path = processed_data_dir + numForTest + "mask.png"
@@ -88,7 +66,7 @@ def predict(
     mask_img = cv2.resize(mask_img, (IMG_SIZE, IMG_SIZE), interpolation=cv2.INTER_AREA)
     mask_img = mask_img[:, :, :1].transpose(2, 0, 1)
 
-    mask_img = Variable(torch.from_numpy(mask_img).cuda()).float()
+    mask_img = Variable(torch.from_numpy(mask_img).cuda()).float() / 255.0
     mask_img = mask_img.unsqueeze(0)
 
     # load the init 3d points
@@ -121,6 +99,9 @@ def predict(
     flow_input = Variable(flow_inputData)
 
     rot, trans, dist, opticalFlow, segmentMask = mymodel(flow_input)
+    trans = trans.unsqueeze(1)
+    dist = dist.unsqueeze(1)
+
     pred_pose = getPredictPose(
         initPose, rot, trans, dist, input_img.shape[-2], rescaleValue
     )
@@ -144,19 +125,35 @@ def predict(
     camera_matrix[:, 1, 1] = camera_matrix_original[:, 1, 1] * rescaleValue
     camera_matrix.unsqueeze_(1)
 
+    # get init pose pts
+    init3dpts = tgm.transform_points(initPose, init3dPt)
+    init_2d_pts = kornia.project_points(init3dpts, camera_matrix)
+
+    for p in init_2d_pts.cpu().detach().numpy()[0]:
+        testimg = cv2.circle(
+            testimg, (int(p[0]), int(p[1])), radius=0, color=(255, 0, 0), thickness=-1
+        )
+
     # predict 3d pts
     predict3dpts = tgm.transform_points(pred_pose, init3dPt)
     predict_2d_pts = kornia.project_points(predict3dpts, camera_matrix)
 
+    for p in predict_2d_pts.cpu().detach().numpy()[0]:
+        testimg = cv2.circle(
+            testimg, (int(p[0]), int(p[1])), radius=0, color=(0, 0, 255), thickness=-1
+        )
+    cv2.imshow("test", testimg)
+    cv2.waitKey(0)
+
 
 if __name__ == "__main__":
-    m, s, chamLoss2d, chamLoss3d = init()
+    m = init()
     highestLoss = 0.0
     highestIndex = None
     diagonalDist = 0.0335 * 1 * 0.1
     correct = 0
 
-    predict(m, p, s, 375, chamLoss2d, chamLoss3d, True)
+    predict(m, 966, True)
     # for i in tqdm(range(2400)):
     #     ch_loss2d, ch_loss3d = predict(m, p, s, i, chamLoss2d, chamLoss3d, False)
     #     if ch_loss3d < diagonalDist:

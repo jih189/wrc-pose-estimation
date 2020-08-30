@@ -40,7 +40,7 @@ rot_class = 60
 
 train_dir = CFG.PROCESSED_DATA_PATH
 val_dir = CFG.PROCESSED_DATA_PATH
-raw_dir = CFG.VERIFY_IMAGE_PATH
+raw_dir = CFG.PROCESSED_DATA_PATH
 
 train_dataset = Rot_data(data_path=train_dir, pose_data_path=raw_dir, isTrain=True)
 train_loader = DataLoader(
@@ -58,73 +58,7 @@ model = nn.DataParallel(model)
 # model.apply(weights_init)
 model.train()
 
-# weights = [1.0, 1.0, 0.5,1.0, 1.0, 0.12,1.0]
-weights = [
-    1.0,
-    1.0,
-    1.0,
-    1.0,
-    1.0,
-    1.0,
-    1.0,
-    1.0,
-    1.0,
-    1.0,
-    1.0,
-    1.0,
-    1.0,
-    1.0,
-    1.0,
-    1.0,
-    1.0,
-    1.0,
-    1.0,
-    1.0,
-    1.0,
-    1.0,
-    1.0,
-    1.0,
-    1.0,
-    1.0,
-    0.0055248618784530384,
-    1.0,
-    1.0,
-    1.0,
-    1.0,
-    0.004694835680751174,
-    1.0,
-    1.0,
-    0.0022935779816513763,
-    1.0,
-    0.02127659574468085,
-    1.0,
-    1.0,
-    0.0027100271002710027,
-    1.0,
-    1.0,
-    0.0045045045045045045,
-    1.0,
-    0.0045045045045045045,
-    1.0,
-    1.0,
-    0.002583979328165375,
-    1.0,
-    0.5,
-    1.0,
-    1.0,
-    0.008264462809917356,
-    1.0,
-    1.0,
-    0.004166666666666667,
-    1.0,
-    0.005376344086021506,
-    1.0,
-    1.0,
-    0.006802721088435374,
-    1.0,
-    1.0,
-    0.1,
-]
+weights = CFG.ROT_WEIGHTS
 
 
 class_weights = torch.FloatTensor(weights).cuda()

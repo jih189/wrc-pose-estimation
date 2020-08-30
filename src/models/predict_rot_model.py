@@ -21,7 +21,7 @@ obj.setIntrinsicMatrix(CFG.CAMERA_MATRIX)
 obj.determineSharpEdges(0.05)
 obj.generateSamplePoints(0.001, 0.001)
 
-test_file = "001510"
+test_file = "001210"
 img_path = CFG.PROCESSED_DATA_PATH + "crop" + test_file + ".png"
 # img_path = "data/processed/pulley_rot/crop"
 # img_path = "test0.png"
@@ -78,13 +78,13 @@ offset = position[:, :2]
 offset = np.array([upperleftx, upperlefty]) + offset.reshape(2) - principle_pt
 
 
-pose_label = np.load(CFG.VERIFY_IMAGE_PATH + test_file + ".npy")
+pose_label = np.load(CFG.PROCESSED_DATA_PATH + test_file + ".npy")
 depth = np.linalg.norm(pose_label[:3, 3])
 
 pose = obj.label2pose(viewpt, rot, offset, depth)
 # print(pose)
 
-frame = cv2.imread(CFG.VERIFY_IMAGE_PATH + test_file + ".png")
+frame = cv2.imread(CFG.PROCESSED_DATA_PATH + test_file + ".png")
 # frame = cv2.imread("ori0.png")
 # frame = cv2.circle(frame, (upperleftx, upperlefty), radius=2, color=(0,0,255), thickness=-1)
 # frame = cv2.circle(frame, (lowerrightx, lowerrighty), radius=2, color=(0,0,255), thickness=-1)
@@ -98,20 +98,22 @@ def mapt(f, *seq):
     return tuple(map(f, *seq))
 
 
-originPoint = mapt(int, obj.project3Dto2D((0.0, 0.0, 0.0), pose))
-xaxis = obj.project3Dto2D((0.05, 0.0, 0.0), pose)
-frame = cv2.line(frame, originPoint, xaxis, (255, 0, 0), 1)
-yaxis = obj.project3Dto2D((0.0, 0.05, 0.0), pose)
-frame = cv2.line(frame, originPoint, yaxis, (0, 255, 0), 1)
-zaxis = obj.project3Dto2D((0.0, 0.0, 0.05), pose)
-frame = cv2.line(frame, originPoint, zaxis, (0, 0, 255), 1)
+# originPoint = mapt(int, obj.project3Dto2D((0.0, 0.0, 0.0), pose))
+# xaxis = mapt(int, obj.project3Dto2D((0.05, 0.0, 0.0), pose))
+# frame = cv2.line(frame, originPoint, xaxis, (255, 0, 0), 1)
+# yaxis = mapt(int, obj.project3Dto2D((0.0, 0.05, 0.0), pose))
+# frame = cv2.line(frame, originPoint, yaxis, (0, 255, 0), 1)
+# zaxis = mapt(int, obj.project3Dto2D((0.0, 0.0, 0.05), pose))
+# frame = cv2.line(frame, originPoint, zaxis, (0, 0, 255), 1)
 
 obj.setModelviewMatrix(pose)
 obj.findVisibleSamplePoint()
 for pt in obj.sharp_2d_pts:
-    frame = cv2.circle(frame, pt, radius=0, color=(0, 0, 255), thickness=-1)
+    pt = mapt(int, pt)
+    frame = cv2.circle(frame, pt, radius=0, color=(0, 255, 0), thickness=-1)
 
 obj.setModelviewMatrix(pose_label)
+obj.findVisibleSamplePoint()
 viewPoint, inplaneRotation, offsetFromCenter, depth = obj.getLabel()
 print("label index = ", OM.cal_idx(viewPoint))
 inplaneRotation = inplaneRotation % (2 * np.pi) / (2 * np.pi / 60)
@@ -122,13 +124,17 @@ if inplaneRotation in idx:
 else:
     print("Top 5: Wrong")
 
-# originPoint = obj.project3Dto2D((0.0,0.0,0.0), pose_label)
-# xaxis = obj.project3Dto2D((0.05,0.0,0.0), pose_label)
-# frame = cv2.line(frame,originPoint,xaxis,(255,0,0),1)
-# yaxis = obj.project3Dto2D((0.0,0.05,0.0), pose_label)
-# frame = cv2.line(frame,originPoint,yaxis,(0,255,0),1)
-# zaxis = obj.project3Dto2D((0.0,0.0,0.05), pose_label)
-# frame = cv2.line(frame,originPoint,zaxis,(0,0,255),1)
+originPoint = mapt(int, obj.project3Dto2D((0.0, 0.0, 0.0), pose_label))
+xaxis = mapt(int, obj.project3Dto2D((0.05, 0.0, 0.0), pose_label))
+frame = cv2.line(frame, originPoint, xaxis, (255, 0, 0), 1)
+yaxis = mapt(int, obj.project3Dto2D((0.0, 0.05, 0.0), pose_label))
+frame = cv2.line(frame, originPoint, yaxis, (0, 255, 0), 1)
+zaxis = mapt(int, obj.project3Dto2D((0.0, 0.0, 0.05), pose_label))
+frame = cv2.line(frame, originPoint, zaxis, (0, 0, 255), 1)
+
+for pt in obj.sharp_2d_pts:
+    pt = mapt(int, pt)
+    frame = cv2.circle(frame, pt, radius=0, color=(0, 0, 255), thickness=-1)
 
 cv2.imshow("view", frame)
 cv2.waitKey(0)
