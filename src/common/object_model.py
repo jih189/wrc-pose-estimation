@@ -910,6 +910,7 @@ def testInPygame():
 # setup the pygame
 def setup(width, height):
     pygame.init()
+    pygame.mixer.quit()
     pygame.display.set_mode((width, height), pygame.DOUBLEBUF | pygame.OPENGL)
     pygame.display.set_caption("Test demo")
     pygame.display.iconify()

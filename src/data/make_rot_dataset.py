@@ -202,8 +202,8 @@ def main(input_filepath, output_filepath):
     image_names.sort()
     pose_names.sort()
 
-    # image_names = image_names[:10]
-    # pose_names = pose_names[:10]
+    # image_names = image_names[:1]
+    # pose_names = pose_names[:1]
 
     # generate input for function
     datalist = list(zip(image_names, pose_names))

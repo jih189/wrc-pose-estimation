@@ -9,12 +9,13 @@ from tqdm import tqdm
 import random
 import src.common.object_model as OM
 import src.configuration as CFG
+from multiprocessing import Pool, Value, cpu_count, Array
 
 EXPAND_SIZE = 2.0
 RANDOM_NUM = 4
 
-# ignore warming
-np.seterr(divide="ignore", invalid="ignore")
+counter = Value("i", 0)
+output_counter = Value("i", 0)
 
 
 def init():
@@ -31,39 +32,43 @@ def init():
     return obj
 
 
-@click.command()
-@click.argument(
-    "input_filepath", default=CFG.VERIFY_IMAGE_PATH, type=click.Path(exists=True)
-)
-@click.argument(
-    "output_filepath", default=CFG.REFINE_SATA_PATH, type=click.Path()
-)
-def main(input_filepath, output_filepath):
-    """ Runs data processing scripts to turn raw data from (../raw) into
-        cleaned data ready to be analyzed (saved in ../processed).
-    """
-    logger = logging.getLogger(__name__)
-    logger.info("making final data set from raw data")
-    logger.info(f"Input directory: {input_filepath}")
-    logger.info(f"Output directory: {output_filepath}")
+def process_data(args):
+    global counter
+    global output_counter
 
-    input_path = Path(input_filepath)
-    image_names, pose_names = [], []
-    for f in input_path.iterdir():
-        if f.match("*.png"):
-            image_names.append(str(f))
-        if f.match("*.npy"):
-            pose_names.append(str(f))
-    image_names.sort()
-    pose_names.sort()
+    output_filepath = CFG.REFINE_SATA_PATH
 
     obj = init()
 
-    current_index = 0
-    for img_name, pose_name in tqdm(zip(image_names, pose_names)):
+    # parse input
+    (id, datalist) = args
+    (img_names, pose_names) = list(zip(*datalist))
+
+    while True:
+        with counter.get_lock():
+            current_index = counter.value
+            counter.value += 1
+
+        if current_index >= len(datalist):
+            return
+
+        # update the progress bar
+        progress = int(50.0 * current_index / len(datalist))
+        rest_progress = 50 - progress
+        print(
+            "Progress: ["
+            + "=" * progress
+            + " " * rest_progress
+            + "]"
+            + str(100.0 * current_index / len(datalist))
+            + "%",
+            end="\r",
+            flush=True,
+        )
+
         # read image and pose
-        img = cv2.imread(img_name)
-        pose = np.load(pose_name)
+        img = cv2.imread(img_names[current_index])
+        pose = np.load(pose_names[current_index])
 
         # generate set of random poses
         random_poses = obj.resample(pose, RANDOM_NUM)
@@ -72,14 +77,25 @@ def main(input_filepath, output_filepath):
         obj.setModelviewMatrix(pose)
         obj.findVisibleSamplePoint()
 
+        # # test
+        # testimg = img.copy()
+        # for p in obj.sharp_2d_pts:
+        #     testimg = cv2.circle(
+        #         testimg,
+        #         (int(p[0]), int(p[1])),
+        #         radius=1,
+        #         color=(0, 255, 0),
+        #         thickness=-1,
+        #     )
+        # cv2.imshow("test", testimg)
+        # cv2.waitKey(0)
+
         # mask bit
         target_mask = obj.getVisibleArea()
 
-        # find the crop size
-        # [rx, ry, rw, rh] = cv2.boundingRect(target_mask)
-
         # use random sample poses as the init pose
         for random_pose in random_poses:
+
             # get current pose if it is moved to the center
             horizontalR, verticalR = obj.getCenterAngle(random_pose)
 
@@ -110,11 +126,9 @@ def main(input_filepath, output_filepath):
             eh = int(boundingsize)
 
             if ew == 0 or eh == 0:
-                logger.warn(f"Invalid image width/height. Continuing...")
                 continue
 
             if ex < 0 or ey < 0 or ex + ew >= img.shape[1] or ey + eh >= img.shape[0]:
-                logger.warn(f"Bounding box out of image. Continuing...")
                 continue
 
             # generate opt flow
@@ -152,7 +166,8 @@ def main(input_filepath, output_filepath):
             obj.findVisibleSamplePoint()
 
             init3dpts = np.array(obj.visible_sharpedge_samplepoint)
-            if init3dpts.shape[0] < 1000:
+            if init3dpts.shape[0] < 500:
+                print("no enough sample point in this pose! continue...")
                 continue
 
             # get the 3d sample pts from target pose
@@ -161,57 +176,116 @@ def main(input_filepath, output_filepath):
             obj.findVisibleSamplePoint()
 
             target3dpts = np.array(obj.visible_sharpedge_samplepoint)
-            if target3dpts.shape[0] < 1000:
+            if target3dpts.shape[0] < 500:
+                print("no enough sample point in this pose! continue...")
                 continue
 
+            # print("write index ", current_index)
+
+            with output_counter.get_lock():
+                current_output_index = output_counter.value
+                output_counter.value += 1
+
             cv2.imwrite(
-                output_filepath + "{:06d}".format(current_index) + "img.png", crop_img,
+                output_filepath + "{:06d}".format(current_output_index) + "img.png",
+                crop_img,
             )
 
             cv2.imwrite(
-                output_filepath + "{:06d}".format(current_index) + "flow.png",
+                output_filepath + "{:06d}".format(current_output_index) + "flow.png",
                 crop_flowImg,
             )
 
             cv2.imwrite(
-                output_filepath + "{:06d}".format(current_index) + "3d.png",
+                output_filepath + "{:06d}".format(current_output_index) + "3d.png",
                 crop_3dImg,
             )
 
             cv2.imwrite(
-                output_filepath + "{:06d}".format(current_index) + "mask.png",
+                output_filepath + "{:06d}".format(current_output_index) + "mask.png",
                 crop_mask,
             )
             cv2.imwrite(
-                output_filepath + "{:06d}".format(current_index) + "edge.png",
+                output_filepath + "{:06d}".format(current_output_index) + "edge.png",
                 crop_edge,
             )
             cv2.imwrite(
-                output_filepath + "{:06d}".format(current_index) + "labelmask.png",
+                output_filepath
+                + "{:06d}".format(current_output_index)
+                + "labelmask.png",
                 crop_label_mask,
             )
 
             np.save(
-                output_filepath + "{:06d}".format(current_index) + "initPose.npy",
+                output_filepath
+                + "{:06d}".format(current_output_index)
+                + "initPose.npy",
                 current_pose_at_center,
             )
             np.save(
-                output_filepath + "{:06d}".format(current_index) + "targetPose.npy",
+                output_filepath
+                + "{:06d}".format(current_output_index)
+                + "targetPose.npy",
                 target_pose_at_center,
             )
             np.save(
-                output_filepath + "{:06d}".format(current_index) + "init3dPt.npy",
+                output_filepath
+                + "{:06d}".format(current_output_index)
+                + "init3dPt.npy",
                 init3dpts,
             )
             np.save(
-                output_filepath + "{:06d}".format(current_index) + "target3dPt.npy",
+                output_filepath
+                + "{:06d}".format(current_output_index)
+                + "target3dPt.npy",
                 target3dpts,
             )
 
-            if current_index % 500 == 0:
-                logger.info(current_index)
 
-            current_index += 1
+@click.command()
+@click.argument(
+    "input_filepath", default=CFG.VERIFY_IMAGE_PATH, type=click.Path(exists=True)
+)
+@click.argument("output_filepath", default=CFG.REFINE_SATA_PATH, type=click.Path())
+def main(input_filepath, output_filepath):
+    global output_counter
+    """ Runs data processing scripts to turn raw data from (../raw) into
+        cleaned data ready to be analyzed (saved in ../processed).
+    """
+    logger = logging.getLogger(__name__)
+    logger.info("making final data set from raw data")
+    logger.info(f"Input directory: {input_filepath}")
+    logger.info(f"Output directory: {output_filepath}")
+
+    input_path = Path(input_filepath)
+    image_names, pose_names = [], []
+    for f in input_path.iterdir():
+        if f.match("*.png"):
+            image_names.append(str(f))
+        if f.match("*.npy"):
+            pose_names.append(str(f))
+    image_names.sort()
+    pose_names.sort()
+
+    # testind = 877
+    # image_names = image_names[testind : testind + 1]
+    # pose_names = pose_names[testind : testind + 1]
+
+    # generate input for function
+    datalist = list(zip(image_names, pose_names))
+
+    inputP = []
+    for o in range(cpu_count()):
+        inputP.append((o, list(datalist)))
+
+    with Pool() as p:
+        p.imap_unordered(process_data, inputP)
+        p.close()
+        p.join()
+
+    current_index = output_counter.value
+
+    print("")
     logger.info(f"Number of images generated = {current_index}")
 
     # update the train.txt and val.txt output_filepath

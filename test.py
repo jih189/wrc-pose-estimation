@@ -2,6 +2,7 @@ import cv2
 from scipy.io import loadmat
 import src.common.object_model as OM
 import numpy as np
+import tqdm
 
 MODEL_DIR = "data/external/YCB_dataset/models/"
 
@@ -25,8 +26,8 @@ def init_obj(camera_h, camera_w, camera_matrix, cad_model):
     obj.setIntrinsicMatrix(camera_matrix)
     obj.loadObjectCADModel(cad_model)
 
-    obj.determineSharpEdges(0.05)
-    obj.generateSamplePoints(0.0001, 0.0001)
+    obj.determineSharpEdges(0.8)
+    obj.generateSamplePoints(0.000001, 0.1)
     return obj
 
 
@@ -52,41 +53,52 @@ if __name__ == "__main__":
 
     classes = loadClasses("data/external/YCB_dataset/image_sets/classes.txt")
 
-    filename = "data/external/YCB_dataset/data/0000/000001"
-    image_file = filename + "-color.png"
-    mat_file = filename + "-meta.mat"
+    targetpose = np.array(
+        [
+            [0.68670714, -0.7268656, -0.01003767, 0.07240387],
+            [-0.39432726, -0.36086995, -0.84515083, 0.0489662],
+            [0.61068822, 0.58432885, -0.53443427, 0.91424911],
+            [0.0, 0.0, 0.0, 1.0],
+        ]
+    )
 
-    # read image
-    img = cv2.imread(image_file)
-    height = img.shape[0]
-    width = img.shape[1]
+    # 56
+    testind = 1
+    for i in tqdm.tqdm(range(testind, testind + 1, 1)):
+        filename = "data/external/YCB_dataset/data/0038/{:06d}".format(i)
+        image_file = filename + "-color.png"
+        mat_file = filename + "-meta.mat"
 
-    camera_matrix, cls_indexes, poses = loadMeta(mat_file)
-    print("camera matrix")
-    print(camera_matrix)
+        # read image
+        img = cv2.imread(image_file)
+        height = img.shape[0]
+        width = img.shape[1]
 
-    # print(poses.shape)
-    # pose = poses[:, :, 0]
-    # rot = pose[:3, :3]
-    # print(rot @ rot.T)
+        camera_matrix, cls_indexes, poses = loadMeta(mat_file)
 
-    for c in cls_indexes:
-        print("init", classes[c[0] - 1])
-        mesh_dir = MODEL_DIR + classes[c[0] - 1] + "/textureless.obj"
-        print("object mesh dir = ", mesh_dir)
-        obj = init_obj(height, width, camera_matrix, mesh_dir)
+        for c in cls_indexes:
+            # print("init", classes[c[0] - 1])
+            mesh_dir = MODEL_DIR + classes[c[0] - 1] + "/textured.obj"
+            # print("object mesh dir = ", mesh_dir)
+            obj = init_obj(height, width, camera_matrix, mesh_dir)
 
-        pose = processPose(poses[:, :, 0])
-        obj.setModelviewMatrix(pose)
+            pose = processPose(poses[:, :, 0])
+            # if np.allclose(pose, targetpose, rtol=0.01):
+            #     print("found ", str(i))
+            obj.setModelviewMatrix(pose)
 
-        obj.findVisibleSamplePoint()
-        # draw init pose
-        for p in obj.sharp_2d_pts:
-            img = cv2.circle(
-                img, (int(p[0]), int(p[1])), radius=2, color=(0, 255, 0), thickness=-1,
-            )
-        break
+            obj.findVisibleSamplePoint()
+            # draw init pose
+            for p in obj.sharp_2d_pts:
+                img = cv2.circle(
+                    img,
+                    (int(p[0]), int(p[1])),
+                    radius=1,
+                    color=(0, 255, 0),
+                    thickness=-1,
+                )
+            cv2.imshow("image", img)
+            cv2.waitKey(0)
+            cv2.destroyAllWindows()
+            break
 
-    cv2.imshow("image", img)
-    cv2.waitKey(0)
-    cv2.destroyAllWindows()

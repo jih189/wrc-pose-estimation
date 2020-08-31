@@ -55,15 +55,16 @@ val_loader = DataLoader(
 model = Magic_Net(viewpt_class=viewpt_class, rot_class=rot_class).cuda()
 model = nn.DataParallel(model)
 
-# model.apply(weights_init)
 model.train()
 
-weights = CFG.ROT_WEIGHTS
+# read the weights
+vp_weights = np.load(CFG.PROCESSED_DATA_PATH + "vp_weight.npy")
+rot_weights = np.load(CFG.PROCESSED_DATA_PATH + "rot_weight.npy")
 
-
-class_weights = torch.FloatTensor(weights).cuda()
-viewpt_criterion = nn.CrossEntropyLoss(weight=class_weights)
-rot_criterion = nn.CrossEntropyLoss()
+vp_class_weights = torch.FloatTensor(vp_weights).cuda()
+viewpt_criterion = nn.CrossEntropyLoss(weight=vp_class_weights)
+rot_class_weights = torch.FloatTensor(rot_weights).cuda()
+rot_criterion = nn.CrossEntropyLoss(weight=rot_class_weights)
 offset_criterion = nn.MSELoss(reduction="sum")
 lamda = 2.0
 lamda2 = 0.5
