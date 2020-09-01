@@ -26,7 +26,7 @@ def init():
     mymodel = Refine_Net().cuda()
 
     mymodel = nn.DataParallel(mymodel)
-    mymodel = torch.load("best_model_refine_housing.pth")
+    mymodel = torch.load(CFG.BEST_MODEL_REFINE)
     mymodel.eval()
 
     return mymodel

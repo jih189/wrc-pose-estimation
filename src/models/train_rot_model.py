@@ -131,10 +131,10 @@ def train():
         #     }
         # )
         if pre_loss == None:
-            torch.save(model, "best_model_rot.pth")
+            torch.save(model, CFG.BEST_MODEL_ROT)
             pre_loss = val_loss
         elif pre_loss > val_loss:
-            torch.save(model, "best_model_rot.pth")
+            torch.save(model, CFG.BEST_MODEL_ROT)
             pre_loss = val_loss
 
         model.train()

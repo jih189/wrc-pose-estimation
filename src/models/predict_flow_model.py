@@ -20,7 +20,7 @@ def init():
     mymodel = FlowNet().cuda()
 
     mymodel = nn.DataParallel(mymodel)
-    mymodel = torch.load("best_model_flownet.pth")
+    mymodel = torch.load(CFG.BEST_MODEL_FLOWNET)
     mymodel.eval()
 
     return mymodel
@@ -71,7 +71,12 @@ def predict(mymodel, predict_index, view_image):
 
     # running model
     inputData = torch.cat(
-        (mask_img.cuda().float() / 255.0, edge_img.cuda().float() / 255.0, img.cuda().float() / 255.0,), 1,
+        (
+            mask_img.cuda().float() / 255.0,
+            edge_img.cuda().float() / 255.0,
+            img.cuda().float() / 255.0,
+        ),
+        1,
     )
     input = Variable(inputData)
     output, segoutput, _ = mymodel(input)
@@ -96,15 +101,21 @@ def predict(mymodel, predict_index, view_image):
     oriimg = cv2.resize(oriimg, (IMG_SIZE, IMG_SIZE), interpolation=cv2.INTER_AREA)
     invflow = np.zeros(oriimg.shape)
 
-
-    seg_pred = torch.argmax(segoutput, 1, keepdim=True).float().squeeze(1).cpu().detach().numpy()
+    seg_pred = (
+        torch.argmax(segoutput, 1, keepdim=True)
+        .float()
+        .squeeze(1)
+        .cpu()
+        .detach()
+        .numpy()
+    )
 
     cv2.imshow("mask", seg_pred[0])
 
     for y in range(flow_img.shape[0]):
         for x in range(flow_img.shape[1]):
-            if seg_pred[0,y,x] == 1:
-                invflow[y, x] = [0,255,0]
+            if seg_pred[0, y, x] == 1:
+                invflow[y, x] = [0, 255, 0]
     for y in range(flow_img.shape[0]):
         for x in range(flow_img.shape[1]):
             if edge_test[y, x, 0] == 255.0:
@@ -116,7 +127,12 @@ def predict(mymodel, predict_index, view_image):
             if mx != 0.0 or my != 0.0:
                 mx = int((mx - 0.5) * IMG_SIZE)
                 my = int((my - 0.5) * IMG_SIZE)
-                if x + mx >= 0 and x + mx < oriimg.shape[0] and y + my >= 0 and y + my < oriimg.shape[1]:
+                if (
+                    x + mx >= 0
+                    and x + mx < oriimg.shape[0]
+                    and y + my >= 0
+                    and y + my < oriimg.shape[1]
+                ):
                     invflow = cv2.circle(
                         invflow,
                         (x + mx, y + my),
@@ -127,7 +143,13 @@ def predict(mymodel, predict_index, view_image):
 
                     if x % 20 == 0 and y % 20 == 0:
 
-                        oriimg = cv2.line(oriimg, (x, y), (x + mx, y + my), color=(0,255,0), thickness = 1)
+                        oriimg = cv2.line(
+                            oriimg,
+                            (x, y),
+                            (x + mx, y + my),
+                            color=(0, 255, 0),
+                            thickness=1,
+                        )
                         oriimg = cv2.circle(
                             oriimg,
                             (x + mx, y + my),
@@ -135,8 +157,6 @@ def predict(mymodel, predict_index, view_image):
                             color=(255, 0, 0),
                             thickness=-1,
                         )
-
-                
 
     testimg = np.transpose(predictflow[0].cpu().detach().numpy(), (1, 2, 0)).copy()
     oriimg = cv2.resize(

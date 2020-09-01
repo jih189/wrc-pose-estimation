@@ -267,10 +267,6 @@ def main(input_filepath, output_filepath):
     image_names.sort()
     pose_names.sort()
 
-    # testind = 877
-    # image_names = image_names[testind : testind + 1]
-    # pose_names = pose_names[testind : testind + 1]
-
     # generate input for function
     datalist = list(zip(image_names, pose_names))
 

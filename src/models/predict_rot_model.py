@@ -38,7 +38,7 @@ rot_class = 60
 
 model = Magic_Net(viewpt_class=viewpt_class, rot_class=rot_class).cuda()
 model = nn.DataParallel(model)
-model = torch.load("best_model_rot.pth")
+model = torch.load(CFG.BEST_MODEL_ROT)
 model.eval()
 
 output = model(input)

@@ -123,10 +123,10 @@ def train():
         print("val loss = {} iou = {} ".format(val_loss, iou))
 
         if pre_loss == None:
-            torch.save(mymodel, "best_model_flownet.pth")
+            torch.save(mymodel, CFG.BEST_MODEL_FLOWNET)
             pre_loss = val_loss
         elif pre_loss > val_loss:
-            torch.save(mymodel, "best_model_flownet.pth")
+            torch.save(mymodel, CFG.BEST_MODEL_FLOWNET)
             pre_loss = val_loss
         mymodel.train()
         if (epoch + 1) % 50 == 0:

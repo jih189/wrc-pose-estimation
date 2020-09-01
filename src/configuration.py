@@ -25,12 +25,18 @@ CAMERA_MATRIX = np.array(
 # PROCESSED_DATA_PATH = "data/processed/housing_rot/"
 # REFINE_SATA_PATH = "data/processed/housing_refine/"
 # CAD_MODEL = "data/mesh/SBARB6200ZZ-30.obj"
+# BEST_MODEL_FLOWNET = "weights/best_model_flownet_housing.pth"
+# BEST_MODEL_ROT = "weights/best_model_rot_housing.pth"
+# BEST_MODEL_FLOWNET = "weights/best_model_refine_housing.pth"
 
 IMAGE_SAVE_PATH = "data/images/009_gelatin_box/"
 VERIFY_IMAGE_PATH = "data/raw/009_gelatin_box/"
 PROCESSED_DATA_PATH = "data/processed/009_gelatin_box_rot/"
 REFINE_SATA_PATH = "data/processed/009_gelatin_box_refine/"
 CAD_MODEL = "data/mesh/009_gelatin_box.obj"
+BEST_MODEL_FLOWNET = "weights/best_model_flownet_009_gelatin_box.pth"
+BEST_MODEL_ROT = "weights/best_model_rot_009_gelatin_box.pth"
+BEST_MODEL_REFINE = "weights/best_model_refine_009_gelatin_box.pth"
 
 CAMERA_ID = 4
 CAMERA_W = 640

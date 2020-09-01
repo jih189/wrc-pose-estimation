@@ -24,22 +24,6 @@ import cv2
 
 # wandb.init(project="wrc-pose-refinement")
 
-##########init PSPNet #####################
-# PSPmodel = PSPNet().cuda()
-# PSPmodel = nn.DataParallel(PSPmodel)
-# PSPmodel = torch.load("best_model_psp.pth")
-# PSPmodel.eval()
-###########################################
-
-
-##########init flownet #####################
-# flow_model = FlowNet().cuda()
-
-# flow_model = nn.DataParallel(flow_model)
-# flow_model = torch.load("best_model_flownet.pth")
-# flow_model.eval()
-###########################################
-
 batch_size = 64
 epochs = 1000
 lr = 1e-5
@@ -325,10 +309,10 @@ def train():
         mymodel.train()
 
         if pre_loss == None:
-            torch.save(mymodel, "best_model_refine_housing.pth")
+            torch.save(mymodel, CFG.BEST_MODEL_REFINE)
             pre_loss = val_loss
         elif pre_loss > val_loss:
-            torch.save(mymodel, "best_model_refine_housing.pth")
+            torch.save(mymodel, CFG.BEST_MODEL_REFINE)
             pre_loss = val_loss
         mymodel.train()
         if (epoch + 1) % 50 == 0:
