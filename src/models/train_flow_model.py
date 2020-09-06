@@ -16,9 +16,9 @@ import cv2
 
 batch_size = 64
 epochs = 1000
-lr = 3e-4
+lr = 1e-4
 momentum = 0.9
-w_decay = 2.0
+w_decay = 10.0
 seglambda = 1000.0
 
 train_dir = CFG.REFINE_SATA_PATH

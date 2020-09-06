@@ -96,7 +96,7 @@ class Refine_data(Dataset):
         if isTrain:
             trainOrVal = "train.txt"
         else:
-            trainOrVal = "val1.txt"
+            trainOrVal = "val.txt"
         self.dataNames = []
         with open(data_path + trainOrVal, "r") as reader:
             for line in reader.readlines():

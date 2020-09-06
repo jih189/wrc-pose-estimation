@@ -27,7 +27,7 @@ CAMERA_MATRIX = np.array(
 # CAD_MODEL = "data/mesh/SBARB6200ZZ-30.obj"
 # BEST_MODEL_FLOWNET = "weights/best_model_flownet_housing.pth"
 # BEST_MODEL_ROT = "weights/best_model_rot_housing.pth"
-# BEST_MODEL_FLOWNET = "weights/best_model_refine_housing.pth"
+# BEST_MODEL_REFINE = "weights/best_model_refine_housing.pth"
 
 IMAGE_SAVE_PATH = "data/images/009_gelatin_box/"
 VERIFY_IMAGE_PATH = "data/raw/009_gelatin_box/"

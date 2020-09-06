@@ -468,6 +468,19 @@ class ObjectModel:
 
         return img
 
+    def getOptFlowWithPosesAndMask(self, height, width, targetpose, mask):
+
+        img = np.zeros((self.height, self.width, 3), dtype=np.uint8)
+        self.getVisiblePointCloud()
+        for i in range(len(self.pointcloud)):
+            y2d, x2d, x3d, y3d, z3d = self.pointcloud[i]
+            (xn, yn) = self.project3Dto2D((x3d, y3d, z3d), targetpose)
+            if mask[int(yn), int(xn), 0] == 255:
+                img[int(y2d), int(x2d), 0] = int(((xn - x2d) / width + 0.5) * 255)
+                img[int(y2d), int(x2d), 1] = int(((yn - y2d) / height + 0.5) * 255)
+
+        return img
+
     def get3dimage(self, height, width):
 
         maxDistance = self.getMaxDis2Point()

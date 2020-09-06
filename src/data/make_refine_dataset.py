@@ -41,8 +41,11 @@ def process_data(args):
     obj = init()
 
     # parse input
-    (id, datalist) = args
-    (img_names, pose_names) = list(zip(*datalist))
+    (id, datalist, isYCB) = args
+    if isYCB:
+        (img_names, pose_names, mask_names) = list(zip(*datalist))
+    else:
+        (img_names, pose_names) = list(zip(*datalist))
 
     while True:
         with counter.get_lock():
@@ -90,8 +93,12 @@ def process_data(args):
         # cv2.imshow("test", testimg)
         # cv2.waitKey(0)
 
-        # mask bit
-        target_mask = obj.getVisibleArea()
+        # todo need to handle the YCB label mask
+        if isYCB:
+            target_mask = cv2.imread(mask_names[current_index])
+        else:
+            # mask bit
+            target_mask = obj.getVisibleArea()
 
         # use random sample poses as the init pose
         for random_pose in random_poses:
@@ -120,7 +127,7 @@ def process_data(args):
             # get center point from pose
             centerPoint = obj.project3Dto2D((0, 0, 0), random_pose)
 
-            ex = int(centerPoint[0] - boundingsize / 2)  # here is wrong
+            ex = int(centerPoint[0] - boundingsize / 2)
             ey = int(centerPoint[1] - boundingsize / 2)
             ew = int(boundingsize)
             eh = int(boundingsize)
@@ -132,7 +139,12 @@ def process_data(args):
                 continue
 
             # generate opt flow
-            flowImg = obj.getOptFlowWithPoses(boundingsize, boundingsize, pose)
+            if isYCB:
+                flowImg = obj.getOptFlowWithPosesAndMask(
+                    boundingsize, boundingsize, pose, target_mask
+                )
+            else:
+                flowImg = obj.getOptFlowWithPoses(boundingsize, boundingsize, pose)
             crop_flowImg = flowImg[ey : ey + eh, ex : ex + ew]
 
             # generate 3d image
@@ -258,7 +270,7 @@ def main(input_filepath, output_filepath):
     logger.info(f"Output directory: {output_filepath}")
 
     input_path = Path(input_filepath)
-    image_names, pose_names = [], []
+    image_names, pose_names, mask_names = [], [], []
     for f in input_path.iterdir():
         if f.match("*.png"):
             image_names.append(str(f))
@@ -267,12 +279,31 @@ def main(input_filepath, output_filepath):
     image_names.sort()
     pose_names.sort()
 
+    # load the label mask
+    mask_file_inputpath = input_filepath + "label_mask/"
+    mask_file_path = Path(mask_file_inputpath)
+    isYCB = False
+    if mask_file_path.exists() and mask_file_path.is_dir():
+        print("Dataset is YCB dataset")
+        isYCB = True
+        for f in mask_file_path.iterdir():
+            if f.match("*-label.png"):
+                mask_names.append(str(f))
+        mask_names.sort()
+
+    # image_names = image_names[886:896]
+    # pose_names = pose_names[886:896]
+    # mask_names = mask_names[886:896]
+
     # generate input for function
-    datalist = list(zip(image_names, pose_names))
+    if isYCB:
+        datalist = list(zip(image_names, pose_names, mask_names))
+    else:
+        datalist = list(zip(image_names, pose_names))
 
     inputP = []
     for o in range(cpu_count()):
-        inputP.append((o, list(datalist)))
+        inputP.append((o, list(datalist), isYCB))
 
     with Pool() as p:
         p.imap_unordered(process_data, inputP)

@@ -158,7 +158,6 @@ class test_object_model(unittest.TestCase):
             # print("before destory windows")
 
             # cv2.destroyAllWindows()
-    """
 
     def test_depth(self):
 
@@ -170,6 +169,72 @@ class test_object_model(unittest.TestCase):
         # o3d.visualization.draw_geometries([pcd])
 
         print(self.obj.getMaxDis2Point())
+    """
+
+    def test_getOptFlowWithPosesAndMask(self):
+        TEST_NUM = 886
+        EXPAND_SIZE = 240
+
+        # read image and pose
+        img = cv2.imread(
+            "/home/cogrob-wrc/wrc-pose-estimation/data/raw/009_gelatin_box/"
+            + "{:06d}".format(TEST_NUM)
+            + ".png"
+        )
+        pose = np.load(
+            "/home/cogrob-wrc/wrc-pose-estimation/data/raw/009_gelatin_box/"
+            + "{:06d}".format(TEST_NUM)
+            + ".npy"
+        )
+
+        label = cv2.imread(
+            "/home/cogrob-wrc/wrc-pose-estimation/data/raw/009_gelatin_box/label_mask/"
+            + "{:06d}".format(TEST_NUM)
+            + "-label.png"
+        )
+
+        random_poses = self.obj.resample(pose, 1)
+        random_pose = random_poses[0]
+
+        # set pose on object
+        self.obj.setModelviewMatrix(random_pose)
+
+        # generate edge of on the object
+        self.obj.findVisibleSamplePoint()
+        # generate preprocessed data
+        # inital pose mask
+        mask = self.obj.getVisibleArea()
+
+        # find the crop size
+        [_, _, w, h] = cv2.boundingRect(mask)
+
+        boundingsize = max(w, h) * EXPAND_SIZE
+
+        # get center point from pose
+        centerPoint = self.obj.project3Dto2D((0, 0, 0), random_pose)
+
+        ex = int(centerPoint[0] - boundingsize / 2)
+        ey = int(centerPoint[1] - boundingsize / 2)
+        ew = int(boundingsize)
+        eh = int(boundingsize)
+
+        cv2.imshow("mask", label)
+        objmask = np.all(label == [255, 255, 255], axis=-1)
+        othermask = np.all(label != [255, 255, 255], axis=-1)
+        obj_img = img.copy()
+        obj_img[othermask] = [0, 0, 0]
+        inv_obj_img = img.copy()
+        inv_obj_img[objmask] = [0, 0, 0]
+
+        # generate opt flow
+        flowImg = self.obj.getOptFlowWithPosesAndMask(
+            boundingsize, boundingsize, pose, label
+        )
+
+        cv2.imshow("flow", flowImg)
+        cv2.imshow("objimg", obj_img)
+        cv2.imshow("invobjimg", inv_obj_img)
+        cv2.waitKey(0)
 
     @classmethod
     def tearDownClass(cls):
