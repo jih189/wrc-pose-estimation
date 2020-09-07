@@ -169,7 +169,6 @@ class test_object_model(unittest.TestCase):
         # o3d.visualization.draw_geometries([pcd])
 
         print(self.obj.getMaxDis2Point())
-    """
 
     def test_getOptFlowWithPosesAndMask(self):
         TEST_NUM = 886
@@ -231,10 +230,23 @@ class test_object_model(unittest.TestCase):
             boundingsize, boundingsize, pose, label
         )
 
-        cv2.imshow("flow", flowImg)
-        cv2.imshow("objimg", obj_img)
-        cv2.imshow("invobjimg", inv_obj_img)
-        cv2.waitKey(0)
+        # cv2.imshow("flow", flowImg)
+        # cv2.imshow("objimg", obj_img)
+        # cv2.imshow("invobjimg", inv_obj_img)
+        # cv2.waitKey(0)
+    """
+
+    def test_generateSamplePointsOnFace(self):
+        mesh = o3d.io.read_triangle_mesh(CFG.SAMPLE_FACE_MODEL)
+        pcd = o3d.geometry.PointCloud()
+        pcd.points = mesh.vertices
+        samplepoints = np.asarray(pcd.points)
+        print(samplepoints.shape)
+        samplepointind = np.random.choice(samplepoints.shape[0], 1000, replace=False)
+        samplepoints = samplepoints[samplepointind]
+        # visiualize
+        pcd.points = o3d.utility.Vector3dVector(samplepoints)
+        o3d.visualization.draw_geometries([pcd])
 
     @classmethod
     def tearDownClass(cls):

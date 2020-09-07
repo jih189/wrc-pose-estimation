@@ -12,10 +12,11 @@ import random
 import numpy as np
 from src.common.iou import iou
 from chamfer2D.dist_chamfer_2D import chamfer_2DDist
-from poseUtil import getPredictPose, getRotationError
+from poseUtil import getPredictPose, getRotationError, ADD_error
 
 import torchgeometry as tgm
 import kornia
+
 import src.configuration as CFG
 
 import cv2
@@ -28,7 +29,7 @@ batch_size = 64
 epochs = 1000
 lr = 1e-5
 momentum = 0.9
-w_decay = 0.1
+w_decay = 2.0
 seglambda = 2.0
 flowlambda = 1.5
 
@@ -60,16 +61,6 @@ mymodel.module.flownet.eval()
 
 seg_criterion = nn.CrossEntropyLoss(reduce=False)
 cham_criterion = chamfer_2DDist()
-
-# optimizer = optim.SGD(
-#     list(mymodel.module.fc1.parameters()) + list(mymodel.module.fc2.parameters()) + list(mymodel.module.fcrotation.parameters())+
-#     list(mymodel.module.fctraslation.parameters()) + list(mymodel.module.fcdist.parameters())
-#     , lr=lr, momentum=momentum, weight_decay=w_decay
-# )
-
-# optimizer = optim.SGD(
-#     mymodel.parameters(), lr=lr, momentum=momentum, weight_decay=w_decay
-# )
 
 optimizer = optim.Adam(
     mymodel.parameters(), lr=lr, betas=(0.9, 0.99), eps=1e-08, weight_decay=w_decay
@@ -234,6 +225,7 @@ def val():
     avg_loss = []
     avg_rot_error = []
     avg_trans_error = []
+    avg_add_match_rate = []
     avg_iou = []
 
     avg_dist3d_loss = []
@@ -342,6 +334,9 @@ def val():
         # translation error
         transError = torch.norm(pred_pose[:, :3, 3] - targetPose[:, :3, 3], p=2, dim=1)
 
+        # ADD rate
+        addMatchRate = ADD_error(pred_pose, targetPose)
+
         # get normal distance
         dist3dloss = torch.mean(torch.norm(distanceBetweenVec3d, p=1, dim=2), 1).sum()
 
@@ -351,6 +346,7 @@ def val():
 
         avg_loss.append(loss.data.cpu().numpy().sum())
         avg_rot_error.append(rotError.sum())
+        avg_add_match_rate.append(addMatchRate.sum())
         avg_trans_error.append(transError.data.cpu().numpy().sum())
         avg_iou.append(iou_value.data.cpu().numpy())
 
@@ -361,6 +357,7 @@ def val():
 
     tem = sum(avg_loss) / len(val_dataset)
     tem_rot_error = sum(avg_rot_error) / len(val_dataset)
+    term_add_rate = sum(avg_add_match_rate) / len(val_dataset)
     tem_trans_error = sum(avg_trans_error) / len(val_dataset)
     ioutem = sum(avg_iou) / len(val_dataset)
     dist3dlosstem = sum(avg_dist3d_loss) / len(val_dataset)
@@ -368,8 +365,13 @@ def val():
     seglosstem = sum(avg_seg_loss) / len(val_dataset)
     chamferlosstem = sum(avg_chamfer_loss) / len(val_dataset)
     print(
-        "val loss {}, rot_error {}, trans_error {} iou {} chamfer_loss {}".format(
-            tem, tem_rot_error, tem_trans_error, ioutem, chamferlosstem
+        "val loss {}, rot_error {}, trans_error {} iou {} chamfer_loss {} add rate {}%".format(
+            tem,
+            tem_rot_error,
+            tem_trans_error,
+            ioutem,
+            chamferlosstem,
+            term_add_rate * 100,
         )
     )
     print(
