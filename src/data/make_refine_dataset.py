@@ -36,7 +36,7 @@ def process_data(args):
     global counter
     global output_counter
 
-    output_filepath = CFG.REFINE_SATA_PATH
+    output_filepath = CFG.REFINE_DATA_PATH
 
     obj = init()
 
@@ -64,7 +64,9 @@ def process_data(args):
             + " " * rest_progress
             + "]"
             + str(100.0 * current_index / len(datalist))
-            + "%",
+            + "%"
+            + " index "
+            + str(current_index),
             end="\r",
             flush=True,
         )
@@ -93,7 +95,6 @@ def process_data(args):
         # cv2.imshow("test", testimg)
         # cv2.waitKey(0)
 
-        # todo need to handle the YCB label mask
         if isYCB:
             target_mask = cv2.imread(mask_names[current_index])
         else:
@@ -258,7 +259,7 @@ def process_data(args):
 @click.argument(
     "input_filepath", default=CFG.VERIFY_IMAGE_PATH, type=click.Path(exists=True)
 )
-@click.argument("output_filepath", default=CFG.REFINE_SATA_PATH, type=click.Path())
+@click.argument("output_filepath", default=CFG.REFINE_DATA_PATH, type=click.Path())
 def main(input_filepath, output_filepath):
     global output_counter
     """ Runs data processing scripts to turn raw data from (../raw) into
@@ -291,9 +292,9 @@ def main(input_filepath, output_filepath):
                 mask_names.append(str(f))
         mask_names.sort()
 
-    # image_names = image_names[886:896]
-    # pose_names = pose_names[886:896]
-    # mask_names = mask_names[886:896]
+    # image_names = image_names[886:]
+    # pose_names = pose_names[886:]
+    # mask_names = mask_names[886:]
 
     # generate input for function
     if isYCB:

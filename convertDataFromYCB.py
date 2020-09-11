@@ -65,6 +65,56 @@ def moveData(count, source, destintion, pose, cls_num):
 
     cv2.imwrite(destintion + "{:06d}".format(count) + "-label.png", mask_img)
 
+    # copy bounding box
+    box_source = source + "-box.txt"
+    dh, dw = mask_img.shape[0], mask_img.shape[1]
+    label = []
+    with open(box_source) as f:
+        line = f.readline()
+        while line:
+            obj_idx = int(line[:3])
+            _, topleftx, toplefty, downrightx, downrighty = line.split()
+            topleftx = float(topleftx)
+            toplefty = float(toplefty)
+            downrightx = float(downrightx)
+            downrighty = float(downrighty)
+            x = (topleftx + downrightx) / 2.0
+            y = (toplefty + downrighty) / 2.0
+            w = downrightx - topleftx
+            h = downrighty - toplefty
+            x = x / dw
+            w = w / dw
+            y = y / dh
+            h = h / dh
+            if (
+                x >= 0.0
+                and y >= 0.0
+                and x <= 1.0
+                and y <= 1.0
+                and w >= 0.0
+                and w <= 1.0
+                and h >= 0.0
+                and h <= 1.0
+            ):
+                label.append([obj_idx, x, y, w, h])
+            line = f.readline()
+
+    with open(destintion + "{:06d}".format(count) + ".txt", "w") as f:
+        for data in label:
+            line = (
+                str(data[0])
+                + " "
+                + str(data[1])
+                + " "
+                + str(data[2])
+                + " "
+                + str(data[3])
+                + " "
+                + str(data[4])
+                + "\n"
+            )
+            f.write(line)
+
 
 def processData(args):
     global counter

@@ -59,13 +59,13 @@ if __name__ == "__main__":
     yolo_model.to(device).eval()
 
     ################### magic net ########################
-    viewpt_class = 64
-    rot_class = 60
+    # viewpt_class = 64
+    # rot_class = 60
 
-    rot_model = Magic_Net(viewpt_class=viewpt_class, rot_class=rot_class).cuda()
-    rot_model = nn.DataParallel(rot_model)
-    rot_model = torch.load("best_model_rot_housing.pth")
-    rot_model.eval()
+    # rot_model = Magic_Net(viewpt_class=viewpt_class, rot_class=rot_class).cuda()
+    # rot_model = nn.DataParallel(rot_model)
+    # rot_model = torch.load("best_model_rot_housing.pth")
+    # rot_model.eval()
 
     ################# refine net ###########################
     # refine_model = Refine_Net().cuda()
@@ -81,11 +81,11 @@ if __name__ == "__main__":
     # PSP_model.eval()
 
     ################ Flow net ###################################
-    flow_model = FlowNet().cuda()
+    # flow_model = FlowNet().cuda()
 
-    flow_model = nn.DataParallel(flow_model)
-    flow_model = torch.load("best_model_flownet.pth")
-    flow_model.eval()
+    # flow_model = nn.DataParallel(flow_model)
+    # flow_model = torch.load("best_model_flownet.pth")
+    # flow_model.eval()
 
     # init camera
     cap = cv2.VideoCapture(4)
@@ -285,14 +285,21 @@ if __name__ == "__main__":
 
             # running model
             inputData = torch.cat(
-                (mask_img.cuda().float(), edge_img.cuda().float(), crop_img.cuda().float(),), 1,
+                (
+                    mask_img.cuda().float(),
+                    edge_img.cuda().float(),
+                    crop_img.cuda().float(),
+                ),
+                1,
             )
             input = Variable(inputData)
             output, segoutput = flow_model(input)
             predictflow = torch.sigmoid(output)
 
             padding = Variable(
-                torch.zeros(predictflow.shape[0], 1, predictflow.shape[2], predictflow.shape[3])
+                torch.zeros(
+                    predictflow.shape[0], 1, predictflow.shape[2], predictflow.shape[3]
+                )
             ).cuda()
 
             predictflow = torch.cat((predictflow, padding), 1)
@@ -300,7 +307,6 @@ if __name__ == "__main__":
             mask = mask_img == 255.0
 
             predictflow = predictflow * mask
-
 
             # for y in range(IMG_SIZE):
             #     for x in range(IMG_SIZE):

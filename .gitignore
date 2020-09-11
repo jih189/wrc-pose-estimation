@@ -88,4 +88,5 @@ target/
 data/
 wandb/
 *.pth
+*.pt
 cfg/

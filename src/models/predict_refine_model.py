@@ -4,15 +4,15 @@ import cv2
 import matplotlib.pyplot as plt
 from poseUtil import getPredictPose
 
-from models.model import Refine_Net
+from models.model import DeepIM
 import torchgeometry as tgm
 import kornia
 
 import torch
 import torch.nn as nn
 from torchvision import utils
-import chamfer2D.dist_chamfer_2D as CHAMFER2D
-import chamfer3D.dist_chamfer_3D as CHAMFER3D
+
+from poseUtil import getPredictPose, getRotationError, ADD_error, ADDS_error
 
 from torch.autograd import Variable
 from tqdm import tqdm
@@ -22,19 +22,21 @@ IMG_SIZE = 240
 
 
 def init():
-
-    mymodel = Refine_Net().cuda()
+    mymodel = DeepIM().cuda()
 
     mymodel = nn.DataParallel(mymodel)
     mymodel = torch.load(CFG.BEST_MODEL_REFINE)
     mymodel.eval()
+    # mymodel.module.flownet.load_state_dict(
+    #     torch.load(CFG.BEST_MODEL_FLOWNET).module.state_dict()
+    # )
 
     return mymodel
 
 
 def predict(mymodel, predict_index, view_image):
     numForTest = "{:06d}".format(predict_index)
-    processed_data_dir = CFG.REFINE_SATA_PATH
+    processed_data_dir = CFG.REFINE_DATA_PATH
 
     # load rgb image
     img_path = processed_data_dir + numForTest + "img.png"
@@ -99,6 +101,7 @@ def predict(mymodel, predict_index, view_image):
     flow_input = Variable(flow_inputData)
 
     rot, trans, dist, opticalFlow, segmentMask = mymodel(flow_input)
+    print("dist", dist)
     trans = trans.unsqueeze(1)
     dist = dist.unsqueeze(1)
 
@@ -153,7 +156,7 @@ if __name__ == "__main__":
     diagonalDist = 0.0335 * 1 * 0.1
     correct = 0
 
-    predict(m, 2322, True)
+    predict(m, 11, True)
     # for i in tqdm(range(2400)):
     #     ch_loss2d, ch_loss3d = predict(m, p, s, i, chamLoss2d, chamLoss3d, False)
     #     if ch_loss3d < diagonalDist:

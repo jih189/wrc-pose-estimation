@@ -21,8 +21,8 @@ momentum = 0.9
 w_decay = 10.0
 seglambda = 1000.0
 
-train_dir = CFG.REFINE_SATA_PATH
-val_dir = CFG.REFINE_SATA_PATH
+train_dir = CFG.REFINE_DATA_PATH
+val_dir = CFG.REFINE_DATA_PATH
 
 # build train data loader
 train_dataset = FlowNet_data(data_path=train_dir, isTrain=True)

@@ -28,7 +28,7 @@ def init():
 
 def predict(mymodel, predict_index, view_image):
     numForTest = "{:06d}".format(predict_index)
-    processed_data_dir = CFG.REFINE_SATA_PATH
+    processed_data_dir = CFG.REFINE_DATA_PATH
 
     # load rgb image
     img_path = processed_data_dir + numForTest + "img.png"

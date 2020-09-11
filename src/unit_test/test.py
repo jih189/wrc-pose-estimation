@@ -234,7 +234,6 @@ class test_object_model(unittest.TestCase):
         # cv2.imshow("objimg", obj_img)
         # cv2.imshow("invobjimg", inv_obj_img)
         # cv2.waitKey(0)
-    """
 
     def test_generateSamplePointsOnFace(self):
         mesh = o3d.io.read_triangle_mesh(CFG.SAMPLE_FACE_MODEL)
@@ -247,6 +246,17 @@ class test_object_model(unittest.TestCase):
         # visiualize
         pcd.points = o3d.utility.Vector3dVector(samplepoints)
         o3d.visualization.draw_geometries([pcd])
+    """
+
+    def test_norm(self):
+        p1 = torch.Tensor([[[1.0, 1.0], [0.5, 0.5]]])
+        p2 = torch.Tensor([[[0.0, 0.0], [0.0, 0.0]]])
+        print(p1)
+        print(p2)
+        value = p1 - p2
+        print(value)
+        result = torch.norm(value, p=1, dim=2)
+        print(result)
 
     @classmethod
     def tearDownClass(cls):

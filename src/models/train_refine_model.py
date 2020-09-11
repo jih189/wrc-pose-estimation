@@ -12,7 +12,7 @@ import random
 import numpy as np
 from src.common.iou import iou
 from chamfer2D.dist_chamfer_2D import chamfer_2DDist
-from poseUtil import getPredictPose, getRotationError, ADD_error
+from poseUtil import getPredictPose, getRotationError, ADD_error, ADDS_error
 
 import torchgeometry as tgm
 import kornia
@@ -33,8 +33,8 @@ w_decay = 2.0
 seglambda = 2.0
 flowlambda = 1.5
 
-train_dir = CFG.REFINE_SATA_PATH
-val_dir = CFG.REFINE_SATA_PATH
+train_dir = CFG.REFINE_DATA_PATH_CLOSE
+val_dir = CFG.REFINE_DATA_PATH_CLOSE
 
 # build train data loader
 train_dataset = Refine_data(data_path=train_dir, isTrain=True)
@@ -52,11 +52,16 @@ val_loader = DataLoader(
 # mymodel = Refine_Net().cuda()
 mymodel = DeepIM().cuda()
 mymodel = nn.DataParallel(mymodel)
-mymodel.module.flownet.load_state_dict(
-    torch.load(CFG.BEST_MODEL_FLOWNET).module.state_dict()
-)
+# mymodel.module.flownet.load_state_dict(
+#     torch.load(CFG.BEST_MODEL_FLOWNET).module.state_dict()
+# )
+refine_model = torch.load(CFG.BEST_MODEL_REFINE)
 mymodel.module.flownet.eval()
 
+
+# validation setup
+# mymodel = torch.load(CFG.BEST_MODEL_REFINE)
+# mymodel.eval()
 # wandb.watch(mymodel)
 
 seg_criterion = nn.CrossEntropyLoss(reduce=False)
@@ -195,7 +200,7 @@ def train():
             # get normal distance
             distanceBetweenVec3d = predict3dpts - targetFromInit3dPt
             dist3dloss = torch.mean(
-                torch.norm(distanceBetweenVec3d, p=1, dim=2), 1
+                torch.norm(distanceBetweenVec3d, p=2, dim=2), 1
             ).sum()
 
             loss = dist3dloss + flowloss + segloss
@@ -210,10 +215,10 @@ def train():
         mymodel.train()
 
         if pre_loss == None:
-            torch.save(mymodel, CFG.BEST_MODEL_REFINE)
+            torch.save(mymodel, CFG.BEST_MODEL_REFINE_CLOSE)
             pre_loss = val_loss
         elif pre_loss > val_loss:
-            torch.save(mymodel, CFG.BEST_MODEL_REFINE)
+            torch.save(mymodel, CFG.BEST_MODEL_REFINE_CLOSE)
             pre_loss = val_loss
         mymodel.train()
         if (epoch + 1) % 50 == 0:
@@ -226,6 +231,7 @@ def val():
     avg_rot_error = []
     avg_trans_error = []
     avg_add_match_rate = []
+    avg_adds_match_rate = []
     avg_iou = []
 
     avg_dist3d_loss = []
@@ -336,9 +342,11 @@ def val():
 
         # ADD rate
         addMatchRate = ADD_error(pred_pose, targetPose)
+        # ADDS rate
+        addsMatchRate = ADDS_error(pred_pose, targetPose)
 
         # get normal distance
-        dist3dloss = torch.mean(torch.norm(distanceBetweenVec3d, p=1, dim=2), 1).sum()
+        dist3dloss = torch.mean(torch.norm(distanceBetweenVec3d, p=2, dim=2), 1).sum()
 
         loss = dist3dloss + flowloss + segloss
 
@@ -347,6 +355,7 @@ def val():
         avg_loss.append(loss.data.cpu().numpy().sum())
         avg_rot_error.append(rotError.sum())
         avg_add_match_rate.append(addMatchRate.sum())
+        avg_adds_match_rate.append(addsMatchRate.sum())
         avg_trans_error.append(transError.data.cpu().numpy().sum())
         avg_iou.append(iou_value.data.cpu().numpy())
 
@@ -358,6 +367,7 @@ def val():
     tem = sum(avg_loss) / len(val_dataset)
     tem_rot_error = sum(avg_rot_error) / len(val_dataset)
     term_add_rate = sum(avg_add_match_rate) / len(val_dataset)
+    term_adds_rate = sum(avg_adds_match_rate) / len(val_dataset)
     tem_trans_error = sum(avg_trans_error) / len(val_dataset)
     ioutem = sum(avg_iou) / len(val_dataset)
     dist3dlosstem = sum(avg_dist3d_loss) / len(val_dataset)
@@ -365,13 +375,14 @@ def val():
     seglosstem = sum(avg_seg_loss) / len(val_dataset)
     chamferlosstem = sum(avg_chamfer_loss) / len(val_dataset)
     print(
-        "val loss {}, rot_error {}, trans_error {} iou {} chamfer_loss {} add rate {}%".format(
+        "val loss {}, rot_error {}, trans_error {} iou {} chamfer_loss {} add rate {}% adds rate {}%".format(
             tem,
             tem_rot_error,
             tem_trans_error,
             ioutem,
             chamferlosstem,
             term_add_rate * 100,
+            term_adds_rate * 100,
         )
     )
     print(

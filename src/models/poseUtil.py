@@ -6,6 +6,7 @@ import torchgeometry as tgm
 import kornia
 import src.configuration as CFG
 from scipy.spatial.transform import Rotation as R
+from chamfer3D.dist_chamfer_3D import chamfer_3DDist
 
 # shape of inputs:
 # inputPose (_,4,4)
@@ -111,10 +112,12 @@ def ADD_error(pred_pose, targetPose):
     # generate sample points on face of the object
     mesh = o3d.io.read_triangle_mesh(CFG.SAMPLE_FACE_MODEL)
     samplepoints = np.asarray(mesh.vertices)
-    # get diameter
+    # get diameter of model
     maxdim = np.amax(samplepoints, axis=0)
     mindim = np.amin(samplepoints, axis=0)
     diameter = np.linalg.norm(maxdim - mindim)
+
+    # keep only 1000 points on the face of the object randomly
     if samplepoints.shape[0] > numberOfSamplePoints:
         samplepointind = np.random.choice(
             samplepoints.shape[0], numberOfSamplePoints, replace=False
@@ -125,10 +128,48 @@ def ADD_error(pred_pose, targetPose):
         print("points on face is not enough!")
         return None
 
+    # generate 3d points of the target pose and 3d points of the predicted pose
     predict_points = tgm.transform_points(pred_pose, samplepoints)
     target_points = tgm.transform_points(targetPose, samplepoints)
     distanceBetweenVec3d = predict_points - target_points
-    dist3d = torch.norm(distanceBetweenVec3d, p=1, dim=2)
+    dist3d = torch.norm(distanceBetweenVec3d, p=2, dim=2)
+    # count the number of correct points
     result = dist3d < (diameter * 0.1)
+    # calculate the matching rate
+    result = torch.sum(result, dim=1).float() / numberOfSamplePoints
+    return result
+
+
+def ADDS_error(pred_pose, targetPose):
+    numberOfSamplePoints = 1000
+    if pred_pose.shape[0] != targetPose.shape[0]:
+        print("Error: the length of prediction and target are different!")
+        return None
+    # generate sample points on face of the object
+    mesh = o3d.io.read_triangle_mesh(CFG.SAMPLE_FACE_MODEL)
+    samplepoints = np.asarray(mesh.vertices)
+    # get diameter of model
+    maxdim = np.amax(samplepoints, axis=0)
+    mindim = np.amin(samplepoints, axis=0)
+    diameter = np.linalg.norm(maxdim - mindim)
+
+    # keep only 1000 points on the face of the object randomly
+    if samplepoints.shape[0] > numberOfSamplePoints:
+        samplepointind = np.random.choice(
+            samplepoints.shape[0], numberOfSamplePoints, replace=False
+        )
+        samplepoints = torch.from_numpy(samplepoints[samplepointind]).cuda().float()
+        samplepoints = samplepoints.repeat(pred_pose.shape[0], 1, 1)
+    else:
+        print("points on face is not enough!")
+        return None
+    chamLoss = chamfer_3DDist()
+    # generate 3d points of the target pose and 3d points of the predicted pose
+    predict_points = tgm.transform_points(pred_pose, samplepoints)
+    target_points = tgm.transform_points(targetPose, samplepoints)
+    dist1, dist2, _, _ = chamLoss(predict_points, target_points)
+    # count the number of correct points
+    result = dist1 < (diameter * 0.1)
+    # calculate the matching rate
     result = torch.sum(result, dim=1).float() / numberOfSamplePoints
     return result

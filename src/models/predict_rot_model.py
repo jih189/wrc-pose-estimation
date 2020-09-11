@@ -21,7 +21,7 @@ obj.setIntrinsicMatrix(CFG.CAMERA_MATRIX)
 obj.determineSharpEdges(0.05)
 obj.generateSamplePoints(0.001, 0.001)
 
-test_file = "001210"
+test_file = "000000"
 img_path = CFG.PROCESSED_DATA_PATH + "crop" + test_file + ".png"
 # img_path = "data/processed/pulley_rot/crop"
 # img_path = "test0.png"

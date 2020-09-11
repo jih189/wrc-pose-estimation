@@ -8,12 +8,33 @@ import cv2
 import random
 import src.common.object_model as OM
 import src.configuration as CFG
-from multiprocessing import Pool, Value, cpu_count, Array
+from torch.multiprocessing import Pool, Value, cpu_count, Array
+
+
+import torch
+import torch.nn as nn
+
+from models.models import Darknet  # set ONNX_EXPORT in models.py
+
+from src.utils.utils import (
+    non_max_suppression,
+    load_classes,
+    scale_coords,
+    plot_one_box,
+)
+
+torch.multiprocessing.set_sharing_strategy("file_system")
 
 counter = Value("i", 0)
 output_counter = Value("i", 0)
 vparr = Array("i", [0] * 64)
 rotarr = Array("i", [0] * 60)
+
+conf_thres = 0.35
+iou_thres = 0.5
+obj_names = "data/wrs-ycb.names"
+names = load_classes(obj_names)
+colors = [[random.randint(0, 255) for _ in range(3)] for _ in range(len(names))]
 
 
 def init():
@@ -26,6 +47,7 @@ def init():
 
     obj.determineSharpEdges(0.05)
     obj.generateSamplePoints(0.0001, 0.001)
+
     return obj
 
 
@@ -47,6 +69,60 @@ def get_centered_crop(topleft, botright):
     return topleft_new, botright_new
 
 
+def yoloDetection(yolo_model, img):
+    # use yolo to detect object
+    yolo_input = img.copy()
+    # resize image
+    yolo_input = cv2.resize(
+        yolo_input, (int(320), int(416)), interpolation=cv2.INTER_AREA
+    )
+    yolo_input = yolo_input[:, :, :3]
+    yolo_input = yolo_input[:, :, ::-1].transpose(2, 0, 1)
+    yolo_input = np.ascontiguousarray(yolo_input)
+    # load image to the device
+    yolo_input = torch.from_numpy(yolo_input).float()
+
+    # convert image to be used
+    yolo_input /= 255.0  # 0 - 255 to 0.0 - 1.0
+    if yolo_input.ndimension() == 3:
+        yolo_input = yolo_input.unsqueeze(0)
+
+    # Inference
+    yolo_pred = yolo_model(yolo_input)[0].float()
+
+    # Apply NMS
+    yolo_pred = non_max_suppression(
+        yolo_pred, conf_thres, iou_thres, classes=None, agnostic=False
+    )
+
+    yolo_pred = yolo_pred[0]
+    croptopleft, croplowright = None, None
+
+    foundObject = False
+    # Process detections
+    if yolo_pred is not None and len(yolo_pred):
+        # Rescale boxes from img_size to demo size
+        yolo_pred[:, :4] = scale_coords(
+            yolo_input.shape[2:], yolo_pred[:, :4], img.shape
+        ).round()
+
+        for *xyxy, conf, cls in yolo_pred:
+            if names[int(cls)] == CFG.OBJ_NAME:
+                foundObject = True
+                croptopleft = [
+                    int(xyxy[0].cpu().detach().numpy()),
+                    int(xyxy[1].cpu().detach().numpy()),
+                ]
+                croplowright = [
+                    int(xyxy[2].cpu().detach().numpy()),
+                    int(xyxy[3].cpu().detach().numpy()),
+                ]
+                break
+    if not foundObject:
+        return None
+    return (croptopleft, croplowright)
+
+
 def process_data(args):
     global counter
     global output_counter
@@ -58,7 +134,8 @@ def process_data(args):
     obj = init()
 
     # parse input
-    (id, datalist) = args
+    (id, datalist, yolo_model) = args
+    useYolo = False if yolo_model == None else True
     (img_names, pose_names) = list(zip(*datalist))
 
     while True:
@@ -93,48 +170,70 @@ def process_data(args):
         # generate the real bounding box for object
         obj.setModelviewMatrix(pose)
 
-        upperleft, lowerright = obj.findVisibleSamplePoint()
+        if useYolo:
+            # run yolo on image
+            try:
+                yoloresult = yoloDetection(yolo_model, img)
+                if yoloresult == None:
+                    continue
 
-        upperleft, lowerright = (
-            np.array(upperleft).reshape(2),
-            np.array(lowerright).reshape(2),
-        )
+            except Exception as e:
+                print("ERROR: yolo detection error")
+                print(str(e))
+                return
 
-        upperleft_nonrand, lowerright_nonrand = get_centered_crop(upperleft, lowerright)
+            upperleft, lowerright = yoloresult
+            # we need to ensure the center point of the object is in the bounding box
+            center_point = obj.project3Dto2D((0.0, 0.0, 0.0), pose)
+            if (
+                center_point[0] < upperleft[0]
+                or center_point[0] >= lowerright[0]
+                or center_point[1] < upperleft[1]
+                or center_point[1] >= lowerright[1]
+            ):
+                continue
+        else:
+            # random generate a bounding box around the object with given pose
+            upperleft, lowerright = obj.findVisibleSamplePoint()
+            upperleft, lowerright = (
+                np.array(upperleft).reshape(2),
+                np.array(lowerright).reshape(2),
+            )
 
-        high = np.clip(10 / depth, 0, 50)
-        crop_upperleft = (
-            upperleft - np.random.uniform(0, high, upperleft.shape)
-        ).astype(np.int)
-        crop_lowerright = (
-            lowerright + np.random.uniform(0, high, lowerright.shape)
-        ).astype(np.int)
+            high = np.clip(10 / depth, 0, 50)
+            upperleft = (
+                upperleft - np.random.uniform(0, high, upperleft.shape)
+            ).astype(np.int)
+            lowerright = (
+                lowerright + np.random.uniform(0, high, lowerright.shape)
+            ).astype(np.int)
 
-        upperleft_rand, lowerright_rand = get_centered_crop(
-            crop_upperleft, crop_lowerright
-        )
+        crop_upperleft, crop_lowerright = get_centered_crop(upperleft, lowerright)
 
+        # for making life easier, we drop the image if the crop bounding box is out of image
         if (
-            int(upperleft_rand[1]) < 0
-            or int(lowerright_rand[1]) >= img.shape[0]
-            or int(upperleft_rand[0]) < 0
-            or int(lowerright_rand[0]) > img.shape[1]
+            int(crop_upperleft[1]) < 0
+            or int(crop_lowerright[1]) >= img.shape[0]
+            or int(crop_upperleft[0]) < 0
+            or int(crop_lowerright[0]) >= img.shape[1]
         ):
             continue
 
+        # get view point, inplance rotation, offset from center, and depth from the pose
         viewPoint, inplaneRotation, offsetFromCenter, depth = obj.getLabel()
         inplaneRotation = inplaneRotation % (2 * np.pi) / (2 * np.pi / 60)
         if np.isnan(inplaneRotation):
+            # the inplane rotation is invalid when y axis is pointing to camera
             continue
+
+        cropImg = img[
+            int(crop_upperleft[1]) : int(crop_lowerright[1]),
+            int(crop_upperleft[0]) : int(crop_lowerright[0]),
+        ]
 
         with output_counter.get_lock():
             current_output_index = output_counter.value
             output_counter.value += 1
-
-        cropImg = img[
-            int(upperleft_rand[1]) : int(lowerright_rand[1]),
-            int(upperleft_rand[0]) : int(lowerright_rand[0]),
-        ]
 
         np.save(
             output_filepath
@@ -143,10 +242,10 @@ def process_data(args):
             + ".npy",
             np.array(
                 [
-                    int(upperleft_rand[0]),
-                    int(upperleft_rand[1]),
-                    int(lowerright_rand[0]),
-                    int(lowerright_rand[1]),
+                    int(crop_upperleft[0]),
+                    int(crop_upperleft[1]),
+                    int(crop_lowerright[0]),
+                    int(crop_lowerright[1]),
                 ]
             ),
         )
@@ -191,6 +290,18 @@ def main(input_filepath, output_filepath):
     logger.info(f"Input directory: {input_filepath}")
     logger.info(f"Output directory: {output_filepath}")
 
+    #################### yolo #########################
+    weights = "weights/best_yolo.pt"
+    cfg = "cfg/yolov3-tiny3.cfg"
+    image_size = 416
+    yolo_model = Darknet(cfg, image_size)  # default image size is 416
+    # Load weights
+    yolo_model.load_state_dict(torch.load(weights)["model"])
+    # Eval mode
+    yolo_model.eval()
+    # make the model can be shared by multiple processes
+    yolo_model.share_memory()
+
     # read images and poses
     input_path = Path(input_filepath)
     image_names, pose_names = [], []
@@ -209,8 +320,9 @@ def main(input_filepath, output_filepath):
     datalist = list(zip(image_names, pose_names))
 
     inputP = []
+    # if you do not want to use yolo, use pass None instead of model
     for o in range(cpu_count()):
-        inputP.append((o, list(datalist)))
+        inputP.append((o, list(datalist), yolo_model))
 
     with Pool() as p:
         p.imap_unordered(process_data, inputP)

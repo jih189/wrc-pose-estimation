@@ -20,8 +20,8 @@ class_weights = [0.1, 1.0]
 # train_dir = "data/processed/pulley_refine/"
 # val_dir = "data/processed/pulley_refine/"
 
-train_dir = CFG.REFINE_SATA_PATH
-val_dir = CFG.REFINE_SATA_PATH
+train_dir = CFG.REFINE_DATA_PATH
+val_dir = CFG.REFINE_DATA_PATH
 
 train_dataset = PSP_data(data_path=train_dir, isTrain=True)
 train_loader = DataLoader(
