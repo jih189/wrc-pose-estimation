@@ -9,13 +9,33 @@ from tqdm import tqdm
 import random
 import src.common.object_model as OM
 import src.configuration as CFG
-from multiprocessing import Pool, Value, cpu_count, Array
+from torch.multiprocessing import Pool, Value, cpu_count, Array
+
+import torch
+import torch.nn as nn
+
+from models.models import Darknet  # set ONNX_EXPORT in models.py
+
+from src.utils.utils import (
+    non_max_suppression,
+    load_classes,
+    scale_coords,
+    plot_one_box,
+)
+
+torch.multiprocessing.set_sharing_strategy("file_system")
 
 EXPAND_SIZE = 2.0
 RANDOM_NUM = 4
 
 counter = Value("i", 0)
 output_counter = Value("i", 0)
+
+conf_thres = 0.35
+iou_thres = 0.5
+obj_names = "data/wrs-ycb.names"
+names = load_classes(obj_names)
+colors = [[random.randint(0, 255) for _ in range(3)] for _ in range(len(names))]
 
 
 def init():
@@ -32,6 +52,64 @@ def init():
     return obj
 
 
+def yoloDetection(yolo_model, img):
+    # use yolo to detect object
+    yolo_input = img.copy()
+    demo = img.copy()
+    # resize image
+    yolo_input = cv2.resize(
+        yolo_input, (int(320), int(416)), interpolation=cv2.INTER_AREA
+    )
+    yolo_input = yolo_input[:, :, :3]
+    yolo_input = yolo_input[:, :, ::-1].transpose(2, 0, 1)
+    yolo_input = np.ascontiguousarray(yolo_input)
+    # load image to the device
+    yolo_input = torch.from_numpy(yolo_input).float()
+
+    # convert image to be used
+    yolo_input /= 255.0  # 0 - 255 to 0.0 - 1.0
+    if yolo_input.ndimension() == 3:
+        yolo_input = yolo_input.unsqueeze(0)
+
+    # Inference
+    yolo_pred = yolo_model(yolo_input)[0].float()
+
+    # Apply NMS
+    yolo_pred = non_max_suppression(
+        yolo_pred, conf_thres, iou_thres, classes=None, agnostic=False
+    )
+
+    yolo_pred = yolo_pred[0]
+    # croptopleft, croplowright = None, None
+
+    foundObject = False
+    # Process detections
+    if yolo_pred is not None and len(yolo_pred):
+        # Rescale boxes from img_size to demo size
+        yolo_pred[:, :4] = scale_coords(
+            yolo_input.shape[2:], yolo_pred[:, :4], img.shape
+        ).round()
+
+        for *xyxy, conf, cls in yolo_pred:
+            # label = "%s %.2f" % (names[int(cls)], conf)
+            # plot_one_box(xyxy, demo, label=label, color=colors[int(cls)])
+            if names[int(cls)] == CFG.OBJ_NAME:
+                foundObject = True
+                # croptopleft = [
+                #     int(xyxy[0].cpu().detach().numpy()),
+                #     int(xyxy[1].cpu().detach().numpy()),
+                # ]
+                # croplowright = [
+                #     int(xyxy[2].cpu().detach().numpy()),
+                #     int(xyxy[3].cpu().detach().numpy()),
+                # ]
+
+    # cv2.imshow("yolo", demo)
+    # cv2.waitKey(0)
+    # return (croptopleft, croplowright)
+    return foundObject
+
+
 def process_data(args):
     global counter
     global output_counter
@@ -41,7 +119,10 @@ def process_data(args):
     obj = init()
 
     # parse input
-    (id, datalist, isYCB) = args
+    (id, datalist, isYCB, yolo_model) = args
+
+    useYolo = False if yolo_model == None else True
+
     if isYCB:
         (img_names, pose_names, mask_names) = list(zip(*datalist))
     else:
@@ -75,6 +156,18 @@ def process_data(args):
         img = cv2.imread(img_names[current_index])
         pose = np.load(pose_names[current_index])
 
+        if useYolo:
+            # if yolo can't detect the object in the image, then ignore it.
+            try:
+                yoloresult = yoloDetection(yolo_model, img)
+                if yoloresult == False:
+                    continue
+
+            except Exception as e:
+                print("ERROR: yolo detection error")
+                print(str(e))
+                return
+
         # generate set of random poses
         random_poses = obj.resample(pose, RANDOM_NUM)
 
@@ -96,9 +189,10 @@ def process_data(args):
         # cv2.waitKey(0)
 
         if isYCB:
+            # read the mask
             target_mask = cv2.imread(mask_names[current_index])
         else:
-            # mask bit
+            # generate the mask from the pose
             target_mask = obj.getVisibleArea()
 
         # use random sample poses as the init pose
@@ -210,7 +304,7 @@ def process_data(args):
             )
 
             cv2.imwrite(
-                output_filepath + "{:06d}".format(current_output_index) + "3d.png",
+                output_filepath + "{:06d}".format(current_output_index) + "-3d.png",
                 crop_3dImg,
             )
 
@@ -270,6 +364,19 @@ def main(input_filepath, output_filepath):
     logger.info(f"Input directory: {input_filepath}")
     logger.info(f"Output directory: {output_filepath}")
 
+    #################### yolo #########################
+    weights = "weights/best_yolo.pt"
+    cfg = "cfg/yolov3-tiny3.cfg"
+    image_size = 416
+    yolo_model = Darknet(cfg, image_size)  # default image size is 416
+    # Load weights
+    yolo_model.load_state_dict(torch.load(weights)["model"])
+    # Eval mode
+    yolo_model.eval()
+    # make the model can be shared by multiple processes
+    yolo_model.share_memory()
+
+    # read images and poses
     input_path = Path(input_filepath)
     image_names, pose_names, mask_names = [], [], []
     for f in input_path.iterdir():
@@ -292,9 +399,9 @@ def main(input_filepath, output_filepath):
                 mask_names.append(str(f))
         mask_names.sort()
 
-    # image_names = image_names[886:]
-    # pose_names = pose_names[886:]
-    # mask_names = mask_names[886:]
+    # image_names = image_names[:1]
+    # pose_names = pose_names[:1]
+    # mask_names = mask_names[:1]
 
     # generate input for function
     if isYCB:
@@ -304,7 +411,7 @@ def main(input_filepath, output_filepath):
 
     inputP = []
     for o in range(cpu_count()):
-        inputP.append((o, list(datalist), isYCB))
+        inputP.append((o, list(datalist), isYCB, yolo_model))
 
     with Pool() as p:
         p.imap_unordered(process_data, inputP)

@@ -185,6 +185,7 @@ def process_data(args):
             upperleft, lowerright = yoloresult
             # we need to ensure the center point of the object is in the bounding box
             center_point = obj.project3Dto2D((0.0, 0.0, 0.0), pose)
+
             if (
                 center_point[0] < upperleft[0]
                 or center_point[0] >= lowerright[0]
@@ -322,7 +323,7 @@ def main(input_filepath, output_filepath):
     inputP = []
     # if you do not want to use yolo, use pass None instead of model
     for o in range(cpu_count()):
-        inputP.append((o, list(datalist), yolo_model))
+        inputP.append((o, list(datalist), None))
 
     with Pool() as p:
         p.imap_unordered(process_data, inputP)

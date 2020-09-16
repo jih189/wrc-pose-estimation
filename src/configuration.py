@@ -1,6 +1,14 @@
 # this is the configuration file of pose estimation
 import numpy as np
 
+
+# IMAGE_SAVE_PATH = "data/images/pulley/"
+# VERIFY_IMAGE_PATH = "data/raw/pulley/"
+# PROCESSED_DATA_PATH = "data/processed/pulley_rot/"
+# REFINE_DATA_PATH = "data/processed/pulley_refine/"
+# CAD_MODEL = "data/mesh/MBRFA30-2-P6.obj"
+
+
 # CAMERA_MATRIX = np.array(
 #     [
 #         [654.968116289191, 0, 322.67377109101744],
@@ -10,24 +18,21 @@ import numpy as np
 #     dtype="double",
 # )
 
-CAMERA_MATRIX = np.array(
-    [[1066.778, 0, 312.9869], [0, 1067.487, 241.3109], [0, 0, 1],], dtype="double",
-)
-
-# IMAGE_SAVE_PATH = "data/images/pulley/"
-# VERIFY_IMAGE_PATH = "data/raw/pulley/"
-# PROCESSED_DATA_PATH = "data/processed/pulley_rot/"
-# REFINE_DATA_PATH = "data/processed/pulley_refine/"
-# CAD_MODEL = "data/mesh/MBRFA30-2-P6.obj"
-
+# OBJ_NAME = "housing"
 # IMAGE_SAVE_PATH = "data/images/housing/"
 # VERIFY_IMAGE_PATH = "data/raw/housing/"
 # PROCESSED_DATA_PATH = "data/processed/housing_rot/"
 # REFINE_DATA_PATH = "data/processed/housing_refine/"
 # CAD_MODEL = "data/mesh/SBARB6200ZZ-30.obj"
+# SAMPLE_FACE_MODEL = "data/mesh/SBARB6200ZZ-30.obj"
 # BEST_MODEL_FLOWNET = "weights/best_model_flownet_housing.pth"
 # BEST_MODEL_ROT = "weights/best_model_rot_housing.pth"
 # BEST_MODEL_REFINE = "weights/best_model_refine_housing.pth"
+
+
+CAMERA_MATRIX = np.array(
+    [[1066.778, 0, 312.9869], [0, 1067.487, 241.3109], [0, 0, 1],], dtype="double",
+)
 
 OBJ_NAME = "009_gelatin_box"
 IMAGE_SAVE_PATH = "data/images/009_gelatin_box/"

@@ -129,7 +129,7 @@ class ObjectModel:
     # load the object CAD model
     def loadObjectCADModel(self, file_name):
         # load the mesh data
-        self.mesh_obj = pywavefront.Wavefront(file_name, collect_faces=True)
+        self.mesh_obj = Wavefront(file_name, collect_faces=True)
         self.dl = glGenLists(1)
         if not self.dl:
             print("Fail to create a display list")
@@ -196,28 +196,40 @@ class ObjectModel:
     # render the mesh object
     def render(self):
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
-        glPushMatrix()
-        """
-        for point in self.visible_sharpedge_samplepoint:
-            glBegin(GL_POINTS)
-            glVertex3f(point[0], point[1], point[2])
-            glEnd()
-        
-        for line in self.sharp_edges:
-            glBegin(GL_LINES)
-            glVertex3f(line[0][0],line[0][1],line[0][2])
-            glVertex3f(line[1][0],line[1][1],line[1][2])
-            glEnd()
-        """
-        for mesh in self.mesh_obj.mesh_list:
-            glBegin(GL_TRIANGLES)
-            for face in mesh.faces:
-                for vertex_i in face:
-                    glVertex3f(*(self.mesh_obj).vertices[vertex_i])
-            glEnd()
 
-        glPopMatrix()
-        glFlush()
+        lightfv = ctypes.c_float * 4
+        glLightfv(GL_LIGHT0, GL_POSITION, lightfv(0.0, 0.0, -1.0, 0.0))
+        glEnable(GL_LIGHT0)
+
+        glLightfv(GL_LIGHT1, GL_POSITION, lightfv(0.0, 1.0, 0.0, 0.0))
+        glLightfv(GL_LIGHT1, GL_AMBIENT, lightfv(0.0, 0.0, 0.0, 1.0))
+        glLightfv(GL_LIGHT1, GL_DIFFUSE, lightfv(1.0, 1.0, 1.0, 1.0))
+        glEnable(GL_LIGHT1)
+
+        glLightfv(GL_LIGHT2, GL_POSITION, lightfv(0.0, -1.0, 0.0, 0.0))
+        glLightfv(GL_LIGHT2, GL_AMBIENT, lightfv(0.0, 0.0, 0.0, 1.0))
+        glLightfv(GL_LIGHT2, GL_DIFFUSE, lightfv(1.0, 1.0, 1.0, 1.0))
+        glEnable(GL_LIGHT2)
+
+        glLightfv(GL_LIGHT3, GL_POSITION, lightfv(1.0, 0.0, 0.0, 0.0))
+        glLightfv(GL_LIGHT3, GL_AMBIENT, lightfv(0.0, 0.0, 0.0, 1.0))
+        glLightfv(GL_LIGHT3, GL_DIFFUSE, lightfv(1.0, 1.0, 1.0, 1.0))
+        glEnable(GL_LIGHT3)
+
+        glLightfv(GL_LIGHT4, GL_POSITION, lightfv(-1.0, 0.0, 0.0, 0.0))
+        glLightfv(GL_LIGHT4, GL_AMBIENT, lightfv(0.0, 0.0, 0.0, 1.0))
+        glLightfv(GL_LIGHT4, GL_DIFFUSE, lightfv(1.0, 1.0, 1.0, 1.0))
+        glEnable(GL_LIGHT4)
+
+        glLightfv(GL_LIGHT5, GL_POSITION, lightfv(0.0, 0.0, 1.0, 0.0))
+        glLightfv(GL_LIGHT5, GL_AMBIENT, lightfv(0.0, 0.0, 0.0, 1.0))
+        glLightfv(GL_LIGHT5, GL_DIFFUSE, lightfv(1.0, 1.0, 1.0, 1.0))
+        glEnable(GL_LIGHT5)
+
+        glEnable(GL_LIGHTING)
+
+        visualization.draw(self.mesh_obj)
+        img = pygame.image.tostring(window, "RGB", False)
 
     def determineSharpEdges(self, th_sharp):
         self.sharp_edges.clear()
@@ -917,19 +929,20 @@ class ObjectModel:
 
 def testInPygame():
     pygame.display.flip()
-    pygame.time.wait(1000)
+    pygame.time.wait(10)
 
 
 # setup the pygame
 def setup(width, height):
     pygame.init()
     pygame.mixer.quit()
-    pygame.display.set_mode((width, height), pygame.DOUBLEBUF | pygame.OPENGL)
+    window = pygame.display.set_mode((width, height), pygame.DOUBLEBUF | pygame.OPENGL)
     pygame.display.set_caption("Test demo")
-    pygame.display.iconify()
+    # pygame.display.iconify()
 
     glEnable(GL_DEPTH_TEST)
     glShadeModel(GL_FLAT)
+    return window
 
 
 # set camera intrinsic matrix

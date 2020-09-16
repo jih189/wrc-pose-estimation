@@ -29,12 +29,12 @@ batch_size = 64
 epochs = 1000
 lr = 1e-5
 momentum = 0.9
-w_decay = 2.0
+w_decay = 3.0
 seglambda = 2.0
 flowlambda = 1.5
 
-train_dir = CFG.REFINE_DATA_PATH_CLOSE
-val_dir = CFG.REFINE_DATA_PATH_CLOSE
+train_dir = CFG.REFINE_DATA_PATH
+val_dir = CFG.REFINE_DATA_PATH
 
 # build train data loader
 train_dataset = Refine_data(data_path=train_dir, isTrain=True)
@@ -52,10 +52,10 @@ val_loader = DataLoader(
 # mymodel = Refine_Net().cuda()
 mymodel = DeepIM().cuda()
 mymodel = nn.DataParallel(mymodel)
-# mymodel.module.flownet.load_state_dict(
-#     torch.load(CFG.BEST_MODEL_FLOWNET).module.state_dict()
-# )
-refine_model = torch.load(CFG.BEST_MODEL_REFINE)
+mymodel.module.flownet.load_state_dict(
+    torch.load(CFG.BEST_MODEL_FLOWNET).module.state_dict()
+)
+# refine_model = torch.load(CFG.BEST_MODEL_REFINE)
 mymodel.module.flownet.eval()
 
 
@@ -215,10 +215,10 @@ def train():
         mymodel.train()
 
         if pre_loss == None:
-            torch.save(mymodel, CFG.BEST_MODEL_REFINE_CLOSE)
+            torch.save(mymodel, CFG.BEST_MODEL_REFINE)
             pre_loss = val_loss
         elif pre_loss > val_loss:
-            torch.save(mymodel, CFG.BEST_MODEL_REFINE_CLOSE)
+            torch.save(mymodel, CFG.BEST_MODEL_REFINE)
             pre_loss = val_loss
         mymodel.train()
         if (epoch + 1) % 50 == 0:

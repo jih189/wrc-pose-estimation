@@ -111,6 +111,7 @@ def ADD_error(pred_pose, targetPose):
         return None
     # generate sample points on face of the object
     mesh = o3d.io.read_triangle_mesh(CFG.SAMPLE_FACE_MODEL)
+    # mesh = o3d.io.read_triangle_mesh(CFG.CAD_MODEL)
     samplepoints = np.asarray(mesh.vertices)
     # get diameter of model
     maxdim = np.amax(samplepoints, axis=0)
@@ -134,12 +135,15 @@ def ADD_error(pred_pose, targetPose):
     distanceBetweenVec3d = predict_points - target_points
     dist3d = torch.norm(distanceBetweenVec3d, p=2, dim=2)
     # count the number of correct points
+    dist3d = torch.sum(dist3d, dim=1).float() / numberOfSamplePoints
     result = dist3d < (diameter * 0.1)
     # calculate the matching rate
-    result = torch.sum(result, dim=1).float() / numberOfSamplePoints
     return result
 
 
+# shape of inputs:
+# pred_pose (_,4,4)
+# targetPose (_,4,4)
 def ADDS_error(pred_pose, targetPose):
     numberOfSamplePoints = 1000
     if pred_pose.shape[0] != targetPose.shape[0]:
@@ -147,6 +151,7 @@ def ADDS_error(pred_pose, targetPose):
         return None
     # generate sample points on face of the object
     mesh = o3d.io.read_triangle_mesh(CFG.SAMPLE_FACE_MODEL)
+    # mesh = o3d.io.read_triangle_mesh(CFG.CAD_MODEL)
     samplepoints = np.asarray(mesh.vertices)
     # get diameter of model
     maxdim = np.amax(samplepoints, axis=0)
@@ -169,7 +174,7 @@ def ADDS_error(pred_pose, targetPose):
     target_points = tgm.transform_points(targetPose, samplepoints)
     dist1, dist2, _, _ = chamLoss(predict_points, target_points)
     # count the number of correct points
+    dist1 = torch.sum(dist1, dim=1).float() / numberOfSamplePoints
     result = dist1 < (diameter * 0.1)
     # calculate the matching rate
-    result = torch.sum(result, dim=1).float() / numberOfSamplePoints
     return result
