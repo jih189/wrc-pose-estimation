@@ -11,6 +11,7 @@ import math
 from scipy.spatial.transform import Rotation as R
 import torch
 from torch.nn import functional as F
+import time
 
 import sys
 
@@ -201,35 +202,34 @@ class ObjectModel:
         glLightfv(GL_LIGHT0, GL_POSITION, lightfv(0.0, 0.0, -1.0, 0.0))
         glEnable(GL_LIGHT0)
 
-        glLightfv(GL_LIGHT1, GL_POSITION, lightfv(0.0, 1.0, 0.0, 0.0))
-        glLightfv(GL_LIGHT1, GL_AMBIENT, lightfv(0.0, 0.0, 0.0, 1.0))
-        glLightfv(GL_LIGHT1, GL_DIFFUSE, lightfv(1.0, 1.0, 1.0, 1.0))
-        glEnable(GL_LIGHT1)
+        # glLightfv(GL_LIGHT1, GL_POSITION, lightfv(0.0, 1.0, 0.0, 0.0))
+        # glLightfv(GL_LIGHT1, GL_AMBIENT, lightfv(0.0, 0.0, 0.0, 1.0))
+        # glLightfv(GL_LIGHT1, GL_DIFFUSE, lightfv(1.0, 1.0, 1.0, 1.0))
+        # glEnable(GL_LIGHT1)
 
-        glLightfv(GL_LIGHT2, GL_POSITION, lightfv(0.0, -1.0, 0.0, 0.0))
-        glLightfv(GL_LIGHT2, GL_AMBIENT, lightfv(0.0, 0.0, 0.0, 1.0))
-        glLightfv(GL_LIGHT2, GL_DIFFUSE, lightfv(1.0, 1.0, 1.0, 1.0))
-        glEnable(GL_LIGHT2)
+        # glLightfv(GL_LIGHT2, GL_POSITION, lightfv(0.0, -1.0, 0.0, 0.0))
+        # glLightfv(GL_LIGHT2, GL_AMBIENT, lightfv(0.0, 0.0, 0.0, 1.0))
+        # glLightfv(GL_LIGHT2, GL_DIFFUSE, lightfv(1.0, 1.0, 1.0, 1.0))
+        # glEnable(GL_LIGHT2)
 
-        glLightfv(GL_LIGHT3, GL_POSITION, lightfv(1.0, 0.0, 0.0, 0.0))
-        glLightfv(GL_LIGHT3, GL_AMBIENT, lightfv(0.0, 0.0, 0.0, 1.0))
-        glLightfv(GL_LIGHT3, GL_DIFFUSE, lightfv(1.0, 1.0, 1.0, 1.0))
-        glEnable(GL_LIGHT3)
+        # glLightfv(GL_LIGHT3, GL_POSITION, lightfv(1.0, 0.0, 0.0, 0.0))
+        # glLightfv(GL_LIGHT3, GL_AMBIENT, lightfv(0.0, 0.0, 0.0, 1.0))
+        # glLightfv(GL_LIGHT3, GL_DIFFUSE, lightfv(1.0, 1.0, 1.0, 1.0))
+        # glEnable(GL_LIGHT3)
 
-        glLightfv(GL_LIGHT4, GL_POSITION, lightfv(-1.0, 0.0, 0.0, 0.0))
-        glLightfv(GL_LIGHT4, GL_AMBIENT, lightfv(0.0, 0.0, 0.0, 1.0))
-        glLightfv(GL_LIGHT4, GL_DIFFUSE, lightfv(1.0, 1.0, 1.0, 1.0))
-        glEnable(GL_LIGHT4)
+        # glLightfv(GL_LIGHT4, GL_POSITION, lightfv(-1.0, 0.0, 0.0, 0.0))
+        # glLightfv(GL_LIGHT4, GL_AMBIENT, lightfv(0.0, 0.0, 0.0, 1.0))
+        # glLightfv(GL_LIGHT4, GL_DIFFUSE, lightfv(1.0, 1.0, 1.0, 1.0))
+        # glEnable(GL_LIGHT4)
 
-        glLightfv(GL_LIGHT5, GL_POSITION, lightfv(0.0, 0.0, 1.0, 0.0))
-        glLightfv(GL_LIGHT5, GL_AMBIENT, lightfv(0.0, 0.0, 0.0, 1.0))
-        glLightfv(GL_LIGHT5, GL_DIFFUSE, lightfv(1.0, 1.0, 1.0, 1.0))
-        glEnable(GL_LIGHT5)
+        # glLightfv(GL_LIGHT5, GL_POSITION, lightfv(0.0, 0.0, 1.0, 0.0))
+        # glLightfv(GL_LIGHT5, GL_AMBIENT, lightfv(0.0, 0.0, 0.0, 1.0))
+        # glLightfv(GL_LIGHT5, GL_DIFFUSE, lightfv(1.0, 1.0, 1.0, 1.0))
+        # glEnable(GL_LIGHT5)
 
         glEnable(GL_LIGHTING)
 
         visualization.draw(self.mesh_obj)
-        img = pygame.image.tostring(window, "RGB", False)
 
     def determineSharpEdges(self, th_sharp):
         self.sharp_edges.clear()
@@ -349,21 +349,21 @@ class ObjectModel:
     def resample(self, pose, numOfPose):
 
         # generate random value for rotation and translation
-        xRot_1 = np.random.normal(0, 0.17, int(numOfPose / 2))
-        yRot_1 = np.random.normal(0, 0.17, int(numOfPose / 2))
-        zRot_1 = np.random.normal(0, 0.17, int(numOfPose / 2))
+        xRot_1 = np.random.normal(0, 0.15, int(numOfPose / 2))
+        yRot_1 = np.random.normal(0, 0.15, int(numOfPose / 2))
+        zRot_1 = np.random.normal(0, 0.15, int(numOfPose / 2))
 
-        xTrans_1 = np.random.normal(0, 0.02, int(numOfPose / 2))
-        yTrans_1 = np.random.normal(0, 0.02, int(numOfPose / 2))
-        zTrans_1 = np.random.normal(0, 0.1, int(numOfPose / 2))
+        xTrans_1 = np.random.normal(0, 0.015, int(numOfPose / 2))
+        yTrans_1 = np.random.normal(0, 0.015, int(numOfPose / 2))
+        zTrans_1 = np.random.normal(0, 0.15, int(numOfPose / 2))
 
         xRot_2 = np.random.normal(0, 0.3, numOfPose - int(numOfPose / 2))
         yRot_2 = np.random.normal(0, 0.3, numOfPose - int(numOfPose / 2))
         zRot_2 = np.random.normal(0, 0.3, numOfPose - int(numOfPose / 2))
 
-        xTrans_2 = np.random.normal(0, 0.01, numOfPose - int(numOfPose / 2))
-        yTrans_2 = np.random.normal(0, 0.01, numOfPose - int(numOfPose / 2))
-        zTrans_2 = np.random.normal(0, 0.08, numOfPose - int(numOfPose / 2))
+        xTrans_2 = np.random.normal(0, 0.005, numOfPose - int(numOfPose / 2))
+        yTrans_2 = np.random.normal(0, 0.005, numOfPose - int(numOfPose / 2))
+        zTrans_2 = np.random.normal(0, 0.07, numOfPose - int(numOfPose / 2))
 
         xRot = np.concatenate((xRot_1, xRot_2))
         yRot = np.concatenate((yRot_1, yRot_2))
@@ -427,10 +427,17 @@ class ObjectModel:
         return poses
 
     def getVisibleArea(self):
-        buffer = glReadPixels(0, 0, self.width, self.height, GL_RGB, GL_UNSIGNED_BYTE)
-        ret = np.frombuffer(buffer, dtype="ubyte").reshape(self.height, self.width, 3)
+        ret = np.zeros([self.height, self.width], dtype=np.uint8)
+        mask = self.getMask()
+        ret[mask] = 255
+        return ret
+
+    def getMask(self):
+        buffer = glReadPixels(0, 0, self.width, self.height, GL_DEPTH_COMPONENT, GL_FLOAT)
+        ret = np.frombuffer(buffer, np.float32).reshape(self.height, self.width, 1)
         ret = cv2.flip(ret, 0)
-        return ret[:, :, 0]
+        ret = ret < 0.99
+        return ret
 
     def getVisiblePointCloud(self):
         self.pointcloud.clear()

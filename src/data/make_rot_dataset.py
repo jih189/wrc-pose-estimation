@@ -292,16 +292,18 @@ def main(input_filepath, output_filepath):
     logger.info(f"Output directory: {output_filepath}")
 
     #################### yolo #########################
-    weights = "weights/best_yolo.pt"
-    cfg = "cfg/yolov3-tiny3.cfg"
-    image_size = 416
-    yolo_model = Darknet(cfg, image_size)  # default image size is 416
-    # Load weights
-    yolo_model.load_state_dict(torch.load(weights)["model"])
-    # Eval mode
-    yolo_model.eval()
-    # make the model can be shared by multiple processes
-    yolo_model.share_memory()
+    # if you do not want to use yolo, comment this part
+    # weights = "weights/best_yolo.pt"
+    # cfg = "cfg/yolov3-tiny3.cfg"
+    # image_size = 416
+    # yolo_model = Darknet(cfg, image_size)  # default image size is 416
+    # # Load weights
+    # yolo_model.load_state_dict(torch.load(weights)["model"])
+    # # Eval mode
+    # yolo_model.eval()
+    # # make the model can be shared by multiple processes
+    # yolo_model.share_memory()
+    ################################################
 
     # read images and poses
     input_path = Path(input_filepath)

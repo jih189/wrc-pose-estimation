@@ -136,6 +136,10 @@ def process_data(args):
         if current_index >= len(datalist):
             return
 
+        try:
+            np.random.seed(current_index)
+        except Exception as e:
+            print(str(e))
         # update the progress bar
         progress = int(50.0 * current_index / len(datalist))
         rest_progress = 50 - progress
@@ -145,9 +149,7 @@ def process_data(args):
             + " " * rest_progress
             + "]"
             + str(100.0 * current_index / len(datalist))
-            + "%"
-            + " index "
-            + str(current_index),
+            + "%",
             end="\r",
             flush=True,
         )
@@ -155,6 +157,13 @@ def process_data(args):
         # read image and pose
         img = cv2.imread(img_names[current_index])
         pose = np.load(pose_names[current_index])
+
+        # if this is symmetric object, you need to remove the redundent poses
+        try:
+            # pose = OM.symmetricRemove_housing(pose)
+            pose = OM.symmetricRemove(pose)
+        except Exception as e:
+            print(str(e))
 
         if useYolo:
             # if yolo can't detect the object in the image, then ignore it.
@@ -364,17 +373,17 @@ def main(input_filepath, output_filepath):
     logger.info(f"Input directory: {input_filepath}")
     logger.info(f"Output directory: {output_filepath}")
 
-    #################### yolo #########################
-    weights = "weights/best_yolo.pt"
-    cfg = "cfg/yolov3-tiny3.cfg"
-    image_size = 416
-    yolo_model = Darknet(cfg, image_size)  # default image size is 416
-    # Load weights
-    yolo_model.load_state_dict(torch.load(weights)["model"])
-    # Eval mode
-    yolo_model.eval()
-    # make the model can be shared by multiple processes
-    yolo_model.share_memory()
+    # #################### yolo #########################
+    # weights = "weights/best_yolo.pt"
+    # cfg = "cfg/yolov3-tiny3.cfg"
+    # image_size = 416
+    # yolo_model = Darknet(cfg, image_size)  # default image size is 416
+    # # Load weights
+    # yolo_model.load_state_dict(torch.load(weights)["model"])
+    # # Eval mode
+    # yolo_model.eval()
+    # # make the model can be shared by multiple processes
+    # yolo_model.share_memory()
 
     # read images and poses
     input_path = Path(input_filepath)
@@ -399,9 +408,9 @@ def main(input_filepath, output_filepath):
                 mask_names.append(str(f))
         mask_names.sort()
 
-    # image_names = image_names[:1]
-    # pose_names = pose_names[:1]
-    # mask_names = mask_names[:1]
+    image_names = image_names[:5]
+    pose_names = pose_names[:5]
+    
 
     # generate input for function
     if isYCB:
@@ -411,7 +420,7 @@ def main(input_filepath, output_filepath):
 
     inputP = []
     for o in range(cpu_count()):
-        inputP.append((o, list(datalist), isYCB, yolo_model))
+        inputP.append((o, list(datalist), isYCB, None))
 
     with Pool() as p:
         p.imap_unordered(process_data, inputP)

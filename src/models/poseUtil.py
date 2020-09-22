@@ -105,7 +105,7 @@ def getRotationError(pred_pose, targetPose):
 # pred_pose (_,4,4)
 # targetPose (_,4,4)
 def ADD_error(pred_pose, targetPose):
-    numberOfSamplePoints = 1000
+    numberOfSamplePoints = 500
     if pred_pose.shape[0] != targetPose.shape[0]:
         print("Error: the length of prediction and target are different!")
         return None
@@ -145,7 +145,7 @@ def ADD_error(pred_pose, targetPose):
 # pred_pose (_,4,4)
 # targetPose (_,4,4)
 def ADDS_error(pred_pose, targetPose):
-    numberOfSamplePoints = 1000
+    numberOfSamplePoints = 500
     if pred_pose.shape[0] != targetPose.shape[0]:
         print("Error: the length of prediction and target are different!")
         return None

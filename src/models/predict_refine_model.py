@@ -101,7 +101,18 @@ def predict(mymodel, predict_index, view_image):
     flow_input = Variable(flow_inputData)
 
     rot, trans, dist, opticalFlow, segmentMask = mymodel(flow_input)
-    print("dist", dist)
+
+    seg_pred = (
+        torch.argmax(segmentMask, 1, keepdim=True)
+        .float()
+        .squeeze(1)
+        .cpu()
+        .detach()
+        .numpy()
+    )
+
+    cv2.imshow("mask", seg_pred[0])
+
     trans = trans.unsqueeze(1)
     dist = dist.unsqueeze(1)
 
@@ -156,9 +167,9 @@ if __name__ == "__main__":
     diagonalDist = 0.0335 * 1 * 0.1
     correct = 0
 
-    predict(m, 1511, True)
-    # for i in tqdm(range(2400)):
-    #     ch_loss2d, ch_loss3d = predict(m, p, s, i, chamLoss2d, chamLoss3d, False)
+    predict(m, 511, True)
+    # for i in tqdm(range(9000)):
+    #     ch_loss2d, ch_loss3d = predict(m, i, False)
     #     if ch_loss3d < diagonalDist:
     #         correct += 1
     #     if ch_loss2d > highestLoss:

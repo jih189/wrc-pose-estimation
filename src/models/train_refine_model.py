@@ -26,12 +26,12 @@ import cv2
 # wandb.init(project="wrc-pose-refinement")
 
 batch_size = 64
-epochs = 1000
+epochs = 150
 lr = 1e-5
 momentum = 0.9
-w_decay = 3.0
-seglambda = 2.0
-flowlambda = 1.5
+w_decay = 0.1
+seglambda = 0.0
+flowlambda = 10.0
 
 train_dir = CFG.REFINE_DATA_PATH
 val_dir = CFG.REFINE_DATA_PATH
@@ -55,7 +55,6 @@ mymodel = nn.DataParallel(mymodel)
 mymodel.module.flownet.load_state_dict(
     torch.load(CFG.BEST_MODEL_FLOWNET).module.state_dict()
 )
-# refine_model = torch.load(CFG.BEST_MODEL_REFINE)
 mymodel.module.flownet.eval()
 
 
@@ -194,16 +193,26 @@ def train():
 
             # wandb.log
 
+            origin_pt = torch.tensor([0,0,0]).view(1,1,3).cuda().float()
+            origin_pt = origin_pt.repeat(init3dPt.shape[0],init3dPt.shape[1],1)
+            origin_pt = tgm.transform_points(targetPose, origin_pt)
+
             # get distance between each point pairs in 3d
             targetFromInit3dPt = tgm.transform_points(targetPose, init3dPt)
+            predictVec = predict3dpts - origin_pt
+            targetVec = targetFromInit3dPt - origin_pt
+            cos = torch.nn.CosineSimilarity(dim=2, eps=1e-6)
+            cosineSim = cos(predictVec, targetVec)    
+            cosloss = -torch.mean(cosineSim, 1).sum()
 
             # get normal distance
             distanceBetweenVec3d = predict3dpts - targetFromInit3dPt
             dist3dloss = torch.mean(
-                torch.norm(distanceBetweenVec3d, p=2, dim=2), 1
+                torch.norm(distanceBetweenVec3d, p=1, dim=2), 1
             ).sum()
 
-            loss = dist3dloss + flowloss + segloss
+            loss = cosloss + flowloss + segloss 
+            # loss = dist3dloss + flowloss + segloss 
             loss.backward()
             optimizer.step()
             avg_loss.append(loss.data.cpu().numpy().sum())
@@ -319,7 +328,7 @@ def val():
 
         # predict 3d pts
         predict3dpts = tgm.transform_points(pred_pose, init3dPt)
-
+       
         # get distance between each point pairs in 3d
         targetFromInit3dPt = tgm.transform_points(targetPose, init3dPt)
         distanceBetweenVec3d = predict3dpts - targetFromInit3dPt
@@ -346,9 +355,22 @@ def val():
         addsMatchRate = ADDS_error(pred_pose, targetPose)
 
         # get normal distance
-        dist3dloss = torch.mean(torch.norm(distanceBetweenVec3d, p=2, dim=2), 1).sum()
+        dist3dloss = torch.mean(torch.norm(distanceBetweenVec3d, p=1, dim=2), 1).sum()
 
-        loss = dist3dloss + flowloss + segloss
+        origin_pt = torch.tensor([0,0,0]).view(1,1,3).cuda().float()
+        origin_pt = origin_pt.repeat(init3dPt.shape[0],init3dPt.shape[1],1)
+        origin_pt = tgm.transform_points(targetPose, origin_pt)
+
+        # get distance between each point pairs in 3d
+        predictVec = predict3dpts - origin_pt
+        targetVec = targetFromInit3dPt - origin_pt
+        cos = torch.nn.CosineSimilarity(dim=2, eps=1e-6)
+        cosineSim = cos(predictVec, targetVec)    
+        cosloss = -torch.mean(cosineSim, 1).sum()
+
+
+        # loss = dist3dloss + flowloss + segloss
+        loss = cosloss + flowloss + segloss
 
         iou_value = iou(labelmask_img, segmentMask, 1)
 
@@ -366,8 +388,8 @@ def val():
 
     tem = sum(avg_loss) / len(val_dataset)
     tem_rot_error = sum(avg_rot_error) / len(val_dataset)
-    term_add_rate = sum(avg_add_match_rate) / len(val_dataset)
-    term_adds_rate = sum(avg_adds_match_rate) / len(val_dataset)
+    term_add_rate = sum(avg_add_match_rate).float() / len(val_dataset)
+    term_adds_rate = sum(avg_adds_match_rate).float() / len(val_dataset)
     tem_trans_error = sum(avg_trans_error) / len(val_dataset)
     ioutem = sum(avg_iou) / len(val_dataset)
     dist3dlosstem = sum(avg_dist3d_loss) / len(val_dataset)
@@ -398,3 +420,4 @@ if __name__ == "__main__":
     train()
     # print("done")
     # initPose rot error = 0.35
+

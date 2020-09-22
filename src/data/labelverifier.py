@@ -23,8 +23,8 @@ if __name__ == "__main__":
     obj.loadObjectCADModel(CFG.CAD_MODEL)
     obj.setIntrinsicMatrix(CFG.CAMERA_MATRIX)
 
-    obj.determineSharpEdges(0.05)
-    obj.generateSamplePoints(0.001, 0.001)
+    obj.determineSharpEdges(0.9)
+    obj.generateSamplePoints(0.001, 0.00000001)
 
     print("s key: save the image")
     print("q key: quit")
@@ -47,12 +47,13 @@ if __name__ == "__main__":
 
         cropImg = img.copy()
         for p in obj.sharp_2d_pts:
+            p = (int(p[0]), int(p[1]))
             cropImg = cv2.circle(cropImg, p, radius=0, color=(0, 0, 255), thickness=-1)
 
         cropImg = cropImg[upperleft[1] : lowerright[1], upperleft[0] : lowerright[0]]
         cropImg = cv2.resize(
             cropImg,
-            (cropImg.shape[0] * 10, cropImg.shape[1] * 10),
+            (cropImg.shape[1] * 30, cropImg.shape[0] * 30),
             interpolation=cv2.INTER_AREA,
         )
         cv2.imshow("crop", cropImg)
