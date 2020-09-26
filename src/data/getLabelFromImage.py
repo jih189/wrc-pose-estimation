@@ -113,11 +113,12 @@ if __name__ == "__main__":
 
             upperleft, lowerright = obj.findVisibleSamplePoint()
             if upperleft is None or lowerright is None:
+                frame_captured, frame = capture.read()
                 continue
             upperleft = (int(upperleft[0]), int(upperleft[1]))
             lowerright = (int(lowerright[0]), int(lowerright[1]))
 
-            pose = OM.symmetricRemove_housing(pose)
+            # pose = OM.symmetricRemove_housing(pose)
             obj.setModelviewMatrix(pose)
             viewPoint, inplaneRotation, offsetFromCenter, depth = obj.getLabel()
             vpidx = OM.cal_idx(viewPoint)

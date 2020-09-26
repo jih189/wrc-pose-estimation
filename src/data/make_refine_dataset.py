@@ -47,8 +47,8 @@ def init():
     obj.setIntrinsicMatrix(CFG.CAMERA_MATRIX)
     obj.loadObjectCADModel(CFG.CAD_MODEL)
 
-    obj.determineSharpEdges(0.05)
-    obj.generateSamplePoints(0.0001, 0.001)
+    obj.determineSharpEdges(0.8)
+    obj.generateSamplePoints(0.001, 0.0001)
     return obj
 
 
@@ -135,227 +135,237 @@ def process_data(args):
 
         if current_index >= len(datalist):
             return
-
         try:
             np.random.seed(current_index)
-        except Exception as e:
-            print(str(e))
-        # update the progress bar
-        progress = int(50.0 * current_index / len(datalist))
-        rest_progress = 50 - progress
-        print(
-            "Progress: ["
-            + "=" * progress
-            + " " * rest_progress
-            + "]"
-            + str(100.0 * current_index / len(datalist))
-            + "%",
-            end="\r",
-            flush=True,
-        )
 
-        # read image and pose
-        img = cv2.imread(img_names[current_index])
-        pose = np.load(pose_names[current_index])
+            # update the progress bar
+            progress = int(50.0 * current_index / len(datalist))
+            rest_progress = 50 - progress
+            print(
+                "Progress: ["
+                + "=" * progress
+                + " " * rest_progress
+                + "]"
+                + str(100.0 * current_index / len(datalist))
+                + "%",
+                end="\r",
+                flush=True,
+            )
 
-        # if this is symmetric object, you need to remove the redundent poses
-        try:
+            # read image and pose
+            img = cv2.imread(img_names[current_index])
+            pose = np.load(pose_names[current_index])
+
+            # if this is symmetric object, you need to remove the redundent poses
             # pose = OM.symmetricRemove_housing(pose)
-            pose = OM.symmetricRemove(pose)
-        except Exception as e:
-            print(str(e))
+            # pose = OM.symmetricRemove(pose)
 
-        if useYolo:
-            # if yolo can't detect the object in the image, then ignore it.
-            try:
-                yoloresult = yoloDetection(yolo_model, img)
-                if yoloresult == False:
+            if useYolo:
+                # if yolo can't detect the object in the image, then ignore it.
+                try:
+                    yoloresult = yoloDetection(yolo_model, img)
+                    if yoloresult == False:
+                        continue
+
+                except Exception as e:
+                    print("ERROR: yolo detection error")
+                    print(str(e))
+                    return
+
+            # generate set of random poses
+            random_poses = obj.resample(pose, RANDOM_NUM)
+
+            # generate the real bounding box for object
+            obj.setModelviewMatrix(pose)
+            obj.findVisibleSamplePoint()
+
+            # # test
+            # testimg = img.copy()
+            # for p in obj.sharp_2d_pts:
+            #     testimg = cv2.circle(
+            #         testimg,
+            #         (int(p[0]), int(p[1])),
+            #         radius=1,
+            #         color=(0, 255, 0),
+            #         thickness=-1,
+            #     )
+            # cv2.imshow("test", testimg)
+            # cv2.waitKey(0)
+
+            if isYCB:
+                # read the mask
+                target_mask = cv2.imread(mask_names[current_index])
+            else:
+                # generate the mask from the pose
+                target_mask = obj.getVisibleArea()
+
+            # use random sample poses as the init pose
+            for random_pose in random_poses:
+
+                # get current pose if it is moved to the center
+                horizontalR, verticalR = obj.getCenterAngle(random_pose)
+
+                # set pose on object
+                obj.setModelviewMatrix(random_pose)
+
+                # generate edge of on the object
+                obj.findVisibleSamplePoint()
+
+                # generate preprocessed data
+                # inital pose mask
+                mask = obj.getVisibleArea()
+
+                # get edge img
+                edge = obj.getEdge(img.shape[0], img.shape[1])
+
+                # find the crop size
+                [_, _, w, h] = cv2.boundingRect(mask)
+
+                boundingsize = max(w, h) * EXPAND_SIZE
+
+                # get center point from pose
+                centerPoint = obj.project3Dto2D((0, 0, 0), random_pose)
+
+                ex = int(centerPoint[0] - boundingsize / 2)
+                ey = int(centerPoint[1] - boundingsize / 2)
+                ew = int(boundingsize)
+                eh = int(boundingsize)
+
+                if ew == 0 or eh == 0:
                     continue
 
-            except Exception as e:
-                print("ERROR: yolo detection error")
-                print(str(e))
-                return
+                if (
+                    ex < 0
+                    or ey < 0
+                    or ex + ew >= img.shape[1]
+                    or ey + eh >= img.shape[0]
+                ):
+                    continue
 
-        # generate set of random poses
-        random_poses = obj.resample(pose, RANDOM_NUM)
+                # generate opt flow
+                if isYCB:
+                    flowImg = obj.getOptFlowWithPosesAndMask(
+                        boundingsize, boundingsize, pose, target_mask
+                    )
+                else:
+                    flowImg = obj.getOptFlowWithPoses(boundingsize, boundingsize, pose)
 
-        # generate the real bounding box for object
-        obj.setModelviewMatrix(pose)
-        obj.findVisibleSamplePoint()
+                crop_flowImg = flowImg[ey : ey + eh, ex : ex + ew]
 
-        # # test
-        # testimg = img.copy()
-        # for p in obj.sharp_2d_pts:
-        #     testimg = cv2.circle(
-        #         testimg,
-        #         (int(p[0]), int(p[1])),
-        #         radius=1,
-        #         color=(0, 255, 0),
-        #         thickness=-1,
-        #     )
-        # cv2.imshow("test", testimg)
-        # cv2.waitKey(0)
+                # generate 3d image
+                imgFor3d = obj.get3dimage(boundingsize, boundingsize)
+                crop_3dImg = imgFor3d[ey : ey + eh, ex : ex + ew]
 
-        if isYCB:
-            # read the mask
-            target_mask = cv2.imread(mask_names[current_index])
-        else:
-            # generate the mask from the pose
-            target_mask = obj.getVisibleArea()
+                # crop_img = img[ey : ey + eh, ex : ex + ew].copy()
+                # cropped image with initial pose as center
+                crop_img = img[ey : ey + eh, ex : ex + ew]
+                # cropped mask for initial pose
+                crop_mask = mask[ey : ey + eh, ex : ex + ew]
+                # cropped edges for initial pose
+                crop_edge = edge[ey : ey + eh, ex : ex + ew]
 
-        # use random sample poses as the init pose
-        for random_pose in random_poses:
+                # target mask
+                crop_label_mask = target_mask[ey : ey + eh, ex : ex + ew]
 
-            # get current pose if it is moved to the center
-            horizontalR, verticalR = obj.getCenterAngle(random_pose)
-
-            # set pose on object
-            obj.setModelviewMatrix(random_pose)
-
-            # generate edge of on the object
-            obj.findVisibleSamplePoint()
-
-            # generate preprocessed data
-            # inital pose mask
-            mask = obj.getVisibleArea()
-
-            # get edge img
-            edge = obj.getEdge(img.shape[0], img.shape[1])
-
-            # find the crop size
-            [_, _, w, h] = cv2.boundingRect(mask)
-
-            boundingsize = max(w, h) * EXPAND_SIZE
-
-            # get center point from pose
-            centerPoint = obj.project3Dto2D((0, 0, 0), random_pose)
-
-            ex = int(centerPoint[0] - boundingsize / 2)
-            ey = int(centerPoint[1] - boundingsize / 2)
-            ew = int(boundingsize)
-            eh = int(boundingsize)
-
-            if ew == 0 or eh == 0:
-                continue
-
-            if ex < 0 or ey < 0 or ex + ew >= img.shape[1] or ey + eh >= img.shape[0]:
-                continue
-
-            # generate opt flow
-            if isYCB:
-                flowImg = obj.getOptFlowWithPosesAndMask(
-                    boundingsize, boundingsize, pose, target_mask
+                # apply rotation on the initial pose to move to it to the center
+                current_pose_at_center = obj.rotatePoseWithAngle(
+                    random_pose, horizontalR, verticalR
                 )
-            else:
-                flowImg = obj.getOptFlowWithPoses(boundingsize, boundingsize, pose)
-            crop_flowImg = flowImg[ey : ey + eh, ex : ex + ew]
 
-            # generate 3d image
-            imgFor3d = obj.get3dimage(boundingsize, boundingsize)
-            crop_3dImg = imgFor3d[ey : ey + eh, ex : ex + ew]
+                # apply same rotation as above
+                target_pose_at_center = obj.rotatePoseWithAngle(
+                    pose, horizontalR, verticalR
+                )
 
-            # crop_img = img[ey : ey + eh, ex : ex + ew].copy()
-            # cropped image with initial pose as center
-            crop_img = img[ey : ey + eh, ex : ex + ew]
-            # cropped mask for initial pose
-            crop_mask = mask[ey : ey + eh, ex : ex + ew]
-            # cropped edges for initial pose
-            crop_edge = edge[ey : ey + eh, ex : ex + ew]
+                # get the 3d pts from init pose
+                obj.setModelviewMatrix(current_pose_at_center)
+                # generate edge of on the object
+                obj.findVisibleSamplePoint()
 
-            # target mask
-            crop_label_mask = target_mask[ey : ey + eh, ex : ex + ew]
+                init3dpts = np.array(obj.visible_sharpedge_samplepoint)
+                if init3dpts.shape[0] < 100:
+                    print("no enough sample point in this pose! continue...")
+                    print("with only ", init3dpts.shape[0], "  points")
+                    continue
 
-            # apply rotation on the initial pose to move to it to the center
-            current_pose_at_center = obj.rotatePoseWithAngle(
-                random_pose, horizontalR, verticalR
-            )
+                # get the 3d sample pts from target pose
+                obj.setModelviewMatrix(target_pose_at_center)
+                # generate edge of on the object
+                obj.findVisibleSamplePoint()
 
-            # apply same rotation as above
-            target_pose_at_center = obj.rotatePoseWithAngle(
-                pose, horizontalR, verticalR
-            )
+                target3dpts = np.array(obj.visible_sharpedge_samplepoint)
+                if target3dpts.shape[0] < 100:
+                    print("no enough sample point in this pose! continue...")
+                    continue
 
-            # get the 3d pts from init pose
-            obj.setModelviewMatrix(current_pose_at_center)
-            # generate edge of on the object
-            obj.findVisibleSamplePoint()
+                # print("write index ", current_index)
 
-            init3dpts = np.array(obj.visible_sharpedge_samplepoint)
-            if init3dpts.shape[0] < 500:
-                print("no enough sample point in this pose! continue...")
-                continue
+                with output_counter.get_lock():
+                    current_output_index = output_counter.value
+                    output_counter.value += 1
 
-            # get the 3d sample pts from target pose
-            obj.setModelviewMatrix(target_pose_at_center)
-            # generate edge of on the object
-            obj.findVisibleSamplePoint()
+                cv2.imwrite(
+                    output_filepath + "{:06d}".format(current_output_index) + "img.png",
+                    crop_img,
+                )
 
-            target3dpts = np.array(obj.visible_sharpedge_samplepoint)
-            if target3dpts.shape[0] < 500:
-                print("no enough sample point in this pose! continue...")
-                continue
+                cv2.imwrite(
+                    output_filepath
+                    + "{:06d}".format(current_output_index)
+                    + "flow.png",
+                    crop_flowImg,
+                )
 
-            # print("write index ", current_index)
+                cv2.imwrite(
+                    output_filepath + "{:06d}".format(current_output_index) + "-3d.png",
+                    crop_3dImg,
+                )
 
-            with output_counter.get_lock():
-                current_output_index = output_counter.value
-                output_counter.value += 1
+                cv2.imwrite(
+                    output_filepath
+                    + "{:06d}".format(current_output_index)
+                    + "mask.png",
+                    crop_mask,
+                )
+                cv2.imwrite(
+                    output_filepath
+                    + "{:06d}".format(current_output_index)
+                    + "edge.png",
+                    crop_edge,
+                )
+                cv2.imwrite(
+                    output_filepath
+                    + "{:06d}".format(current_output_index)
+                    + "labelmask.png",
+                    crop_label_mask,
+                )
 
-            cv2.imwrite(
-                output_filepath + "{:06d}".format(current_output_index) + "img.png",
-                crop_img,
-            )
-
-            cv2.imwrite(
-                output_filepath + "{:06d}".format(current_output_index) + "flow.png",
-                crop_flowImg,
-            )
-
-            cv2.imwrite(
-                output_filepath + "{:06d}".format(current_output_index) + "-3d.png",
-                crop_3dImg,
-            )
-
-            cv2.imwrite(
-                output_filepath + "{:06d}".format(current_output_index) + "mask.png",
-                crop_mask,
-            )
-            cv2.imwrite(
-                output_filepath + "{:06d}".format(current_output_index) + "edge.png",
-                crop_edge,
-            )
-            cv2.imwrite(
-                output_filepath
-                + "{:06d}".format(current_output_index)
-                + "labelmask.png",
-                crop_label_mask,
-            )
-
-            np.save(
-                output_filepath
-                + "{:06d}".format(current_output_index)
-                + "initPose.npy",
-                current_pose_at_center,
-            )
-            np.save(
-                output_filepath
-                + "{:06d}".format(current_output_index)
-                + "targetPose.npy",
-                target_pose_at_center,
-            )
-            np.save(
-                output_filepath
-                + "{:06d}".format(current_output_index)
-                + "init3dPt.npy",
-                init3dpts,
-            )
-            np.save(
-                output_filepath
-                + "{:06d}".format(current_output_index)
-                + "target3dPt.npy",
-                target3dpts,
-            )
+                np.save(
+                    output_filepath
+                    + "{:06d}".format(current_output_index)
+                    + "initPose.npy",
+                    current_pose_at_center,
+                )
+                np.save(
+                    output_filepath
+                    + "{:06d}".format(current_output_index)
+                    + "targetPose.npy",
+                    target_pose_at_center,
+                )
+                np.save(
+                    output_filepath
+                    + "{:06d}".format(current_output_index)
+                    + "init3dPt.npy",
+                    init3dpts,
+                )
+                np.save(
+                    output_filepath
+                    + "{:06d}".format(current_output_index)
+                    + "target3dPt.npy",
+                    target3dpts,
+                )
+        except Exception as e:
+            print(str(e))
 
 
 @click.command()
@@ -408,9 +418,8 @@ def main(input_filepath, output_filepath):
                 mask_names.append(str(f))
         mask_names.sort()
 
-    image_names = image_names[:5]
-    pose_names = pose_names[:5]
-    
+    # image_names = image_names[:5]
+    # pose_names = pose_names[:5]
 
     # generate input for function
     if isYCB:

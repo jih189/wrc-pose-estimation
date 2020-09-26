@@ -53,7 +53,7 @@ if __name__ == "__main__":
         cropImg = cropImg[upperleft[1] : lowerright[1], upperleft[0] : lowerright[0]]
         cropImg = cv2.resize(
             cropImg,
-            (cropImg.shape[1] * 30, cropImg.shape[0] * 30),
+            (cropImg.shape[1] * 6, cropImg.shape[0] * 6),
             interpolation=cv2.INTER_AREA,
         )
         cv2.imshow("crop", cropImg)

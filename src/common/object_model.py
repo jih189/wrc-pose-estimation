@@ -12,6 +12,7 @@ from scipy.spatial.transform import Rotation as R
 import torch
 from torch.nn import functional as F
 import time
+import src.configuration as CFG
 
 import sys
 
@@ -106,8 +107,8 @@ class ObjectModel:
         self.templateKernel = None
         self.kernelSize = None
         self.pointcloud = []
-        self.height = 480
-        self.width = 640
+        self.height = CFG.CAMERA_H
+        self.width = CFG.CAMERA_W
 
     # project a 3d point to a 2d point with pose
     # input: (3,) numpy matrix

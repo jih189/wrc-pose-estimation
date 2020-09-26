@@ -2,16 +2,40 @@
 import numpy as np
 
 
-OBJ_NAME = "pulley"
-IMAGE_SAVE_PATH = "data/images/pulley/"
-VERIFY_IMAGE_PATH = "data/raw/pulley/"
-PROCESSED_DATA_PATH = "data/processed/pulley_rot/"
-REFINE_DATA_PATH = "data/processed/pulley_refine/"
-CAD_MODEL = "data/mesh/MBRFA30-2-P6.obj"
-SAMPLE_FACE_MODEL = "data/mesh/MBRFA30-2-P6.obj"
-BEST_MODEL_FLOWNET = "weights/best_model_flownet_pulley.pth"
-BEST_MODEL_ROT = "weights/best_model_rot_pulley.pth"
-BEST_MODEL_REFINE = "weights/best_model_refine_pulley.pth"
+# OBJ_NAME = "pulley"
+# IMAGE_SAVE_PATH = "data/images/pulley/"
+# VERIFY_IMAGE_PATH = "data/raw/pulley/"
+# PROCESSED_DATA_PATH = "data/processed/pulley_rot/"
+# REFINE_DATA_PATH = "data/processed/pulley_refine/"
+# CAD_MODEL = "data/mesh/MBRFA30-2-P6.obj"
+# SAMPLE_FACE_MODEL = "data/mesh/MBRFA30-2-P6.obj"
+# BEST_MODEL_FLOWNET = "weights/best_model_flownet_pulley.pth"
+# BEST_MODEL_ROT = "weights/best_model_rot_pulley.pth"
+# BEST_MODEL_REFINE = "weights/best_model_refine_pulley.pth"
+
+
+OBJ_NAME = "shaft"
+IMAGE_SAVE_PATH = "data/images/shaft/"
+VERIFY_IMAGE_PATH = "data/raw/shaft/"
+PROCESSED_DATA_PATH = "data/processed/shaft_rot/"
+REFINE_DATA_PATH = "data/processed/shaft_refine/"
+CAD_MODEL = "data/mesh/SSFHRT10-75-M4-FC55-G20.obj"
+SAMPLE_FACE_MODEL = "data/mesh/SSFHRT10-75-M4-FC55-G20.obj"
+BEST_MODEL_FLOWNET = "weights/best_model_flownet_shaft.pth"
+BEST_MODEL_ROT = "weights/best_model_rot_shaft.pth"
+BEST_MODEL_REFINE = "weights/best_model_refine_shaft.pth"
+
+
+# OBJ_NAME = "belt-s-pulley"
+# IMAGE_SAVE_PATH = "data/images/belt-s-pulley/"
+# VERIFY_IMAGE_PATH = "data/raw/belt-s-pulley/"
+# PROCESSED_DATA_PATH = "data/processed/belt-s-pulley_rot/"
+# REFINE_DATA_PATH = "data/processed/belt-s-pulley_refine/"
+# CAD_MODEL = "data/mesh/MBGNA30-2.obj"
+# SAMPLE_FACE_MODEL = "data/mesh/MBGNA30-2.obj"
+# BEST_MODEL_FLOWNET = "weights/best_model_flownet_belt-s-pulley.pth"
+# BEST_MODEL_ROT = "weights/best_model_rot_belt-s-pulley.pth"
+# BEST_MODEL_REFINE = "weights/best_model_refine_belt-s-pulley.pth"
 
 
 CAMERA_MATRIX = np.array(

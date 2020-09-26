@@ -105,7 +105,7 @@ def getRotationError(pred_pose, targetPose):
 # pred_pose (_,4,4)
 # targetPose (_,4,4)
 def ADD_error(pred_pose, targetPose):
-    numberOfSamplePoints = 500
+    numberOfSamplePoints = 100
     if pred_pose.shape[0] != targetPose.shape[0]:
         print("Error: the length of prediction and target are different!")
         return None
@@ -145,7 +145,7 @@ def ADD_error(pred_pose, targetPose):
 # pred_pose (_,4,4)
 # targetPose (_,4,4)
 def ADDS_error(pred_pose, targetPose):
-    numberOfSamplePoints = 500
+    numberOfSamplePoints = 100
     if pred_pose.shape[0] != targetPose.shape[0]:
         print("Error: the length of prediction and target are different!")
         return None
@@ -157,6 +157,7 @@ def ADDS_error(pred_pose, targetPose):
     maxdim = np.amax(samplepoints, axis=0)
     mindim = np.amin(samplepoints, axis=0)
     diameter = np.linalg.norm(maxdim - mindim)
+    # print(diameter)
 
     # keep only 1000 points on the face of the object randomly
     if samplepoints.shape[0] > numberOfSamplePoints:
@@ -174,7 +175,9 @@ def ADDS_error(pred_pose, targetPose):
     target_points = tgm.transform_points(targetPose, samplepoints)
     dist1, dist2, _, _ = chamLoss(predict_points, target_points)
     # count the number of correct points
-    dist1 = torch.sum(dist1, dim=1).float() / numberOfSamplePoints
-    result = dist1 < (diameter * 0.1)
+    # print(dist1[0,:5])
+    dist = torch.sum(dist1, dim=1).float() / numberOfSamplePoints
+    # print(dist[:3])
+    result = dist < (diameter * 0.1)
     # calculate the matching rate
     return result

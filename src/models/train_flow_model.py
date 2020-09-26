@@ -15,7 +15,7 @@ import src.configuration as CFG
 import cv2
 
 batch_size = 64
-epochs = 1000
+epochs = 200
 lr = 1e-4
 momentum = 0.9
 w_decay = 10.0

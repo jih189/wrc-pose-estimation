@@ -45,8 +45,8 @@ def init():
     obj.setIntrinsicMatrix(CFG.CAMERA_MATRIX)
     obj.loadObjectCADModel(CFG.CAD_MODEL)
 
-    obj.determineSharpEdges(0.05)
-    obj.generateSamplePoints(0.0001, 0.001)
+    obj.determineSharpEdges(0.8)
+    obj.generateSamplePoints(0.001, 0.0001)
 
     return obj
 
@@ -160,11 +160,16 @@ def process_data(args):
             flush=True,
         )
 
-        # read image and pose
-        img = cv2.imread(img_names[current_index])
-        img = np.array(img)
+        try:
+            # read image and pose
+            img = cv2.imread(img_names[current_index])
+            img = np.array(img)
 
-        pose = np.load(pose_names[current_index])
+            pose = np.load(pose_names[current_index])
+        except Exception as e:
+            print("error in load data!!!!")
+            print(str(e))
+
         depth = pose[2, 3]
 
         # generate the real bounding box for object
@@ -194,20 +199,25 @@ def process_data(args):
             ):
                 continue
         else:
-            # random generate a bounding box around the object with given pose
-            upperleft, lowerright = obj.findVisibleSamplePoint()
-            upperleft, lowerright = (
-                np.array(upperleft).reshape(2),
-                np.array(lowerright).reshape(2),
-            )
+            try:
+                # random generate a bounding box around the object with given pose
+                upperleft, lowerright = obj.findVisibleSamplePoint()
+                upperleft, lowerright = (
+                    np.array(upperleft).reshape(2),
+                    np.array(lowerright).reshape(2),
+                )
 
-            high = np.clip(10 / depth, 0, 50)
-            upperleft = (
-                upperleft - np.random.uniform(0, high, upperleft.shape)
-            ).astype(np.int)
-            lowerright = (
-                lowerright + np.random.uniform(0, high, lowerright.shape)
-            ).astype(np.int)
+                high = np.clip(10 / depth, 0, 50)
+                upperleft = (
+                    upperleft - np.random.uniform(0, high, upperleft.shape)
+                ).astype(np.int)
+                lowerright = (
+                    lowerright + np.random.uniform(0, high, lowerright.shape)
+                ).astype(np.int)
+            except Exception as e:
+                print("error in generate bounding box!!!!")
+                print(upperleft)
+                print(str(e))
 
         crop_upperleft, crop_lowerright = get_centered_crop(upperleft, lowerright)
 
@@ -227,10 +237,14 @@ def process_data(args):
             # the inplane rotation is invalid when y axis is pointing to camera
             continue
 
-        cropImg = img[
-            int(crop_upperleft[1]) : int(crop_lowerright[1]),
-            int(crop_upperleft[0]) : int(crop_lowerright[0]),
-        ]
+        try:
+            cropImg = img[
+                int(crop_upperleft[1]) : int(crop_lowerright[1]),
+                int(crop_upperleft[0]) : int(crop_lowerright[0]),
+            ]
+        except Exception as e:
+            print("error in cropping image!!!")
+            print(str(e))
 
         with output_counter.get_lock():
             current_output_index = output_counter.value

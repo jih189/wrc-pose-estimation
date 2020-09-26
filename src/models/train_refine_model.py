@@ -30,8 +30,8 @@ epochs = 150
 lr = 1e-5
 momentum = 0.9
 w_decay = 0.1
-seglambda = 0.0
-flowlambda = 10.0
+seglambda = 0.5
+flowlambda = 5.0
 
 train_dir = CFG.REFINE_DATA_PATH
 val_dir = CFG.REFINE_DATA_PATH
@@ -59,7 +59,7 @@ mymodel.module.flownet.eval()
 
 
 # validation setup
-# mymodel = torch.load(CFG.BEST_MODEL_REFINE)
+mymodel = torch.load(CFG.BEST_MODEL_REFINE)
 # mymodel.eval()
 # wandb.watch(mymodel)
 
@@ -193,8 +193,8 @@ def train():
 
             # wandb.log
 
-            origin_pt = torch.tensor([0,0,0]).view(1,1,3).cuda().float()
-            origin_pt = origin_pt.repeat(init3dPt.shape[0],init3dPt.shape[1],1)
+            origin_pt = torch.tensor([0, 0, 0]).view(1, 1, 3).cuda().float()
+            origin_pt = origin_pt.repeat(init3dPt.shape[0], init3dPt.shape[1], 1)
             origin_pt = tgm.transform_points(targetPose, origin_pt)
 
             # get distance between each point pairs in 3d
@@ -202,7 +202,7 @@ def train():
             predictVec = predict3dpts - origin_pt
             targetVec = targetFromInit3dPt - origin_pt
             cos = torch.nn.CosineSimilarity(dim=2, eps=1e-6)
-            cosineSim = cos(predictVec, targetVec)    
+            cosineSim = cos(predictVec, targetVec)
             cosloss = -torch.mean(cosineSim, 1).sum()
 
             # get normal distance
@@ -211,8 +211,8 @@ def train():
                 torch.norm(distanceBetweenVec3d, p=1, dim=2), 1
             ).sum()
 
-            loss = cosloss + flowloss + segloss 
-            # loss = dist3dloss + flowloss + segloss 
+            loss = cosloss + flowloss + segloss
+            # loss = dist3dloss + flowloss + segloss
             loss.backward()
             optimizer.step()
             avg_loss.append(loss.data.cpu().numpy().sum())
@@ -328,7 +328,7 @@ def val():
 
         # predict 3d pts
         predict3dpts = tgm.transform_points(pred_pose, init3dPt)
-       
+
         # get distance between each point pairs in 3d
         targetFromInit3dPt = tgm.transform_points(targetPose, init3dPt)
         distanceBetweenVec3d = predict3dpts - targetFromInit3dPt
@@ -353,21 +353,20 @@ def val():
         addMatchRate = ADD_error(pred_pose, targetPose)
         # ADDS rate
         addsMatchRate = ADDS_error(pred_pose, targetPose)
-
+        # print(addsMatchRate[:3])
         # get normal distance
         dist3dloss = torch.mean(torch.norm(distanceBetweenVec3d, p=1, dim=2), 1).sum()
 
-        origin_pt = torch.tensor([0,0,0]).view(1,1,3).cuda().float()
-        origin_pt = origin_pt.repeat(init3dPt.shape[0],init3dPt.shape[1],1)
+        origin_pt = torch.tensor([0, 0, 0]).view(1, 1, 3).cuda().float()
+        origin_pt = origin_pt.repeat(init3dPt.shape[0], init3dPt.shape[1], 1)
         origin_pt = tgm.transform_points(targetPose, origin_pt)
 
         # get distance between each point pairs in 3d
         predictVec = predict3dpts - origin_pt
         targetVec = targetFromInit3dPt - origin_pt
         cos = torch.nn.CosineSimilarity(dim=2, eps=1e-6)
-        cosineSim = cos(predictVec, targetVec)    
+        cosineSim = cos(predictVec, targetVec)
         cosloss = -torch.mean(cosineSim, 1).sum()
-
 
         # loss = dist3dloss + flowloss + segloss
         loss = cosloss + flowloss + segloss
@@ -413,7 +412,6 @@ def val():
         )
     )
     return tem
-
 
 if __name__ == "__main__":
     # val()

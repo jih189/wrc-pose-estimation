@@ -144,6 +144,7 @@ def yolo_detect(yolo_model, img):
             # label = "%s %.2f" % (names[int(cls)], conf)
             # plot_one_box(xyxy, demo, label=label, color=colors[int(cls)])
             if names[int(cls)] == "009_gelatin_box":
+            # if names[int(cls)] == "Pulley":
                 foundObject = True
                 croptopleft = [
                     int(xyxy[0].detach().numpy()),
