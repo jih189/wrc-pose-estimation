@@ -13,7 +13,6 @@ import kornia
 from models.models import Darknet  # set ONNX_EXPORT in models.py
 from models.model import Magic_Net, DeepIM, FlowNet
 from torch.multiprocessing import Pool, Value, cpu_count, Array
-from poseUtil import ADD_error
 
 torch.multiprocessing.set_sharing_strategy("file_system")
 
@@ -25,7 +24,7 @@ from src.utils.utils import (
 )
 import tqdm
 import cv2
-from poseUtil import getPredictPose, getRotationError, ADD_error, ADDS_error
+from poseUtil import getPredictPose, getRotationError, ADD_error  # , ADDS_error
 
 counter = Value("i", 0)
 
@@ -45,6 +44,7 @@ colors = [[random.randint(0, 255) for _ in range(3)] for _ in range(len(names))]
 np.seterr(divide="ignore", invalid="ignore")
 
 totalADD = []
+totalADDS = []
 
 
 def get_centered_crop(topleft, botright):
@@ -69,13 +69,13 @@ def init():
 
     ###################### yolo ########################
 
-    image_size = 416
-    yolo_model = Darknet(cfg, image_size)  # default image size is 416
-    # Load weights
-    yolo_model.load_state_dict(torch.load(weights)["model"])
-    # Eval mode
-    yolo_model.eval()
-    yolo_model.share_memory()
+    # image_size = 416
+    # yolo_model = Darknet(cfg, image_size)  # default image size is 416
+    # # Load weights
+    # yolo_model.load_state_dict(torch.load(weights)["model"])
+    # # Eval mode
+    # yolo_model.eval()
+    # yolo_model.share_memory()
 
     ################## rot model ################################
 
@@ -90,7 +90,7 @@ def init():
     refine_model.eval()
     refine_model.share_memory()
 
-    return yolo_model, rot_model, refine_model
+    return None, rot_model, refine_model
 
 
 def obj_init():
@@ -101,8 +101,8 @@ def obj_init():
     obj.loadObjectCADModel(CFG.CAD_MODEL)
     obj.setIntrinsicMatrix(CFG.CAMERA_MATRIX)
 
-    obj.determineSharpEdges(0.05)
-    obj.generateSamplePoints(0.001, 0.001)
+    obj.determineSharpEdges(0.8)
+    obj.generateSamplePoints(0.001, 0.0001)
     return obj
 
 
@@ -144,7 +144,7 @@ def yolo_detect(yolo_model, img):
             # label = "%s %.2f" % (names[int(cls)], conf)
             # plot_one_box(xyxy, demo, label=label, color=colors[int(cls)])
             if names[int(cls)] == "009_gelatin_box":
-            # if names[int(cls)] == "Pulley":
+                # if names[int(cls)] == "Pulley":
                 foundObject = True
                 croptopleft = [
                     int(xyxy[0].detach().numpy()),
@@ -182,6 +182,7 @@ def testData(obj, yolo_model, rot_model, refine_model, d):
     image_name, pose_name = d
     # read image
     img = cv2.imread(image_name)
+    # cv2.imshow("origin image", img)
     rot_frame = img.copy()
     refine_frame = img.copy()
     demo = img.copy()
@@ -215,6 +216,8 @@ def testData(obj, yolo_model, rot_model, refine_model, d):
             int(upperleft_rand[0]) : int(lowerright_rand[0]),
         ]
 
+        cv2.imshow("cropped image", img_crop)
+
         l = int(lowerright_rand[0]) - int(upperleft_rand[0])
 
         # resize the image so rot classifier can process
@@ -243,13 +246,13 @@ def testData(obj, yolo_model, rot_model, refine_model, d):
         offset = position[:, :2]
         offset = np.array(upperleft_rand) + offset.reshape(2) - principle_pt
 
-        depth = 0.7
+        depth = 0.5
 
         # get the rough pose from view point, rotation, offset, and depth
         rough_pred_pose = obj.label2pose(viewpt, rot, offset, depth)
 
         # pose refinement
-        for t in range(8):
+        for t in range(30):
             obj.setModelviewMatrix(rough_pred_pose)
             obj.findVisibleSamplePoint()
 
@@ -286,6 +289,7 @@ def testData(obj, yolo_model, rot_model, refine_model, d):
             crop_mask = mask[ey : ey + eh, ex : ex + ew]
             # cropped edges for initial pose
             crop_edge = edge[ey : ey + eh, ex : ex + ew]
+            # cv2.imshow("edge image", crop_edge)
 
             # apply rotation on the initial pose to move to it to the center
             rough_pose_at_center = obj.rotatePoseWithAngle(
@@ -380,12 +384,15 @@ def testData(obj, yolo_model, rot_model, refine_model, d):
         # obj.setModelviewMatrix(pred_pose)
         # obj.findVisibleSamplePoint()
 
-        # pred_pose = torch.from_numpy(pred_pose)
-        # targetPose = targetPose.cuda().float().unsqueeze(0)
-        # pred_pose = pred_pose.cuda().float().unsqueeze(0)
+        pred_pose = torch.from_numpy(pred_pose)
+        targetPose = targetPose.cuda().float().unsqueeze(0)
+        pred_pose = pred_pose.cuda().float().unsqueeze(0)
 
-        # addrate = ADD_error(pred_pose, targetPose)
-        # totalADD.append(addrate.cpu().numpy()[0])
+        addrate = ADD_error(pred_pose, targetPose)
+        totalADD.append(addrate.cpu().numpy()[0])
+
+        # addsrate = ADDS_error(pred_pose, targetPose)
+        # totalADDS.append(addsrate.cpu().numpy()[0])
 
 
 if __name__ == "__main__":
@@ -404,7 +411,7 @@ if __name__ == "__main__":
     image_names.sort()
     pose_names.sort()
 
-    indexnum = 0
+    indexnum = 1000
     image_names = image_names[indexnum : indexnum + 1]
     pose_names = pose_names[indexnum : indexnum + 1]
 
@@ -414,5 +421,6 @@ if __name__ == "__main__":
     for d in tqdm.tqdm(datalist):
         testData(obj, yolo_model, rot_model, refine_model, d)
 
-    # print("average add is ", sum(totalADD) / len(totalADD))
+    print("average add is ", sum(totalADD) / len(totalADD))
+    print("average adds is ", sum(totalADDS) / len(totalADDS))
 

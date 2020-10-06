@@ -167,7 +167,7 @@ if __name__ == "__main__":
     diagonalDist = 0.0335 * 1 * 0.1
     correct = 0
 
-    predict(m, 511, True)
+    predict(m, 20, True)
     # for i in tqdm(range(9000)):
     #     ch_loss2d, ch_loss3d = predict(m, i, False)
     #     if ch_loss3d < diagonalDist:

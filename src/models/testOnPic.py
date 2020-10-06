@@ -18,7 +18,7 @@ from src.utils.utils import (
     scale_coords,
     plot_one_box,
 )
-from src.models.poseUtil import getPredictPose
+from poseUtil import getPredictPose
 
 import cv2
 
@@ -47,52 +47,53 @@ def get_centered_crop(topleft, botright):
     return topleft_new, botright_new
 
 
-OM.setup(CFG.CAMERA_W, CFG.CAMERA_H)
-OM.setProjectMatrixWithIntr(CFG.CAMERA_MATRIX, CFG.CAMERA_W, CFG.CAMERA_H)
+if __name__ == "__main__":
 
-obj = OM.ObjectModel()
-obj.loadObjectCADModel(CFG.CAD_MODEL)
-obj.setIntrinsicMatrix(CFG.CAMERA_MATRIX)
+    OM.setup(CFG.CAMERA_W, CFG.CAMERA_H)
+    OM.setProjectMatrixWithIntr(CFG.CAMERA_MATRIX, CFG.CAMERA_W, CFG.CAMERA_H)
 
-obj.determineSharpEdges(0.5)
-obj.generateSamplePoints(0.0001, 0.000001)
+    obj = OM.ObjectModel()
+    obj.loadObjectCADModel(CFG.CAD_MODEL)
+    obj.setIntrinsicMatrix(CFG.CAMERA_MATRIX)
 
-###################### yolo ########################
-webcam = "4"
-cfg = "/home/cogrob-wrc/wrc-pose-estimation/cfg/yolov3-tiny3.cfg"
-weights = "/home/cogrob-wrc/wrc-pose-estimation/weights/best_yolo_model_wrc.pt"
-conf_thres = 0.3
-iou_thres = 0.2
-device = "cuda"
-obj_names = "/home/cogrob-wrc/wrc-pose-estimation/data/wrs-wrc.names"
-image_size = 416
+    obj.determineSharpEdges(0.5)
+    obj.generateSamplePoints(0.0001, 0.000001)
 
-names = load_classes(obj_names)
-colors = [[random.randint(0, 255) for _ in range(3)] for _ in range(len(names))]
-yolo_model = Darknet(cfg, image_size)  # default image size is 416
+    ###################### yolo ########################
+    webcam = "4"
+    cfg = "cfg/yolov3-tiny3.cfg"
+    weights = "weights/best_yolo_model_wrc.pt"
+    conf_thres = 0.3
+    iou_thres = 0.2
+    device = "cuda"
+    obj_names = "data/wrs-wrc.names"
+    image_size = 416
 
-# Load weights
-yolo_model.load_state_dict(torch.load(weights)["model"])
-# Eval mode
-yolo_model.to(device).eval()
+    names = load_classes(obj_names)
+    colors = [[random.randint(0, 255) for _ in range(3)] for _ in range(len(names))]
+    yolo_model = Darknet(cfg, image_size)  # default image size is 416
 
-################### magic net ########################
-viewpt_class = 64
-rot_class = 60
+    # Load weights
+    yolo_model.load_state_dict(torch.load(weights)["model"])
+    # Eval mode
+    yolo_model.to(device).eval()
 
-rot_model = Magic_Net(viewpt_class=viewpt_class, rot_class=rot_class).cuda()
-rot_model = torch.load(CFG.BEST_MODEL_ROT)
-rot_model.eval()
+    ################### magic net ########################
+    viewpt_class = 64
+    rot_class = 60
 
-################# refine net ###########################
-refine_model = DeepIM()
-refine_model = torch.load(CFG.BEST_MODEL_REFINE)
-refine_model.eval()
+    rot_model = Magic_Net(viewpt_class=viewpt_class, rot_class=rot_class).cuda()
+    rot_model = nn.DataParallel(rot_model)
+    rot_model = torch.load(CFG.BEST_MODEL_ROT)
+    rot_model.eval()
 
+    ################# refine net ###########################
+    refine_model = DeepIM()
+    refine_model = torch.load(CFG.BEST_MODEL_REFINE)
+    refine_model.eval()
 
-def detect(object_id, img, estimated_depth):
-    frame = img
-    cv2.imshow("image", img)
+    # read image
+    frame = cv2.imread("input.jpg")
     demo = frame.copy()
     rot_frame = frame.copy()
     refine_frame = frame.copy()
@@ -131,7 +132,7 @@ def detect(object_id, img, estimated_depth):
         for *xyxy, conf, cls in pred:
             label = "%s %.2f" % (names[int(cls)], conf)
             plot_one_box(xyxy, demo, label=label, color=colors[int(cls)])
-            if names[int(cls)] == object_id:
+            if names[int(cls)] == "pulley":
                 foundObject = True
                 croptopleft = [
                     int(xyxy[0].cpu().detach().numpy()),
@@ -141,9 +142,6 @@ def detect(object_id, img, estimated_depth):
                     int(xyxy[2].cpu().detach().numpy()),
                     int(xyxy[3].cpu().detach().numpy()),
                 ]
-
-    cv2.imshow("demo", demo)
-    cv2.waitKey(0)
 
     if foundObject:
         # rot classifier
@@ -157,6 +155,7 @@ def detect(object_id, img, estimated_depth):
         ]
 
         img_crop = cv2.resize(img_crop, (IMG_SIZE, IMG_SIZE))
+        cv2.imshow("crop", img_crop)
 
         img_crop = img_crop[:, :, :3].transpose(2, 0, 1)
         img_crop = img_crop[np.newaxis, ...]
@@ -181,11 +180,11 @@ def detect(object_id, img, estimated_depth):
         offset = position[:, :2]
         offset = np.array(upperleft) + offset.reshape(2) - principle_pt
 
-        depth = estimated_depth
+        depth = 0.2
         rough_pred_pose = obj.label2pose(viewpt, rot, offset, depth)
 
         # pose refinement
-        for t in range(2):
+        for t in range(30):
             obj.setModelviewMatrix(rough_pred_pose)
             obj.findVisibleSamplePoint()
 
@@ -303,7 +302,19 @@ def detect(object_id, img, estimated_depth):
             )
 
             rough_pred_pose = pred_pose
-        return pred_pose
-    else:
-        # can't detect the object
-        return None
+            rough_pred_pose = OM.symmetricRemove(rough_pred_pose)
+
+            demotemp = demo.copy()
+
+            # draw image
+            for p in obj.sharp_2d_pts:
+                p = (int(p[0]), int(p[1]))
+                demotemp = cv2.circle(
+                    demotemp, p, radius=2, color=(0, 0, 255), thickness=-1
+                )
+            cv2.imshow("demo", demotemp)
+            cv2.waitKey(0)
+
+    cv2.imshow("demo", demo)
+    cv2.waitKey(0)
+    cv2.destroyAllWindows()

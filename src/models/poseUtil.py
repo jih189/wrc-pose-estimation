@@ -6,7 +6,10 @@ import torchgeometry as tgm
 import kornia
 import src.configuration as CFG
 from scipy.spatial.transform import Rotation as R
+
 from chamfer3D.dist_chamfer_3D import chamfer_3DDist
+
+# from pytorch3d.loss import chamfer_distance
 
 # shape of inputs:
 # inputPose (_,4,4)
@@ -134,8 +137,12 @@ def ADD_error(pred_pose, targetPose):
     target_points = tgm.transform_points(targetPose, samplepoints)
     distanceBetweenVec3d = predict_points - target_points
     dist3d = torch.norm(distanceBetweenVec3d, p=2, dim=2)
+    # print(dist3d[0,:10])
     # count the number of correct points
     dist3d = torch.sum(dist3d, dim=1).float() / numberOfSamplePoints
+    # print("ADD")
+    # print(diameter)
+    # print(dist3d[:5])
     result = dist3d < (diameter * 0.1)
     # calculate the matching rate
     return result
@@ -144,6 +151,8 @@ def ADD_error(pred_pose, targetPose):
 # shape of inputs:
 # pred_pose (_,4,4)
 # targetPose (_,4,4)
+
+
 def ADDS_error(pred_pose, targetPose):
     numberOfSamplePoints = 100
     if pred_pose.shape[0] != targetPose.shape[0]:
@@ -176,8 +185,15 @@ def ADDS_error(pred_pose, targetPose):
     dist1, dist2, _, _ = chamLoss(predict_points, target_points)
     # count the number of correct points
     # print(dist1[0,:5])
+    # loss_chamfer,_ = chamfer_distance(predict_points, target_points, batch_reduction = None)
+    # result = loss_chamfer < (diameter * 0.01)
+    # print(loss_chamfer)
     dist = torch.sum(dist1, dim=1).float() / numberOfSamplePoints
-    # print(dist[:3])
-    result = dist < (diameter * 0.1)
+    # print(dist)
+    # print("ADDS")
+    # print(diameter)
+    # print(dist[:5])
+    result = dist < (diameter * 0.01)
     # calculate the matching rate
     return result
+

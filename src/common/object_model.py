@@ -346,6 +346,85 @@ class ObjectModel:
             result = max(np.linalg.norm(l), result)
         return result
 
+    def resampleOne(self, pose):
+        # generate random value for rotation and translation
+        xRot_1 = np.random.normal(0, 0.15, 1)
+        yRot_1 = np.random.normal(0, 0.15, 1)
+        zRot_1 = np.random.normal(0, 0.15, 1)
+
+        xTrans_1 = np.random.normal(0, 0.01, 1)
+        yTrans_1 = np.random.normal(0, 0.01, 1)
+        zTrans_1 = np.random.normal(0, 0.08, 1)
+
+        xRot_2 = np.random.normal(0, 0.3, numOfPose - int(numOfPose / 2))
+        yRot_2 = np.random.normal(0, 0.3, numOfPose - int(numOfPose / 2))
+        zRot_2 = np.random.normal(0, 0.3, numOfPose - int(numOfPose / 2))
+
+        xTrans_2 = np.random.normal(0, 0.005, numOfPose - int(numOfPose / 2))
+        yTrans_2 = np.random.normal(0, 0.005, numOfPose - int(numOfPose / 2))
+        zTrans_2 = np.random.normal(0, 0.07, numOfPose - int(numOfPose / 2))
+
+        xRot = np.concatenate((xRot_1, xRot_2))
+        yRot = np.concatenate((yRot_1, yRot_2))
+        zRot = np.concatenate((zRot_1, zRot_2))
+
+        xTrans = np.concatenate((xTrans_1, xTrans_2))
+        yTrans = np.concatenate((yTrans_1, yTrans_2))
+        zTrans = np.concatenate((zTrans_1, zTrans_2))
+
+        # rotate it to the center
+        horizontalR = np.arctan2(pose[0, 3], pose[2, 3])
+        r = R.from_euler("Y", -horizontalR)
+        Rmatrix = np.identity(4)
+        Rmatrix[:3, :3] = r.as_matrix()
+        center_pose = np.dot(Rmatrix, pose)
+
+        verticalR = np.arctan2(
+            pose[1, 3], np.sqrt(pose[0, 3] * pose[0, 3] + pose[2, 3] * pose[2, 3])
+        )
+        r = R.from_euler("X", verticalR)
+        Rmatrix[:3, :3] = r.as_matrix()
+        center_pose = np.dot(Rmatrix, center_pose)
+
+        poses = []
+
+        for i in range(numOfPose):
+            tempPose = np.identity(4)
+            Rmatrix = np.identity(4)
+            r = R.from_euler("X", xRot[i])
+            Rmatrix[:3, :3] = r.as_matrix()
+            tempPose = np.dot(Rmatrix, tempPose)
+
+            r = R.from_euler("Y", yRot[i])
+            Rmatrix[:3, :3] = r.as_matrix()
+            tempPose = np.dot(Rmatrix, tempPose)
+
+            r = R.from_euler("Z", zRot[i])
+            Rmatrix[:3, :3] = r.as_matrix()
+            tempPose = np.dot(Rmatrix, tempPose)
+
+            tempPose = np.dot(center_pose, tempPose)
+
+            tempPose[0, 3] += xTrans[i]
+            tempPose[1, 3] += yTrans[i]
+            tempPose[2, 3] += zTrans[i]
+
+            # to ensure that the object doesn't go behind the camera
+            tempPose[2, 3] = max(tempPose[2, 3], 0.1)
+
+            # rotate it back
+            r = R.from_euler("Y", horizontalR)
+            Rmatrix[:3, :3] = r.as_matrix()
+            tempPose = np.dot(Rmatrix, tempPose)
+
+            r = R.from_euler("X", -verticalR)
+            Rmatrix[:3, :3] = r.as_matrix()
+            tempPose = np.dot(Rmatrix, tempPose)
+
+            poses.append(tempPose)
+
+        return poses
+
     # this resample will generate random pose in roughly translation and rotation
     def resample(self, pose, numOfPose):
 
@@ -354,9 +433,9 @@ class ObjectModel:
         yRot_1 = np.random.normal(0, 0.15, int(numOfPose / 2))
         zRot_1 = np.random.normal(0, 0.15, int(numOfPose / 2))
 
-        xTrans_1 = np.random.normal(0, 0.015, int(numOfPose / 2))
-        yTrans_1 = np.random.normal(0, 0.015, int(numOfPose / 2))
-        zTrans_1 = np.random.normal(0, 0.15, int(numOfPose / 2))
+        xTrans_1 = np.random.normal(0, 0.01, int(numOfPose / 2))
+        yTrans_1 = np.random.normal(0, 0.01, int(numOfPose / 2))
+        zTrans_1 = np.random.normal(0, 0.08, int(numOfPose / 2))
 
         xRot_2 = np.random.normal(0, 0.3, numOfPose - int(numOfPose / 2))
         yRot_2 = np.random.normal(0, 0.3, numOfPose - int(numOfPose / 2))
@@ -434,7 +513,9 @@ class ObjectModel:
         return ret
 
     def getMask(self):
-        buffer = glReadPixels(0, 0, self.width, self.height, GL_DEPTH_COMPONENT, GL_FLOAT)
+        buffer = glReadPixels(
+            0, 0, self.width, self.height, GL_DEPTH_COMPONENT, GL_FLOAT
+        )
         ret = np.frombuffer(buffer, np.float32).reshape(self.height, self.width, 1)
         ret = cv2.flip(ret, 0)
         ret = ret < 0.99
@@ -942,15 +1023,20 @@ def testInPygame():
 
 # setup the pygame
 def setup(width, height):
-    pygame.init()
-    pygame.mixer.quit()
+    if not pygame.get_init():
+        pygame.init()
+        pygame.mixer.quit()
     window = pygame.display.set_mode((width, height), pygame.DOUBLEBUF | pygame.OPENGL)
     pygame.display.set_caption("Test demo")
-    # pygame.display.iconify()
+    pygame.display.iconify()
 
     glEnable(GL_DEPTH_TEST)
     glShadeModel(GL_FLAT)
-    return window
+
+
+def exit():
+    if pygame.get_init():
+        pygame.quit()
 
 
 # set camera intrinsic matrix

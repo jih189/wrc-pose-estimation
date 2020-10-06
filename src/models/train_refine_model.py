@@ -26,12 +26,12 @@ import cv2
 # wandb.init(project="wrc-pose-refinement")
 
 batch_size = 64
-epochs = 150
+epochs = 600
 lr = 1e-5
 momentum = 0.9
 w_decay = 0.1
 seglambda = 0.5
-flowlambda = 5.0
+flowlambda = 15.0
 
 train_dir = CFG.REFINE_DATA_PATH
 val_dir = CFG.REFINE_DATA_PATH
@@ -59,7 +59,7 @@ mymodel.module.flownet.eval()
 
 
 # validation setup
-mymodel = torch.load(CFG.BEST_MODEL_REFINE)
+# mymodel = torch.load(CFG.BEST_MODEL_REFINE)
 # mymodel.eval()
 # wandb.watch(mymodel)
 
@@ -412,6 +412,7 @@ def val():
         )
     )
     return tem
+
 
 if __name__ == "__main__":
     # val()

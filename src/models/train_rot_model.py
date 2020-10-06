@@ -56,10 +56,10 @@ model = Magic_Net(viewpt_class=viewpt_class, rot_class=rot_class).cuda()
 model = nn.DataParallel(model)
 
 # Evaluation setup
-model = torch.load(CFG.BEST_MODEL_ROT)
-model.eval()
+# model = torch.load(CFG.BEST_MODEL_ROT)
+# model.eval()
 
-# model.train()
+model.train()
 
 # read the weights
 vp_weights = np.load(CFG.PROCESSED_DATA_PATH + "vp_weight.npy")
@@ -219,5 +219,5 @@ def val():
 
 
 if __name__ == "__main__":
-    # train()
-    val()
+    train()
+    # val()

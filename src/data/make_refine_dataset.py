@@ -47,8 +47,8 @@ def init():
     obj.setIntrinsicMatrix(CFG.CAMERA_MATRIX)
     obj.loadObjectCADModel(CFG.CAD_MODEL)
 
-    obj.determineSharpEdges(0.8)
-    obj.generateSamplePoints(0.001, 0.0001)
+    obj.determineSharpEdges(0.3)
+    obj.generateSamplePoints(0.0001, 0.0001)
     return obj
 
 
@@ -283,7 +283,7 @@ def process_data(args):
                 obj.findVisibleSamplePoint()
 
                 init3dpts = np.array(obj.visible_sharpedge_samplepoint)
-                if init3dpts.shape[0] < 100:
+                if init3dpts.shape[0] < 900:
                     print("no enough sample point in this pose! continue...")
                     print("with only ", init3dpts.shape[0], "  points")
                     continue
@@ -294,7 +294,7 @@ def process_data(args):
                 obj.findVisibleSamplePoint()
 
                 target3dpts = np.array(obj.visible_sharpedge_samplepoint)
-                if target3dpts.shape[0] < 100:
+                if target3dpts.shape[0] < 900:
                     print("no enough sample point in this pose! continue...")
                     continue
 
@@ -366,6 +366,7 @@ def process_data(args):
                 )
         except Exception as e:
             print(str(e))
+    pygame.quit()
 
 
 @click.command()
