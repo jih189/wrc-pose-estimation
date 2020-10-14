@@ -1,4 +1,5 @@
 # wrc-pose-estimation
+Warning: the document here is used for old pipeline. i will update it later.
 ==============================
 ### Description
 Pose estimation of WRC objects. The pose estimation is splited into four sections.
