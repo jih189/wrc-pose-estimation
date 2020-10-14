@@ -31,6 +31,13 @@ def symmetricRemove_housing(pose_input):
     return pose_input
 
 
+def symmetricRemove_nut(pose_input):
+    eulerVec = (R.from_matrix(pose_input[:3, :3])).as_euler("ZYX")
+    eulerVec[2] = eulerVec[2] % (np.pi / 3)
+    pose_input[:3, :3] = (R.from_euler("ZYX", eulerVec)).as_matrix()
+    return pose_input
+
+
 def py_ang(v1, v2):
     """ Returns the angle in radians between vectors 'v1' and 'v2'    """
     cosang = np.dot(v1, v2)
@@ -346,31 +353,15 @@ class ObjectModel:
             result = max(np.linalg.norm(l), result)
         return result
 
-    def resampleOne(self, pose):
+    def resamplePose(self, pose, offsetValue, depthValue, rotationValue):
         # generate random value for rotation and translation
-        xRot_1 = np.random.normal(0, 0.15, 1)
-        yRot_1 = np.random.normal(0, 0.15, 1)
-        zRot_1 = np.random.normal(0, 0.15, 1)
+        xRot = np.random.normal(0, rotationValue, 1)
+        yRot = np.random.normal(0, rotationValue, 1)
+        zRot = np.random.normal(0, rotationValue, 1)
 
-        xTrans_1 = np.random.normal(0, 0.01, 1)
-        yTrans_1 = np.random.normal(0, 0.01, 1)
-        zTrans_1 = np.random.normal(0, 0.08, 1)
-
-        xRot_2 = np.random.normal(0, 0.3, numOfPose - int(numOfPose / 2))
-        yRot_2 = np.random.normal(0, 0.3, numOfPose - int(numOfPose / 2))
-        zRot_2 = np.random.normal(0, 0.3, numOfPose - int(numOfPose / 2))
-
-        xTrans_2 = np.random.normal(0, 0.005, numOfPose - int(numOfPose / 2))
-        yTrans_2 = np.random.normal(0, 0.005, numOfPose - int(numOfPose / 2))
-        zTrans_2 = np.random.normal(0, 0.07, numOfPose - int(numOfPose / 2))
-
-        xRot = np.concatenate((xRot_1, xRot_2))
-        yRot = np.concatenate((yRot_1, yRot_2))
-        zRot = np.concatenate((zRot_1, zRot_2))
-
-        xTrans = np.concatenate((xTrans_1, xTrans_2))
-        yTrans = np.concatenate((yTrans_1, yTrans_2))
-        zTrans = np.concatenate((zTrans_1, zTrans_2))
+        xTrans = np.random.normal(0, offsetValue, 1)
+        yTrans = np.random.normal(0, offsetValue, 1)
+        zTrans = np.random.normal(0, depthValue, 1)
 
         # rotate it to the center
         horizontalR = np.arctan2(pose[0, 3], pose[2, 3])
@@ -386,44 +377,43 @@ class ObjectModel:
         Rmatrix[:3, :3] = r.as_matrix()
         center_pose = np.dot(Rmatrix, center_pose)
 
-        poses = []
+        # generate the random rotation
+        tempPose = np.identity(4)
+        Rmatrix = np.identity(4)
+        r = R.from_euler("X", xRot[0])
+        Rmatrix[:3, :3] = r.as_matrix()
+        tempPose = np.dot(Rmatrix, tempPose)
 
-        for i in range(numOfPose):
-            tempPose = np.identity(4)
-            Rmatrix = np.identity(4)
-            r = R.from_euler("X", xRot[i])
-            Rmatrix[:3, :3] = r.as_matrix()
-            tempPose = np.dot(Rmatrix, tempPose)
+        r = R.from_euler("Y", yRot[0])
+        Rmatrix[:3, :3] = r.as_matrix()
+        tempPose = np.dot(Rmatrix, tempPose)
 
-            r = R.from_euler("Y", yRot[i])
-            Rmatrix[:3, :3] = r.as_matrix()
-            tempPose = np.dot(Rmatrix, tempPose)
+        r = R.from_euler("Z", zRot[0])
+        Rmatrix[:3, :3] = r.as_matrix()
+        tempPose = np.dot(Rmatrix, tempPose)
 
-            r = R.from_euler("Z", zRot[i])
-            Rmatrix[:3, :3] = r.as_matrix()
-            tempPose = np.dot(Rmatrix, tempPose)
+        rot_center_pose = np.identity(4)
+        rot_center_pose[:3, :3] = center_pose[:3, :3].copy()
 
-            tempPose = np.dot(center_pose, tempPose)
+        center_pose[:3, :3] = np.dot(tempPose, rot_center_pose)[:3, :3]
 
-            tempPose[0, 3] += xTrans[i]
-            tempPose[1, 3] += yTrans[i]
-            tempPose[2, 3] += zTrans[i]
+        center_pose[0, 3] += xTrans[0]
+        center_pose[1, 3] += yTrans[0]
+        center_pose[2, 3] += zTrans[0]
 
-            # to ensure that the object doesn't go behind the camera
-            tempPose[2, 3] = max(tempPose[2, 3], 0.1)
+        # to ensure that the object doesn't go behind the camera
+        center_pose[2, 3] = max(center_pose[2, 3], 0.1)
 
-            # rotate it back
-            r = R.from_euler("Y", horizontalR)
-            Rmatrix[:3, :3] = r.as_matrix()
-            tempPose = np.dot(Rmatrix, tempPose)
+        # rotate it back
+        r = R.from_euler("Y", horizontalR)
+        Rmatrix[:3, :3] = r.as_matrix()
+        tempPose = np.dot(Rmatrix, center_pose)
 
-            r = R.from_euler("X", -verticalR)
-            Rmatrix[:3, :3] = r.as_matrix()
-            tempPose = np.dot(Rmatrix, tempPose)
+        r = R.from_euler("X", -verticalR)
+        Rmatrix[:3, :3] = r.as_matrix()
+        tempPose = np.dot(Rmatrix, tempPose)
 
-            poses.append(tempPose)
-
-        return poses
+        return tempPose
 
     # this resample will generate random pose in roughly translation and rotation
     def resample(self, pose, numOfPose):

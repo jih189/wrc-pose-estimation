@@ -9,7 +9,7 @@ import src.configuration as CFG
 from torchvision import utils
 import random
 
-numberOfSampledPoint = 100
+numberOfSampledPoint = 800
 
 
 class Rot_data(Dataset):

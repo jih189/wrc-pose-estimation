@@ -61,8 +61,8 @@ obj.generateSamplePoints(0.0001, 0.000001)
 webcam = "4"
 cfg = "/home/cogrob-wrc/wrc-pose-estimation/cfg/yolov3-tiny3.cfg"
 weights = "/home/cogrob-wrc/wrc-pose-estimation/weights/best_yolo_model_wrc.pt"
-conf_thres = 0.3
-iou_thres = 0.2
+conf_thres = 0.7
+iou_thres = 0.4
 device = "cuda"
 obj_names = "/home/cogrob-wrc/wrc-pose-estimation/data/wrs-wrc.names"
 image_size = 416
@@ -86,19 +86,65 @@ rot_model.eval()
 
 ################# refine net ###########################
 refine_model = DeepIM()
-refine_model = torch.load(CFG.BEST_MODEL_REFINE)
+refine_model = torch.load(CFG.BEST_MODEL_ITERATIVE_REFINE)
 refine_model.eval()
 
 
+def letterbox(
+    img,
+    new_shape=(416, 416),
+    color=(128, 128, 128),
+    auto=True,
+    scaleFill=False,
+    scaleup=True,
+    interp=cv2.INTER_AREA,
+):
+    # Resize image to a 32-pixel-multiple rectangle https://github.com/ultralytics/yolov3/issues/232
+    shape = img.shape[:2]  # current shape [height, width]
+    if isinstance(new_shape, int):
+        new_shape = (new_shape, new_shape)
+
+    # Scale ratio (new / old)
+    r = max(new_shape) / max(shape)
+    if not scaleup:  # only scale down, do not scale up (for better test mAP)
+        r = min(r, 1.0)
+
+    # Compute padding
+    ratio = r, r  # width, height ratios
+    new_unpad = int(round(shape[1] * r)), int(round(shape[0] * r))
+    dw, dh = new_shape[1] - new_unpad[0], new_shape[0] - new_unpad[1]  # wh padding
+    if auto:  # minimum rectangle
+        dw, dh = np.mod(dw, 32), np.mod(dh, 32)  # wh padding
+    elif scaleFill:  # stretch
+        dw, dh = 0.0, 0.0
+        new_unpad = new_shape
+        ratio = new_shape[0] / shape[1], new_shape[1] / shape[0]  # width, height ratios
+
+    dw /= 2  # divide padding into 2 sides
+    dh /= 2
+
+    if shape[::-1] != new_unpad:  # resize
+        img = cv2.resize(
+            img, new_unpad, interpolation=interp
+        )  # INTER_AREA is better, INTER_LINEAR is faster
+    top, bottom = int(round(dh - 0.1)), int(round(dh + 0.1))
+    left, right = int(round(dw - 0.1)), int(round(dw + 0.1))
+    img = cv2.copyMakeBorder(
+        img, top, bottom, left, right, cv2.BORDER_CONSTANT, value=color
+    )  # add border
+    return img, ratio, (dw, dh)
+
+
 def detect(object_id, img, estimated_depth):
+
     frame = img
-    cv2.imshow("image", img)
     demo = frame.copy()
     rot_frame = frame.copy()
     refine_frame = frame.copy()
 
     # resize image
-    frame = cv2.resize(frame, (int(320), int(416)), interpolation=cv2.INTER_AREA)
+    frame = letterbox(frame, new_shape=416)[0]
+    # frame = cv2.resize(frame, (int(320), int(416)), interpolation=cv2.INTER_AREA)
     frame = frame[:, :, :3]
     frame = frame[:, :, ::-1].transpose(2, 0, 1)
     frame = np.ascontiguousarray(frame)
@@ -142,9 +188,6 @@ def detect(object_id, img, estimated_depth):
                     int(xyxy[3].cpu().detach().numpy()),
                 ]
 
-    cv2.imshow("demo", demo)
-    cv2.waitKey(0)
-
     if foundObject:
         # rot classifier
         upperleft, lowerright = get_centered_crop(croptopleft, croplowright)
@@ -185,7 +228,7 @@ def detect(object_id, img, estimated_depth):
         rough_pred_pose = obj.label2pose(viewpt, rot, offset, depth)
 
         # pose refinement
-        for t in range(2):
+        for t in range(15):
             obj.setModelviewMatrix(rough_pred_pose)
             obj.findVisibleSamplePoint()
 
@@ -303,7 +346,17 @@ def detect(object_id, img, estimated_depth):
             )
 
             rough_pred_pose = pred_pose
+
+        obj.setModelviewMatrix(pred_pose)
+        obj.findVisibleSamplePoint()
+        for p in obj.sharp_2d_pts:
+            p = (int(p[0]), int(p[1]))
+            demo = cv2.circle(demo, p, radius=2, color=(0, 0, 255), thickness=-1)
+        cv2.imshow("demo", demo)
+        cv2.waitKey(0)
+
         return pred_pose
     else:
         # can't detect the object
+        print("can't detect object!!")
         return None

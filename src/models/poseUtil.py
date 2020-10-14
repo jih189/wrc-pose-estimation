@@ -7,7 +7,7 @@ import kornia
 import src.configuration as CFG
 from scipy.spatial.transform import Rotation as R
 
-from chamfer3D.dist_chamfer_3D import chamfer_3DDist
+# from chamfer3D.dist_chamfer_3D import chamfer_3DDist
 
 # from pytorch3d.loss import chamfer_distance
 
@@ -136,13 +136,14 @@ def ADD_error(pred_pose, targetPose):
     predict_points = tgm.transform_points(pred_pose, samplepoints)
     target_points = tgm.transform_points(targetPose, samplepoints)
     distanceBetweenVec3d = predict_points - target_points
+
     dist3d = torch.norm(distanceBetweenVec3d, p=2, dim=2)
     # print(dist3d[0,:10])
     # count the number of correct points
     dist3d = torch.sum(dist3d, dim=1).float() / numberOfSamplePoints
     # print("ADD")
     # print(diameter)
-    # print(dist3d[:5])
+    # print(dist3d.cpu().numpy()[0])
     result = dist3d < (diameter * 0.1)
     # calculate the matching rate
     return result
@@ -154,6 +155,8 @@ def ADD_error(pred_pose, targetPose):
 
 
 def ADDS_error(pred_pose, targetPose):
+    from chamfer3D.dist_chamfer_3D import chamfer_3DDist
+
     numberOfSamplePoints = 100
     if pred_pose.shape[0] != targetPose.shape[0]:
         print("Error: the length of prediction and target are different!")

@@ -10,8 +10,8 @@ if __name__ == "__main__":
     output_path = CFG.VERIFY_IMAGE_PATH
 
     # you can update this two numbers if need
-    startIdx = 0
-    saveInx = 0
+    startIdx = 3237
+    saveInx = 2970
 
     currentInx = startIdx
 

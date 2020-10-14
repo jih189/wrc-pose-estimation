@@ -26,13 +26,12 @@ import cv2
 # wandb.init(project="wrc-pose-refinement")
 
 batch_size = 64
-epochs = 600
-lr = 1e-5
+epochs = 150
+lr = 4e-5
 momentum = 0.9
 w_decay = 0.1
-seglambda = 0.5
-flowlambda = 15.0
-
+seglambda = 0.0  # 0.5
+flowlambda = 0.0  # 10.0
 train_dir = CFG.REFINE_DATA_PATH
 val_dir = CFG.REFINE_DATA_PATH
 
@@ -59,8 +58,8 @@ mymodel.module.flownet.eval()
 
 
 # validation setup
-# mymodel = torch.load(CFG.BEST_MODEL_REFINE)
-# mymodel.eval()
+mymodel = torch.load(CFG.BEST_MODEL_REFINE)
+mymodel.eval()
 # wandb.watch(mymodel)
 
 seg_criterion = nn.CrossEntropyLoss(reduce=False)
@@ -226,11 +225,11 @@ def train():
         if pre_loss == None:
             torch.save(mymodel, CFG.BEST_MODEL_REFINE)
             pre_loss = val_loss
-        elif pre_loss > val_loss:
+        elif pre_loss < val_loss:
             torch.save(mymodel, CFG.BEST_MODEL_REFINE)
             pre_loss = val_loss
         mymodel.train()
-        if (epoch + 1) % 50 == 0:
+        if (epoch + 1) % 30 == 0:
             scheduler.step()
 
 
@@ -411,12 +410,12 @@ def val():
             dist3dlosstem, flowlosstem, seglosstem
         )
     )
-    return tem
+    return term_add_rate
 
 
 if __name__ == "__main__":
-    # val()
-    train()
+    val()
+    # train()
     # print("done")
     # initPose rot error = 0.35
 

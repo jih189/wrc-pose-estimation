@@ -16,9 +16,9 @@ import cv2
 
 batch_size = 64
 epochs = 200
-lr = 1e-4
+lr = 8e-5
 momentum = 0.9
-w_decay = 10.0
+w_decay = 1.0
 seglambda = 1000.0
 
 train_dir = CFG.REFINE_DATA_PATH

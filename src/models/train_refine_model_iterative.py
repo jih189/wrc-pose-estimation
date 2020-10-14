@@ -18,6 +18,7 @@ import kornia
 import src.common.object_model as OM
 import src.configuration as CFG
 import cv2
+import open3d as o3d
 
 # importing shutil module
 import shutil
@@ -33,12 +34,12 @@ EXPAND_SIZE = 2.0
 
 # refine parameters
 batch_size = 64
-epochs = 60
-lr = 1e-5
+epochs = 150
+lr = 4e-5
 momentum = 0.9
 w_decay = 0.1
 seglambda = 0.5
-flowlambda = 15.0
+flowlambda = 10.0
 
 # file addresses
 train_dir = CFG.REFINE_ITERATIVE_DATA_PATH
@@ -59,13 +60,16 @@ seg_criterion = nn.CrossEntropyLoss(reduce=False)
 optimizer = optim.Adam(
     mymodel.parameters(), lr=lr, betas=(0.9, 0.99), eps=1e-08, weight_decay=w_decay
 )
-
 lmbda = lambda epoch: 0.5
 scheduler = lr_scheduler.MultiplicativeLR(optimizer, lr_lambda=lmbda)
 
 torch.autograd.set_detect_anomaly(True)
 
+# get diameter of model
+samplepoints = np.asarray(o3d.io.read_triangle_mesh(CFG.CAD_MODEL).vertices)
+diameter = np.linalg.norm(np.amax(samplepoints, axis=0) - np.amin(samplepoints, axis=0))
 
+# object init.
 def init():
     # load the object mesh
     OM.setup(CFG.CAMERA_W, CFG.CAMERA_H)
@@ -79,6 +83,7 @@ def init():
     return obj
 
 
+# preprocess the init pose, render the input for module.
 def process_data(args):
     global counter
     global output_counter
@@ -502,6 +507,7 @@ def train(sample_points, train_loader, train_dataset):
     return tem
 
 
+# generate the init pose for next round
 def generateData(obj, sample_points):
     mymodel = torch.load(CFG.BEST_MODEL_ITERATIVE_REFINE)
     mymodel.eval()
@@ -616,6 +622,12 @@ def generateData(obj, sample_points):
                 pred_pose[predindex], -horizontalR_ori, -verticalR_ori
             )
 
+            # randomly resample the pose
+            if bool(random.getrandbits(1)):
+                global_pred_pose = obj.resamplePose(
+                    global_pred_pose, diameter * 0.08, diameter * 0.15, 0.27
+                )
+
             obj.setModelviewMatrix(global_pred_pose)
             obj.findVisibleSamplePoint()
             for p in obj.sharp_2d_pts:
@@ -623,6 +635,7 @@ def generateData(obj, sample_points):
                 original_img = cv2.circle(
                     original_img, p, radius=2, color=(0, 0, 255), thickness=-1
                 )
+
             cv2.imwrite(
                 pool_dir + "{:06d}".format(savedIndex) + "demo.png", original_img,
             )
@@ -647,6 +660,7 @@ def generateData(obj, sample_points):
             )
 
 
+# remove the directory
 def removeFilesInDir(directory):
     filenames = []
     pool_path = Path(directory)
@@ -680,7 +694,7 @@ def main():
             str(f), pool_dir + str(f.name),
         )
 
-    for iterative in range(3):
+    for iterative in range(6):
         # # generate the processed data
         # read images and poses
         input_path = Path(pool_dir)
@@ -739,7 +753,7 @@ def main():
 
         sample_points = torch.as_tensor(obj.sharp_sample_points)
 
-        # # train data set
+        # train data set
         # build train data loader
         train_dataset = Iterative_refine_data(data_path=processed_dir, isTrain=True)
         train_loader = DataLoader(
@@ -785,6 +799,10 @@ def main():
         removeFilesInDir(processed_dir)
         print("data generation done!")
         OM.exit()
+
+        # reset the learning rate
+        for g in optimizer.param_groups:
+            g["lr"] = lr
 
 
 if __name__ == "__main__":

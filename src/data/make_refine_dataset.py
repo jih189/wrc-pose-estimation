@@ -47,8 +47,8 @@ def init():
     obj.setIntrinsicMatrix(CFG.CAMERA_MATRIX)
     obj.loadObjectCADModel(CFG.CAD_MODEL)
 
-    obj.determineSharpEdges(0.3)
-    obj.generateSamplePoints(0.0001, 0.0001)
+    obj.determineSharpEdges(0.8)
+    obj.generateSamplePoints(0.00001, 0.00001)
     return obj
 
 
@@ -116,17 +116,20 @@ def process_data(args):
 
     output_filepath = CFG.REFINE_DATA_PATH
 
-    obj = init()
+    try:
+        obj = init()
 
-    # parse input
-    (id, datalist, isYCB, yolo_model) = args
+        # parse input
+        (id, datalist, isYCB, yolo_model) = args
 
-    useYolo = False if yolo_model == None else True
+        useYolo = False if yolo_model == None else True
 
-    if isYCB:
-        (img_names, pose_names, mask_names) = list(zip(*datalist))
-    else:
-        (img_names, pose_names) = list(zip(*datalist))
+        if isYCB:
+            (img_names, pose_names, mask_names) = list(zip(*datalist))
+        else:
+            (img_names, pose_names) = list(zip(*datalist))
+    except Exception as e:
+        print(str(e))
 
     while True:
         with counter.get_lock():
@@ -155,10 +158,6 @@ def process_data(args):
             # read image and pose
             img = cv2.imread(img_names[current_index])
             pose = np.load(pose_names[current_index])
-
-            # if this is symmetric object, you need to remove the redundent poses
-            # pose = OM.symmetricRemove_housing(pose)
-            # pose = OM.symmetricRemove(pose)
 
             if useYolo:
                 # if yolo can't detect the object in the image, then ignore it.
@@ -261,11 +260,15 @@ def process_data(args):
                 crop_img = img[ey : ey + eh, ex : ex + ew]
                 # cropped mask for initial pose
                 crop_mask = mask[ey : ey + eh, ex : ex + ew]
+
                 # cropped edges for initial pose
                 crop_edge = edge[ey : ey + eh, ex : ex + ew]
 
                 # target mask
                 crop_label_mask = target_mask[ey : ey + eh, ex : ex + ew]
+                # check whether the mask is in the image
+                if cv2.countNonZero(crop_label_mask) < 300:
+                    continue
 
                 # apply rotation on the initial pose to move to it to the center
                 current_pose_at_center = obj.rotatePoseWithAngle(
@@ -283,7 +286,7 @@ def process_data(args):
                 obj.findVisibleSamplePoint()
 
                 init3dpts = np.array(obj.visible_sharpedge_samplepoint)
-                if init3dpts.shape[0] < 900:
+                if init3dpts.shape[0] < 150:
                     print("no enough sample point in this pose! continue...")
                     print("with only ", init3dpts.shape[0], "  points")
                     continue
@@ -294,7 +297,7 @@ def process_data(args):
                 obj.findVisibleSamplePoint()
 
                 target3dpts = np.array(obj.visible_sharpedge_samplepoint)
-                if target3dpts.shape[0] < 900:
+                if target3dpts.shape[0] < 150:
                     print("no enough sample point in this pose! continue...")
                     continue
 
@@ -366,7 +369,8 @@ def process_data(args):
                 )
         except Exception as e:
             print(str(e))
-    pygame.quit()
+
+    OM.exit()
 
 
 @click.command()
