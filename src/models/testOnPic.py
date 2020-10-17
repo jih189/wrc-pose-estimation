@@ -130,11 +130,15 @@ if __name__ == "__main__":
     rot_model = Magic_Net(viewpt_class=viewpt_class, rot_class=rot_class).cuda()
     rot_model = nn.DataParallel(rot_model)
     rot_model = torch.load(CFG.BEST_MODEL_ROT)
+    torch.save(rot_model.module.state_dict(), "best_model_rot_pulley-test.pth")
     rot_model.eval()
 
     ################# refine net ###########################
     refine_model = DeepIM()
     refine_model = torch.load(CFG.BEST_MODEL_ITERATIVE_REFINE)
+    torch.save(
+        refine_model.module.state_dict(), "best_model_iterative_refine_pulley-test.pth"
+    )
     refine_model.eval()
 
     # read image
@@ -177,7 +181,7 @@ if __name__ == "__main__":
 
         for *xyxy, conf, cls in pred:
             label = "%s %.2f" % (names[int(cls)], conf)
-            plot_one_box(xyxy, demo, label=label, color=colors[int(cls)])
+            # plot_one_box(xyxy, demo, label=label, color=colors[int(cls)])
             if names[int(cls)] == "pulley":
                 foundObject = True
                 croptopleft = [
@@ -227,11 +231,11 @@ if __name__ == "__main__":
         offset = position[:, :2]
         offset = np.array(upperleft) + offset.reshape(2) - principle_pt
 
-        depth = 0.7
+        depth = 0.4
         rough_pred_pose = obj.label2pose(viewpt, rot, offset, depth)
 
         # pose refinement
-        for t in range(30):
+        for t in range(40):
             obj.setModelviewMatrix(rough_pred_pose)
             obj.findVisibleSamplePoint()
 
@@ -271,7 +275,6 @@ if __name__ == "__main__":
             crop_mask = mask[ey : ey + eh, ex : ex + ew]
             # cropped edges for initial pose
             crop_edge = edge[ey : ey + eh, ex : ex + ew]
-            # cv2.imshow("edge image", crop_edge)
 
             # apply rotation on the initial pose to move to it to the center
             rough_pose_at_center = obj.rotatePoseWithAngle(
@@ -359,6 +362,7 @@ if __name__ == "__main__":
                 demotemp = cv2.circle(
                     demotemp, p, radius=2, color=(0, 0, 255), thickness=-1
                 )
+
             cv2.imshow("demo", demotemp)
             cv2.waitKey(0)
     else:

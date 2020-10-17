@@ -35,11 +35,11 @@ EXPAND_SIZE = 2.0
 # refine parameters
 batch_size = 64
 epochs = 150
-lr = 4e-5
+lr = 1e-5
 momentum = 0.9
 w_decay = 0.1
 seglambda = 0.5
-flowlambda = 10.0
+flowlambda = 8.0
 
 # file addresses
 train_dir = CFG.REFINE_ITERATIVE_DATA_PATH
@@ -50,10 +50,12 @@ pool_dir = "pred_temp/"
 # initiate the net
 mymodel = DeepIM().cuda()
 mymodel = nn.DataParallel(mymodel)
-mymodel.module.flownet.load_state_dict(
-    torch.load(CFG.BEST_MODEL_FLOWNET).module.state_dict()
-)
-mymodel.module.flownet.eval()
+# mymodel.module.flownet.load_state_dict(
+#     torch.load(CFG.BEST_MODEL_FLOWNET).module.state_dict()
+# )
+# mymodel.module.flownet.eval()
+
+mymodel = torch.load(CFG.BEST_MODEL_ITERATIVE_REFINE)
 
 seg_criterion = nn.CrossEntropyLoss(reduce=False)
 

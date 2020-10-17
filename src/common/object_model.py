@@ -210,6 +210,7 @@ class ObjectModel:
         glLightfv(GL_LIGHT0, GL_POSITION, lightfv(0.0, 0.0, -1.0, 0.0))
         glEnable(GL_LIGHT0)
 
+        # # define light condition here
         # glLightfv(GL_LIGHT1, GL_POSITION, lightfv(0.0, 1.0, 0.0, 0.0))
         # glLightfv(GL_LIGHT1, GL_AMBIENT, lightfv(0.0, 0.0, 0.0, 1.0))
         # glLightfv(GL_LIGHT1, GL_DIFFUSE, lightfv(1.0, 1.0, 1.0, 1.0))
@@ -239,6 +240,7 @@ class ObjectModel:
 
         visualization.draw(self.mesh_obj)
 
+    # filter out the edge which is not sharp enough
     def determineSharpEdges(self, th_sharp):
         self.sharp_edges.clear()
 
@@ -288,6 +290,7 @@ class ObjectModel:
                             (self.mesh_obj.vertices[i], self.mesh_obj.vertices[j])
                         )
 
+    # generate sample points on the edges of the object
     def generateSamplePoints(self, sample_step, sample_th):
         self.sharp_sample_points.clear()
         self.sharp_sample_points_edge_indices.clear()
@@ -314,6 +317,7 @@ class ObjectModel:
                 self.sharp_sample_points_edge_indices.append(l)
                 j += 1
 
+    # calculate the angles of the pose so it can be rotated to the center view
     def getCenterAngle(self, pose):
         horizontalR = -np.arctan2(pose[0, 3], pose[2, 3])
         verticalR = np.arctan2(
@@ -322,16 +326,8 @@ class ObjectModel:
 
         return horizontalR, verticalR
 
+    # rotate the pose with angles respect to x and y axis
     def rotatePoseWithAngle(self, pose, horizontalR, verticalR):
-        # r = R.from_euler('y', horizontalR)
-        # Rmatrix = np.identity(4)
-        # Rmatrix[:3,:3] = r.as_matrix()
-        # pose = np.dot(Rmatrix, pose)
-
-        # r = R.from_euler('x', verticalR)
-        # Rmatrix = np.identity(4)
-        # Rmatrix[:3,:3] = r.as_matrix()
-        # pose = np.dot(Rmatrix, pose)
 
         Rmatrix = np.identity(4)
         Rmatrix[:3, :3] = R.from_euler("XYZ", [verticalR, horizontalR, 0]).as_matrix()
@@ -339,6 +335,7 @@ class ObjectModel:
 
         return pose
 
+    # generate teh sharp edge of image
     def getEdge(self, height, width):
         edgeImg = np.zeros((height, width), np.uint8)
         for p in self.sharp_2d_pts:
@@ -496,6 +493,7 @@ class ObjectModel:
 
         return poses
 
+    # get the mask of the object
     def getVisibleArea(self):
         ret = np.zeros([self.height, self.width], dtype=np.uint8)
         mask = self.getMask()
@@ -511,6 +509,7 @@ class ObjectModel:
         ret = ret < 0.99
         return ret
 
+    # generate the visible point cloud on the object surface
     def getVisiblePointCloud(self):
         self.pointcloud.clear()
         model = glGetDoublev(GL_MODELVIEW_MATRIX)
@@ -543,11 +542,8 @@ class ObjectModel:
                         (y, x, result[y, x, 0], result[y, x, 1], result[y, x, 2])
                     )
 
+    # after the object is rendered, the optical flow can be calculated to the
     def getOptFlowWithPoses(self, height, width, targetpose):
-
-        # do not need if object is already rendered
-        # self.setModelviewMatrix(initpose)
-        # self.findVisibleSamplePoint()
 
         img = np.zeros((self.height, self.width, 3), dtype=np.uint8)
         self.getVisiblePointCloud()

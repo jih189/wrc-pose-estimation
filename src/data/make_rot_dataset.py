@@ -9,6 +9,7 @@ import random
 import src.common.object_model as OM
 import src.configuration as CFG
 from torch.multiprocessing import Pool, Value, cpu_count, Array
+from scipy.spatial.transform import Rotation as R
 
 
 import torch
@@ -51,6 +52,12 @@ def init():
     return obj
 
 
+def rotate_image(image, angle, rotate_center):
+    rot_mat = cv2.getRotationMatrix2D(rotate_center, angle, 1.0)
+    result = cv2.warpAffine(image, rot_mat, image.shape[1::-1], flags=cv2.INTER_LINEAR)
+    return result
+
+
 def get_centered_crop(topleft, botright):
     cropHeight = botright[1] - topleft[1]
     cropWidth = botright[0] - topleft[0]
@@ -67,6 +74,25 @@ def get_centered_crop(topleft, botright):
     )
 
     return topleft_new, botright_new
+
+
+def rotateAngle(pose, angle):
+    angle = np.radians(angle)
+    horizontalR = -np.arctan2(pose[0, 3], pose[2, 3])
+    verticalR = np.arctan2(
+        pose[1, 3], np.sqrt(pose[0, 3] * pose[0, 3] + pose[2, 3] * pose[2, 3])
+    )
+
+    Rmatrix = np.identity(4)
+    Rmatrix[:3, :3] = R.from_euler("XYZ", [verticalR, horizontalR, 0]).as_matrix()
+    pose = np.dot(Rmatrix, pose)
+
+    Rmatrix[:3, :3] = R.from_euler("Z", -angle).as_matrix()
+
+    pose = np.dot(Rmatrix, pose)
+    Rmatrix[:3, :3] = R.from_euler("XYZ", [-verticalR, -horizontalR, 0]).as_matrix()
+    pose = np.dot(Rmatrix, pose)
+    return pose
 
 
 def yoloDetection(yolo_model, img):
@@ -170,35 +196,20 @@ def process_data(args):
             print("error in load data!!!!")
             print(str(e))
 
+        center_pt = obj.project3Dto2D((0, 0, 0), pose)
+        center_pt = (int(center_pt[0]), int(center_pt[1]))
         depth = pose[2, 3]
 
-        # generate the real bounding box for object
-        obj.setModelviewMatrix(pose)
+        # generate different rotation to increase the number of data
+        for r in range(8):
+            inplaneRotate = r * 45.0
 
-        if useYolo:
-            # run yolo on image
-            try:
-                yoloresult = yoloDetection(yolo_model, img)
-                if yoloresult == None:
-                    continue
+            rot_img = rotate_image(img, inplaneRotate, center_pt)
+            rot_pose = rotateAngle(pose, inplaneRotate)
 
-            except Exception as e:
-                print("ERROR: yolo detection error")
-                print(str(e))
-                return
+            # generate the real bounding box for object
+            obj.setModelviewMatrix(rot_pose)
 
-            upperleft, lowerright = yoloresult
-            # we need to ensure the center point of the object is in the bounding box
-            center_point = obj.project3Dto2D((0.0, 0.0, 0.0), pose)
-
-            if (
-                center_point[0] < upperleft[0]
-                or center_point[0] >= lowerright[0]
-                or center_point[1] < upperleft[1]
-                or center_point[1] >= lowerright[1]
-            ):
-                continue
-        else:
             try:
                 # random generate a bounding box around the object with given pose
                 upperleft, lowerright = obj.findVisibleSamplePoint()
@@ -219,73 +230,78 @@ def process_data(args):
                 print(upperleft)
                 print(str(e))
 
-        crop_upperleft, crop_lowerright = get_centered_crop(upperleft, lowerright)
+            crop_upperleft, crop_lowerright = get_centered_crop(upperleft, lowerright)
 
-        # for making life easier, we drop the image if the crop bounding box is out of image
-        if (
-            int(crop_upperleft[1]) < 0
-            or int(crop_lowerright[1]) >= img.shape[0]
-            or int(crop_upperleft[0]) < 0
-            or int(crop_lowerright[0]) >= img.shape[1]
-        ):
-            continue
+            # for making life easier, we drop the image if the crop bounding box is out of image
+            if (
+                int(crop_upperleft[1]) < 0
+                or int(crop_lowerright[1]) >= rot_img.shape[0]
+                or int(crop_upperleft[0]) < 0
+                or int(crop_lowerright[0]) >= rot_img.shape[1]
+            ):
+                continue
 
-        # get view point, inplance rotation, offset from center, and depth from the pose
-        viewPoint, inplaneRotation, offsetFromCenter, depth = obj.getLabel()
-        inplaneRotation = inplaneRotation % (2 * np.pi) / (2 * np.pi / 60)
-        if np.isnan(inplaneRotation):
-            # the inplane rotation is invalid when y axis is pointing to camera
-            continue
+            # get view point, inplance rotation, offset from center, and depth from the pose
+            viewPoint, inplaneRotation, offsetFromCenter, depth = obj.getLabel()
+            inplaneRotation = inplaneRotation % (2 * np.pi) / (2 * np.pi / 60)
+            if np.isnan(inplaneRotation):
+                # the inplane rotation is invalid when y axis is pointing to camera
+                continue
 
-        try:
-            cropImg = img[
-                int(crop_upperleft[1]) : int(crop_lowerright[1]),
-                int(crop_upperleft[0]) : int(crop_lowerright[0]),
-            ]
-        except Exception as e:
-            print("error in cropping image!!!")
-            print(str(e))
-
-        with output_counter.get_lock():
-            current_output_index = output_counter.value
-            output_counter.value += 1
-
-        np.save(
-            output_filepath
-            + "bounding"
-            + "{:06d}".format(current_output_index)
-            + ".npy",
-            np.array(
-                [
-                    int(crop_upperleft[0]),
-                    int(crop_upperleft[1]),
-                    int(crop_lowerright[0]),
-                    int(crop_lowerright[1]),
+            try:
+                cropImg = rot_img[
+                    int(crop_upperleft[1]) : int(crop_lowerright[1]),
+                    int(crop_upperleft[0]) : int(crop_lowerright[0]),
                 ]
-            ),
-        )
+            except Exception as e:
+                print("error in cropping image!!!")
+                print(str(e))
 
-        np.save(
-            output_filepath + "{:06d}".format(current_output_index) + ".npy", pose,
-        )
+            with output_counter.get_lock():
+                current_output_index = output_counter.value
+                output_counter.value += 1
 
-        cv2.imwrite(
-            output_filepath + "crop" + "{:06d}".format(current_output_index) + ".png",
-            cropImg,
-        )
+            np.save(
+                output_filepath
+                + "bounding"
+                + "{:06d}".format(current_output_index)
+                + ".npy",
+                np.array(
+                    [
+                        int(crop_upperleft[0]),
+                        int(crop_upperleft[1]),
+                        int(crop_lowerright[0]),
+                        int(crop_lowerright[1]),
+                    ]
+                ),
+            )
 
-        cv2.imwrite(
-            output_filepath + "{:06d}".format(current_output_index) + ".png", img,
-        )
+            np.save(
+                output_filepath + "{:06d}".format(current_output_index) + ".npy",
+                rot_pose,
+            )
 
-        inplaneRotation = int(inplaneRotation)
-        vpidx = OM.cal_idx(viewPoint)
+            cv2.imwrite(
+                output_filepath
+                + "crop"
+                + "{:06d}".format(current_output_index)
+                + ".png",
+                cropImg,
+            )
 
-        with vparr.get_lock():
-            vparr[vpidx] += 1
+            cv2.imwrite(
+                output_filepath + "{:06d}".format(current_output_index) + ".png",
+                rot_img,
+            )
 
-        with rotarr.get_lock():
-            rotarr[inplaneRotation] += 1
+            inplaneRotation = int(inplaneRotation)
+            vpidx = OM.cal_idx(viewPoint)
+
+            with vparr.get_lock():
+                vparr[vpidx] += 1
+
+            with rotarr.get_lock():
+                rotarr[inplaneRotation] += 1
 
 
 @click.command()

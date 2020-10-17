@@ -254,7 +254,7 @@ def testData(obj, yolo_model, rot_model, refine_model, d):
         rough_pred_pose = obj.label2pose(viewpt, rot, offset, depth)
 
         # pose refinement
-        for t in range(10):
+        for t in range(3):
             obj.setModelviewMatrix(rough_pred_pose)
             obj.findVisibleSamplePoint()
 
@@ -369,29 +369,30 @@ def testData(obj, yolo_model, rot_model, refine_model, d):
             )
 
             rough_pred_pose = pred_pose
-        # demotemp = demo.copy()
-        # obj.setModelviewMatrix(pred_pose)
-        # obj.findVisibleSamplePoint()
 
-        # # draw image
-        # for p in obj.sharp_2d_pts:
-        #     p = (int(p[0]), int(p[1]))
-        #     demotemp = cv2.circle(
-        #         demotemp, p, radius=0, color=(0, 0, 255), thickness=-1
-        #     )
+        _, croptopleft, croplowright = generateBoundingbox(obj, pred_pose)
 
-        # obj.setModelviewMatrix(targetPose_temp)
-        # obj.findVisibleSamplePoint()
+        upperleft_rand, lowerright_rand = get_centered_crop(croptopleft, croplowright)
 
-        # # draw image
-        # for p in obj.sharp_2d_pts:
-        #     p = (int(p[0]), int(p[1]))
-        #     demotemp = cv2.circle(
-        #         demotemp, p, radius=0, color=(0, 255, 0), thickness=-1
-        #     )
+        demotemp = demo.copy()
+        obj.setModelviewMatrix(pred_pose)
+        obj.findVisibleSamplePoint()
 
-        # cv2.imshow("frame", demotemp)
-        # cv2.waitKey(0)
+        # draw image
+        for p in obj.sharp_2d_pts:
+            p = (int(p[0]), int(p[1]))
+            demotemp = cv2.circle(
+                demotemp, p, radius=0, color=(0, 0, 255), thickness=-1
+            )
+
+        demo = demo[
+            int(upperleft_rand[1]) : int(lowerright_rand[1]),
+            int(upperleft_rand[0]) : int(lowerright_rand[0]),
+        ]
+        demotemp = demotemp[
+            int(upperleft_rand[1]) : int(lowerright_rand[1]),
+            int(upperleft_rand[0]) : int(lowerright_rand[0]),
+        ]
 
         pred_pose = OM.symmetricRemove_housing(pred_pose)
 
@@ -404,6 +405,11 @@ def testData(obj, yolo_model, rot_model, refine_model, d):
 
         addsrate = ADDS_error(pred_pose, targetPose)
         totalADDS.append(addsrate.cpu().numpy()[0])
+
+        if addrate > 0.0:
+            cv2.imshow("edge", demotemp)
+            cv2.imshow("frame", demo)
+            cv2.waitKey(0)
 
 
 if __name__ == "__main__":
@@ -422,9 +428,9 @@ if __name__ == "__main__":
     image_names.sort()
     pose_names.sort()
 
-    indexnum = 100
-    image_names = image_names[indexnum : indexnum + 500]
-    pose_names = pose_names[indexnum : indexnum + 500]
+    indexnum = 500
+    image_names = image_names[indexnum : indexnum + 100]
+    pose_names = pose_names[indexnum : indexnum + 100]
 
     datalist = list(zip(image_names, pose_names))
 
