@@ -48,7 +48,6 @@ val_loader = DataLoader(
 )
 
 # initiate the net
-# mymodel = Refine_Net().cuda()
 mymodel = DeepIM().cuda()
 mymodel = nn.DataParallel(mymodel)
 mymodel.module.flownet.load_state_dict(

@@ -17,25 +17,71 @@ import src.configuration as CFG
 import sys
 
 # map the pose to the pose which has the same shape, so it can avoid the symetric issue
-def symmetricRemove(pose_input):
+def symmetricRemove(pose_input_):
+    pose_input = pose_input_.copy()
     eulerVec = (R.from_matrix(pose_input[:3, :3])).as_euler("ZYX")
     eulerVec[2] = 0
     pose_input[:3, :3] = (R.from_euler("ZYX", eulerVec)).as_matrix()
     return pose_input
 
 
-def symmetricRemove_housing(pose_input):
+def symmetricRemove_housing(pose_input_):
+    pose_input = pose_input_.copy()
     eulerVec = (R.from_matrix(pose_input[:3, :3])).as_euler("ZYX")
     eulerVec[2] = eulerVec[2] % (np.pi / 2)
     pose_input[:3, :3] = (R.from_euler("ZYX", eulerVec)).as_matrix()
     return pose_input
 
 
-def symmetricRemove_nut(pose_input):
+def symmetricRemove_nut(pose_input_):
+    pose_input = pose_input_.copy()
     eulerVec = (R.from_matrix(pose_input[:3, :3])).as_euler("ZYX")
     eulerVec[2] = eulerVec[2] % (np.pi / 3)
     pose_input[:3, :3] = (R.from_euler("ZYX", eulerVec)).as_matrix()
     return pose_input
+
+
+def rotate_image(image, angle, rotate_center):
+    rot_mat = cv2.getRotationMatrix2D(rotate_center, angle, 1.0)
+    result = cv2.warpAffine(image, rot_mat, image.shape[1::-1], flags=cv2.INTER_LINEAR)
+    return result
+
+
+def get_centered_crop(topleft, botright):
+    cropHeight = botright[1] - topleft[1]
+    cropWidth = botright[0] - topleft[0]
+
+    centerPoint = (int(topleft[0] + cropWidth / 2), int(topleft[1] + cropHeight / 2))
+
+    cropSize = int(max(cropHeight, cropWidth) / 2)
+
+    topleft_new = np.array(
+        [centerPoint[0] - cropSize, centerPoint[1] - cropSize], dtype=int
+    )
+    botright_new = np.array(
+        [centerPoint[0] + cropSize, centerPoint[1] + cropSize], dtype=int
+    )
+
+    return topleft_new, botright_new
+
+
+def rotateAngle(pose_, angle):
+    pose = pose_.copy()
+    horizontalR = -np.arctan2(pose[0, 3], pose[2, 3])
+    verticalR = np.arctan2(
+        pose[1, 3], np.sqrt(pose[0, 3] * pose[0, 3] + pose[2, 3] * pose[2, 3])
+    )
+
+    Rmatrix = np.identity(4)
+    Rmatrix[:3, :3] = R.from_euler("XYZ", [verticalR, horizontalR, 0]).as_matrix()
+    pose = np.dot(Rmatrix, pose)
+
+    Rmatrix[:3, :3] = R.from_euler("Z", -np.radians(angle)).as_matrix()
+
+    pose = np.dot(Rmatrix, pose)
+    Rmatrix[:3, :3] = R.from_euler("XYZ", [-verticalR, -horizontalR, 0]).as_matrix()
+    pose = np.dot(Rmatrix, pose)
+    return pose
 
 
 def py_ang(v1, v2):
@@ -85,10 +131,9 @@ def directionGen(samples):
 # convert view point to view point index
 def cal_idx(viewpoint):
     direction = fibonacci_sphere(64)
-    viewpoint *= -1
     differenceList = []
     for v in range(len(direction)):
-        differenceList.append(py_ang(viewpoint, np.array(direction[v])))
+        differenceList.append(py_ang(viewpoint * -1, np.array(direction[v])))
     matchindex = np.argmin(differenceList)
 
     return matchindex
@@ -120,11 +165,11 @@ class ObjectModel:
     # project a 3d point to a 2d point with pose
     # input: (3,) numpy matrix
     # output: (2,) numpy matrix
-    def project3Dto2D(self, pt3, pose):
-        if type(pt3) != tuple:
+    def project3Dto2D(self, pt3_, pose):
+        if type(pt3_) != tuple:
             raise Exception("Error: 3d point should be tuple ", pt3)
         # convert to numpy
-        pt3 = np.array([[pt3[0], pt3[1], pt3[2], 1]]).T
+        pt3 = np.array([[pt3_[0], pt3_[1], pt3_[2], 1]]).T
         pt3_cam = (np.dot(pose, pt3))[:3, 0]
         fx = self.intrinsic[0, 0]
         fy = self.intrinsic[1, 1]
@@ -180,11 +225,12 @@ class ObjectModel:
         pose[:3, :3] = self.VP2Rotation(viewpoint)
         pose[2, 3] = np.linalg.norm(self.pose[:3, 3])
 
+        # need to be carefule for selecting the direction for inplane rotation
         currentO = self.project3Dto2D((0.0, 0.0, 0.0), self.pose)
-        currenty = self.project3Dto2D((0.0, 0.01, 0.0), self.pose)
+        currenty = self.project3Dto2D((0.0, 0.1, 0.0), self.pose)
 
         newO = self.project3Dto2D((0.0, 0.0, 0.0), pose)
-        newy = self.project3Dto2D((0.0, 0.01, 0.0), pose)
+        newy = self.project3Dto2D((0.0, 0.1, 0.0), pose)
 
         v1 = np.array([currenty[0] - currentO[0], currenty[1] - currentO[1]])
         v2 = np.array([newy[0] - newO[0], newy[1] - newO[1]])
@@ -197,9 +243,9 @@ class ObjectModel:
 
         return (
             viewpoint,
-            angle,
-            (currentO[0] - newO[0], currentO[1] - newO[1]),
-            np.linalg.norm(self.pose[:3, 3]),
+            angle,  # in-plane rotation
+            (currentO[0] - newO[0], currentO[1] - newO[1]),  # offset
+            np.linalg.norm(self.pose[:3, 3]),  # depth
         )
 
     # render the mesh object
@@ -327,8 +373,8 @@ class ObjectModel:
         return horizontalR, verticalR
 
     # rotate the pose with angles respect to x and y axis
-    def rotatePoseWithAngle(self, pose, horizontalR, verticalR):
-
+    def rotatePoseWithAngle(self, pose_, horizontalR, verticalR):
+        pose = pose_.copy()
         Rmatrix = np.identity(4)
         Rmatrix[:3, :3] = R.from_euler("XYZ", [verticalR, horizontalR, 0]).as_matrix()
         pose = np.dot(Rmatrix, pose)
@@ -702,6 +748,7 @@ class ObjectModel:
         qy = oy + math.sin(angle) * (px - ox) + math.cos(angle) * (py - oy)
         return int(qx), int(qy)
 
+    # we may need to be carefule the rotate image may make the object out of the boundary
     def rotateImg(self, input, angle):
         _, height, width = input.shape
         result = np.zeros((height, width), np.float32)
@@ -709,7 +756,6 @@ class ObjectModel:
         centerx = width / 2
         for h in range(height):
             for w in range(width):
-                # todo
                 n_h, n_w = self.rotate((centery, centerx), (h, w), angle)
                 if n_h < 0 or n_w < 0 or n_h >= height or n_w >= width:
                     continue
@@ -791,7 +837,7 @@ class ObjectModel:
         pose = np.identity(4)
         pose[:3, :3] = self.VP2Rotation(viewpoint)
         pose[2, 3] = depth
-        r = R.from_euler("Z", -inplaneR)
+        r = R.from_euler("Z", inplaneR)
         pose[:3, :3] = np.dot(r.as_matrix(), pose[:3, :3])
 
         horizontalR = np.arctan2(offset[0], self.intrinsic[0, 0])

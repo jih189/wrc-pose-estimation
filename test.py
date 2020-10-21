@@ -1,104 +1,71 @@
-import cv2
-from scipy.io import loadmat
-import src.common.object_model as OM
 import numpy as np
-import tqdm
+import cv2
 
-MODEL_DIR = "data/external/YCB_dataset/models/"
+import src.common.object_model as OM
+import src.configuration as CFG
 
+OM.setup(CFG.CAMERA_W, CFG.CAMERA_H)
 
-def loadMeta(mat_file):
-    # load meta data
-    mat = loadmat(mat_file)
-    camera_matrix = mat["intrinsic_matrix"]
-    cls_indexes = mat["cls_indexes"]
-    poses = mat["poses"]
+OM.setProjectMatrixWithIntr(CFG.CAMERA_MATRIX, CFG.CAMERA_W, CFG.CAMERA_H)
 
-    return camera_matrix, cls_indexes, poses
+obj = OM.ObjectModel()
+obj.loadObjectCADModel(CFG.CAD_MODEL)
+obj.setIntrinsicMatrix(CFG.CAMERA_MATRIX)
 
-
-def init_obj(camera_h, camera_w, camera_matrix, cad_model):
-    # load the object mesh
-    OM.setup(camera_w, camera_h)
-    OM.setProjectMatrixWithIntr(camera_matrix, camera_w, camera_h)
-
-    obj = OM.ObjectModel()
-    obj.setIntrinsicMatrix(camera_matrix)
-    obj.loadObjectCADModel(cad_model)
-
-    obj.determineSharpEdges(0.8)
-    obj.generateSamplePoints(0.000001, 0.1)
-    return obj
+obj.determineSharpEdges(0.5)
+obj.generateSamplePoints(0.0001, 0.0001)
 
 
-def loadClasses(classesfile):
-    file1 = open(classesfile, "r")
-    Lines = file1.readlines()
-
-    count = 1
-    result = []
-    # Strips the newline character
-    for line in Lines:
-        result.append(line.strip())
-        count += 1
-    return result
+def mapt(f, *seq):
+    return tuple(map(f, *seq))
 
 
-def processPose(pose):
-    pose = np.concatenate((pose, [[0, 0, 0, 1]]), 0)
-    return pose
+test_file = "000100"
+frame = cv2.imread(CFG.PROCESSED_DATA_PATH + test_file + ".png")
+pose_label = np.load(CFG.PROCESSED_DATA_PATH + test_file + ".npy")
 
 
-if __name__ == "__main__":
+depth = np.linalg.norm(pose_label[:3, 3])
 
-    classes = loadClasses("data/external/YCB_dataset/image_sets/classes.txt")
 
-    targetpose = np.array(
-        [
-            [0.68670714, -0.7268656, -0.01003767, 0.07240387],
-            [-0.39432726, -0.36086995, -0.84515083, 0.0489662],
-            [0.61068822, 0.58432885, -0.53443427, 0.91424911],
-            [0.0, 0.0, 0.0, 1.0],
-        ]
-    )
+obj.setModelviewMatrix(pose_label)
+obj.findVisibleSamplePoint()
+viewPoint, inplaneRotation, offsetFromCenter, depth = obj.getLabel()
 
-    # 56
-    testind = 1
-    for i in tqdm.tqdm(range(testind, testind + 1, 1)):
-        filename = "data/external/YCB_dataset/data/0038/{:06d}".format(i)
-        image_file = filename + "-color.png"
-        mat_file = filename + "-meta.mat"
 
-        # read image
-        img = cv2.imread(image_file)
-        height = img.shape[0]
-        width = img.shape[1]
+pre_pose = obj.label2pose(viewPoint, inplaneRotation, offsetFromCenter, depth)
+viewPoint = OM.cal_idx(viewPoint)
+print("view point = ", viewPoint)
+inplaneRotation = inplaneRotation % (2 * np.pi) / (2 * np.pi / 60)
+inplaneRotation = int(inplaneRotation)
+print("inplane rotation index = ", inplaneRotation)
 
-        camera_matrix, cls_indexes, poses = loadMeta(mat_file)
+for pt in obj.sharp_2d_pts:
+    pt = mapt(int, pt)
+    frame = cv2.circle(frame, pt, radius=0, color=(0, 0, 255), thickness=-1)
 
-        for c in cls_indexes:
-            # print("init", classes[c[0] - 1])
-            mesh_dir = MODEL_DIR + classes[c[0] - 1] + "/textured.obj"
-            # print("object mesh dir = ", mesh_dir)
-            obj = init_obj(height, width, camera_matrix, mesh_dir)
+originPoint = mapt(int, obj.project3Dto2D((0.0, 0.0, 0.0), pose_label))
+xaxis = mapt(int, obj.project3Dto2D((0.05, 0.0, 0.0), pose_label))
+frame = cv2.line(frame, originPoint, xaxis, (255, 0, 0), 1)
+yaxis = mapt(int, obj.project3Dto2D((0.0, 0.05, 0.0), pose_label))
+frame = cv2.line(frame, originPoint, yaxis, (0, 255, 0), 1)
+zaxis = mapt(int, obj.project3Dto2D((0.0, 0.0, 0.05), pose_label))
+frame = cv2.line(frame, originPoint, zaxis, (0, 0, 255), 1)
 
-            pose = processPose(poses[:, :, 0])
-            # if np.allclose(pose, targetpose, rtol=0.01):
-            #     print("found ", str(i))
-            obj.setModelviewMatrix(pose)
+obj.setModelviewMatrix(pre_pose)
+obj.findVisibleSamplePoint()
 
-            obj.findVisibleSamplePoint()
-            # draw init pose
-            for p in obj.sharp_2d_pts:
-                img = cv2.circle(
-                    img,
-                    (int(p[0]), int(p[1])),
-                    radius=1,
-                    color=(0, 255, 0),
-                    thickness=-1,
-                )
-            cv2.imshow("image", img)
-            cv2.waitKey(0)
-            cv2.destroyAllWindows()
-            break
+for pt in obj.sharp_2d_pts:
+    pt = mapt(int, pt)
+    frame = cv2.circle(frame, pt, radius=0, color=(0, 255, 0), thickness=-1)
 
+originPoint = mapt(int, obj.project3Dto2D((0.0, 0.0, 0.0), pose_label))
+xaxis = mapt(int, obj.project3Dto2D((0.05, 0.0, 0.0), pose_label))
+frame = cv2.line(frame, originPoint, xaxis, (255, 0, 0), 1)
+yaxis = mapt(int, obj.project3Dto2D((0.0, 0.05, 0.0), pose_label))
+frame = cv2.line(frame, originPoint, yaxis, (0, 255, 0), 1)
+zaxis = mapt(int, obj.project3Dto2D((0.0, 0.0, 0.05), pose_label))
+frame = cv2.line(frame, originPoint, zaxis, (0, 0, 255), 1)
+
+cv2.imshow("view", frame)
+cv2.waitKey(0)

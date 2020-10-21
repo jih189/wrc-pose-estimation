@@ -35,11 +35,11 @@ EXPAND_SIZE = 2.0
 # refine parameters
 batch_size = 64
 epochs = 150
-lr = 1e-5
+lr = 4e-5
 momentum = 0.9
 w_decay = 0.1
-seglambda = 0.5
-flowlambda = 8.0
+seglambda = 1.0
+flowlambda = 5.0
 
 # file addresses
 train_dir = CFG.REFINE_ITERATIVE_DATA_PATH
@@ -696,6 +696,8 @@ def main():
             str(f), pool_dir + str(f.name),
         )
 
+    learningrate = lr
+
     for iterative in range(6):
         # # generate the processed data
         # read images and poses
@@ -786,7 +788,7 @@ def main():
             if (epoch + 1) % 50 == 0:
                 scheduler.step()
 
-        print("training process done!")
+        print("training process done for interation ", iterative)
 
         # # generate next dataset
         # generate the new val file for generate data set
@@ -804,7 +806,8 @@ def main():
 
         # reset the learning rate
         for g in optimizer.param_groups:
-            g["lr"] = lr
+            learningrate = 0.4 * learningrate
+            g["lr"] = learningrate
 
 
 if __name__ == "__main__":

@@ -28,25 +28,6 @@ EXPAND_SIZE = 2.0
 # ignore warming
 np.seterr(divide="ignore", invalid="ignore")
 
-
-def get_centered_crop(topleft, botright):
-    cropHeight = botright[1] - topleft[1]
-    cropWidth = botright[0] - topleft[0]
-
-    centerPoint = (topleft[0] + cropWidth / 2, topleft[1] + cropHeight / 2)
-
-    cropSize = max(cropHeight, cropWidth)
-
-    topleft_new = np.array(
-        [centerPoint[0] - cropSize / 2, centerPoint[1] - cropSize / 2], dtype=int
-    )
-    botright_new = np.array(
-        [centerPoint[0] + cropSize / 2, centerPoint[1] + cropSize / 2], dtype=int
-    )
-
-    return topleft_new, botright_new
-
-
 OM.setup(CFG.CAMERA_W, CFG.CAMERA_H)
 OM.setProjectMatrixWithIntr(CFG.CAMERA_MATRIX, CFG.CAMERA_W, CFG.CAMERA_H)
 
@@ -190,7 +171,7 @@ def detect(object_id, img, estimated_depth):
 
     if foundObject:
         # rot classifier
-        upperleft, lowerright = get_centered_crop(croptopleft, croplowright)
+        upperleft, lowerright = OM.get_centered_crop(croptopleft, croplowright)
         l = int(lowerright[0]) - int(upperleft[0])
 
         # crop the image for rot classifier

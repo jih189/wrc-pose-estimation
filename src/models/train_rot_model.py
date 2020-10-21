@@ -7,7 +7,6 @@ from torch.utils.data import DataLoader
 
 from src.common.DataLoader import Rot_data
 from models.model import Magic_Net
-import src.common.object_model as OM
 import src.configuration as CFG
 import numpy as np
 
@@ -17,18 +16,6 @@ np.seterr(divide="ignore", invalid="ignore")
 # import wandb
 
 # wandb.init(project="wrc-rot-classifier")
-
-OM.setup(CFG.CAMERA_W, CFG.CAMERA_H)
-
-OM.setProjectMatrixWithIntr(CFG.CAMERA_MATRIX, CFG.CAMERA_W, CFG.CAMERA_H)
-
-obj = OM.ObjectModel()
-obj.loadObjectCADModel(CFG.CAD_MODEL)
-obj.setIntrinsicMatrix(CFG.CAMERA_MATRIX)
-
-obj.determineSharpEdges(0.05)
-obj.generateSamplePoints(0.001, 0.001)
-
 
 batch_size = 64
 epochs = 1000
@@ -59,8 +46,6 @@ model = nn.DataParallel(model)
 # model = torch.load(CFG.BEST_MODEL_ROT)
 # model.eval()
 
-model.train()
-
 # read the weights
 vp_weights = np.load(CFG.PROCESSED_DATA_PATH + "vp_weight.npy")
 rot_weights = np.load(CFG.PROCESSED_DATA_PATH + "rot_weight.npy")
@@ -70,8 +55,8 @@ viewpt_criterion = nn.CrossEntropyLoss(weight=vp_class_weights)
 rot_class_weights = torch.FloatTensor(rot_weights).cuda()
 rot_criterion = nn.CrossEntropyLoss(weight=rot_class_weights)
 offset_criterion = nn.MSELoss(reduction="sum")
-lamda = 2.0
-lamda2 = 0.5
+rot_lamda = 5.0
+offset_lamda = 0.5
 
 optimizer = optim.SGD(model.parameters(), lr=lr, momentum=momentum)
 lmbda = lambda epoch: 0.5
@@ -84,6 +69,7 @@ def cal_rot_loss(thetas, target):
 
 def train():
     print("start training:")
+    model.train()
     pre_loss = None
     for epoch in range(epochs):
         avg_loss = []
@@ -112,7 +98,7 @@ def train():
                 torch.sigmoid(output[:, viewpt_class + rot_class :]), offset_label
             )
 
-            loss = viewpt_loss + rot_loss * lamda + lamda2 * offset_loss
+            loss = viewpt_loss + rot_loss * rot_lamda + offset_lamda * offset_loss
 
             loss.backward()
             optimizer.step()
@@ -179,7 +165,7 @@ def val():
             torch.sigmoid(output[:, viewpt_class + rot_class :]), offset_label
         )
 
-        loss = viewpt_loss + rot_loss * lamda + lamda2 * offset_loss
+        loss = viewpt_loss + rot_loss * rot_lamda + offset_loss * offset_lamda
 
         pred = output[:, :viewpt_class].data.cpu().numpy()
         pred = np.argmax(pred, axis=1)

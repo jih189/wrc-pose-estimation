@@ -56,8 +56,6 @@ class Rot_data(Dataset):
         # create label
         label_path = self.poseDataPath + self.dataNames[idx] + ".npy"
         pose = np.load(label_path)
-        # remove the symmetry
-        # pose = OM.symmetricRemove(pose)
         self.obj.setModelviewMatrix(pose)
         viewPoint, inplaneRotation, offsetFromCenter, depth = self.obj.getLabel()
         vpidx = OM.cal_idx(viewPoint)
@@ -285,50 +283,6 @@ class Refine_data(Dataset):
             rescaleValue,
             labelmask_img,
             flow_img,
-        )
-
-
-class PSP_data(Dataset):
-    def __init__(self, data_path="", isTrain=True):
-        trainBit = ""
-        if isTrain:
-            trainOrVal = "train.txt"
-        else:
-            trainOrVal = "val.txt"
-        self.dataNames = []
-        with open(data_path + trainOrVal, "r") as reader:
-            for line in reader.readlines():
-                self.dataNames.append(data_path + line.rstrip("\n"))
-
-        self.imgSize = 240
-
-    def __len__(self):
-        return len(self.dataNames)
-
-    def __getitem__(self, idx):
-        # create label
-        # load rgb image
-        img_path = self.dataNames[idx] + "img.png"
-        img = cv2.imread(img_path)
-
-        # resize rgb image
-        img = cv2.resize(
-            img, (self.imgSize, self.imgSize), interpolation=cv2.INTER_AREA
-        )
-        img = img[:, :, :3].transpose(2, 0, 1)
-
-        # load label mask image
-        labelmask_path = self.dataNames[idx] + "labelmask.png"
-        labelmask_img = cv2.imread(labelmask_path)
-        labelmask_img = cv2.resize(
-            labelmask_img, (self.imgSize, self.imgSize), interpolation=cv2.INTER_AREA
-        )
-        labelmask_img = labelmask_img[:, :, :1].transpose(2, 0, 1) / 255.0
-
-        return (
-            idx,
-            img,
-            labelmask_img,
         )
 
 

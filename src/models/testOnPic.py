@@ -74,24 +74,6 @@ def letterbox(
     return img, ratio, (dw, dh)
 
 
-def get_centered_crop(topleft, botright):
-    cropHeight = botright[1] - topleft[1]
-    cropWidth = botright[0] - topleft[0]
-
-    centerPoint = (topleft[0] + cropWidth / 2, topleft[1] + cropHeight / 2)
-
-    cropSize = max(cropHeight, cropWidth)
-
-    topleft_new = np.array(
-        [centerPoint[0] - cropSize / 2, centerPoint[1] - cropSize / 2], dtype=int
-    )
-    botright_new = np.array(
-        [centerPoint[0] + cropSize / 2, centerPoint[1] + cropSize / 2], dtype=int
-    )
-
-    return topleft_new, botright_new
-
-
 if __name__ == "__main__":
 
     OM.setup(CFG.CAMERA_W, CFG.CAMERA_H)
@@ -142,7 +124,7 @@ if __name__ == "__main__":
     refine_model.eval()
 
     # read image
-    frame = cv2.imread("input.jpg")
+    frame = cv2.imread("input-3.jpg")
     demo = frame.copy()
     rot_frame = frame.copy()
     refine_frame = frame.copy()
@@ -195,7 +177,7 @@ if __name__ == "__main__":
 
     if foundObject:
         # rot classifier
-        upperleft, lowerright = get_centered_crop(croptopleft, croplowright)
+        upperleft, lowerright = OM.get_centered_crop(croptopleft, croplowright)
         l = int(lowerright[0]) - int(upperleft[0])
 
         # crop the image for rot classifier
@@ -317,6 +299,17 @@ if __name__ == "__main__":
             flow_input = Variable(flow_inputData)
 
             rot, trans, dist, opticalFlow, segmentMask = refine_model(flow_input)
+
+            seg_pred = (
+                torch.argmax(segmentMask, 1, keepdim=True)
+                .float()
+                .squeeze(1)
+                .cpu()
+                .detach()
+                .numpy()
+            )
+
+            cv2.imshow("mask", seg_pred[0])
 
             trans = trans.unsqueeze(1)
             dist = dist.unsqueeze(1)

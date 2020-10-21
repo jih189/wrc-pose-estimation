@@ -152,8 +152,6 @@ def ADD_error(pred_pose, targetPose):
 # shape of inputs:
 # pred_pose (_,4,4)
 # targetPose (_,4,4)
-
-
 def ADDS_error(pred_pose, targetPose):
     from chamfer3D.dist_chamfer_3D import chamfer_3DDist
 

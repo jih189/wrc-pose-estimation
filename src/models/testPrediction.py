@@ -47,24 +47,6 @@ totalADD = []
 totalADDS = []
 
 
-def get_centered_crop(topleft, botright):
-    cropHeight = botright[1] - topleft[1]
-    cropWidth = botright[0] - topleft[0]
-
-    centerPoint = (topleft[0] + cropWidth / 2, topleft[1] + cropHeight / 2)
-
-    cropSize = max(cropHeight, cropWidth)
-
-    topleft_new = np.array(
-        [centerPoint[0] - cropSize / 2, centerPoint[1] - cropSize / 2], dtype=int
-    )
-    botright_new = np.array(
-        [centerPoint[0] + cropSize / 2, centerPoint[1] + cropSize / 2], dtype=int
-    )
-
-    return topleft_new, botright_new
-
-
 def init():
 
     ###################### yolo ########################
@@ -173,7 +155,7 @@ def generateBoundingbox(obj, pose):
         np.int
     )
 
-    crop_upperleft, crop_lowerright = get_centered_crop(upperleft, lowerright)
+    crop_upperleft, crop_lowerright = OM.get_centered_crop(upperleft, lowerright)
     return True, crop_upperleft, crop_lowerright
 
 
@@ -202,7 +184,9 @@ def testData(obj, yolo_model, rot_model, refine_model, d):
 
     if foundObject:
         # rot classifier
-        upperleft_rand, lowerright_rand = get_centered_crop(croptopleft, croplowright)
+        upperleft_rand, lowerright_rand = OM.get_centered_crop(
+            croptopleft, croplowright
+        )
 
         if (
             int(upperleft_rand[1]) < 0
@@ -372,7 +356,9 @@ def testData(obj, yolo_model, rot_model, refine_model, d):
 
         _, croptopleft, croplowright = generateBoundingbox(obj, pred_pose)
 
-        upperleft_rand, lowerright_rand = get_centered_crop(croptopleft, croplowright)
+        upperleft_rand, lowerright_rand = OM.get_centered_crop(
+            croptopleft, croplowright
+        )
 
         demotemp = demo.copy()
         obj.setModelviewMatrix(pred_pose)
