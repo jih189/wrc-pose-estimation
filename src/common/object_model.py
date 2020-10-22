@@ -130,7 +130,7 @@ def directionGen(samples):
 
 # convert view point to view point index
 def cal_idx(viewpoint):
-    direction = fibonacci_sphere(64)
+    direction = fibonacci_sphere(CFG.VIEWPOINT_NUM)
     differenceList = []
     for v in range(len(direction)):
         differenceList.append(py_ang(viewpoint * -1, np.array(direction[v])))
@@ -139,8 +139,9 @@ def cal_idx(viewpoint):
     return matchindex
 
 
+# convert view point index to viewpoint
 def idx2vp(idx):
-    direction = fibonacci_sphere(64)
+    direction = fibonacci_sphere(CFG.VIEWPOINT_NUM)
     return (-direction[idx][0], -direction[idx][1], -direction[idx][2])
 
 
@@ -765,7 +766,7 @@ class ObjectModel:
 
     # generate the kenerl of the object
     def generateKernel(self):
-        numOfView = 64
+        numOfView = CFG.VIEWPOINT_NUM
         angleSteps = 120
         directionrpy, direction3d = directionGen(numOfView)
         Cur_matrix = np.identity(4)
@@ -837,7 +838,7 @@ class ObjectModel:
         pose = np.identity(4)
         pose[:3, :3] = self.VP2Rotation(viewpoint)
         pose[2, 3] = depth
-        r = R.from_euler("Z", inplaneR)
+        r = R.from_euler("Z", -inplaneR)
         pose[:3, :3] = np.dot(r.as_matrix(), pose[:3, :3])
 
         horizontalR = np.arctan2(offset[0], self.intrinsic[0, 0])
@@ -878,7 +879,7 @@ class ObjectModel:
         img = torch.from_numpy(view_tmp)
         img.unsqueeze_(0)
         img.unsqueeze_(0)
-        numOfView = 64
+        numOfView = CFG.VIEWPOINT_NUM
         angleSteps = 120
         similarTh = 90.0
         result = F.conv2d(img.cuda(), self.templateKernel.cuda())

@@ -20,7 +20,7 @@ torch.multiprocessing.set_sharing_strategy("file_system")
 # global variable for multiprocessing
 counter = Value("i", 0)
 output_counter = Value("i", 0)
-vparr = Array("i", [0] * 64)
+vparr = Array("i", [0] * CFG.VIEWPOINT_NUM)
 rotarr = Array("i", [0] * 60)
 testTrigger = Value(c_bool, False)
 
@@ -280,7 +280,7 @@ def main(input_filepath, output_filepath):
 
     # calculate the weight of the dataset
     vp_weight_balance = []
-    for i in range(64):
+    for i in range(CFG.VIEWPOINT_NUM):
         if vparr[i] != 0:
             vp_weight_balance.append(1.0 / vparr[i])
         else:

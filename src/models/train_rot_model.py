@@ -19,10 +19,10 @@ np.seterr(divide="ignore", invalid="ignore")
 
 batch_size = 64
 epochs = 1000
-lr = 3e-5
+lr = 2e-4
 momentum = 0.9
 w_decay = 4e-3
-viewpt_class = 64
+viewpt_class = CFG.VIEWPOINT_NUM
 rot_class = 60
 
 train_dir = CFG.PROCESSED_DATA_PATH
@@ -55,8 +55,8 @@ viewpt_criterion = nn.CrossEntropyLoss(weight=vp_class_weights)
 rot_class_weights = torch.FloatTensor(rot_weights).cuda()
 rot_criterion = nn.CrossEntropyLoss(weight=rot_class_weights)
 offset_criterion = nn.MSELoss(reduction="sum")
-rot_lamda = 5.0
-offset_lamda = 0.5
+rot_lamda = 2.0
+offset_lamda = 1.0
 
 optimizer = optim.SGD(model.parameters(), lr=lr, momentum=momentum)
 lmbda = lambda epoch: 0.5
@@ -129,7 +129,7 @@ def train():
 
         model.train()
 
-        if (epoch + 1) % 90 == 0:
+        if (epoch + 1) % 50 == 0:
             scheduler.step()
 
 

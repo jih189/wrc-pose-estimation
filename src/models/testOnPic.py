@@ -106,7 +106,7 @@ if __name__ == "__main__":
     yolo_model.to(device).eval()
 
     ################### magic net ########################
-    viewpt_class = 64
+    viewpt_class = CFG.VIEWPOINT_NUM
     rot_class = 60
 
     rot_model = Magic_Net(viewpt_class=viewpt_class, rot_class=rot_class).cuda()
@@ -124,7 +124,7 @@ if __name__ == "__main__":
     refine_model.eval()
 
     # read image
-    frame = cv2.imread("input-3.jpg")
+    frame = cv2.imread("input-5.jpg")
     demo = frame.copy()
     rot_frame = frame.copy()
     refine_frame = frame.copy()
@@ -217,7 +217,7 @@ if __name__ == "__main__":
         rough_pred_pose = obj.label2pose(viewpt, rot, offset, depth)
 
         # pose refinement
-        for t in range(40):
+        for t in range(20):
             obj.setModelviewMatrix(rough_pred_pose)
             obj.findVisibleSamplePoint()
 
@@ -363,3 +363,5 @@ if __name__ == "__main__":
     cv2.imshow("demo", demo)
     cv2.waitKey(0)
     cv2.destroyAllWindows()
+
+print(pred_pose)

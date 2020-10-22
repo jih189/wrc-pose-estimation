@@ -58,7 +58,7 @@ yolo_model.load_state_dict(torch.load(weights)["model"])
 yolo_model.to(device).eval()
 
 ################### magic net ########################
-viewpt_class = 64
+viewpt_class = CFG.VIEWPOINT_NUM
 rot_class = 60
 
 rot_model = Magic_Net(viewpt_class=viewpt_class, rot_class=rot_class).cuda()

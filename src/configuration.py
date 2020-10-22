@@ -14,16 +14,16 @@ import numpy as np
 # BEST_MODEL_REFINE = "weights/best_model_refine_pulley.pth"
 
 
-# OBJ_NAME = "shaft"
-# IMAGE_SAVE_PATH = "data/images/shaft/"
-# VERIFY_IMAGE_PATH = "data/raw/shaft/"
-# PROCESSED_DATA_PATH = "data/processed/shaft_rot/"
-# REFINE_DATA_PATH = "data/processed/shaft_refine/"
-# CAD_MODEL = "data/mesh/SSFHRT10-75-M4-FC55-G20.obj"
-# SAMPLE_FACE_MODEL = "data/mesh/SSFHRT10-75-M4-FC55-G20.obj"
-# BEST_MODEL_FLOWNET = "weights/best_model_flownet_shaft.pth"
-# BEST_MODEL_ROT = "weights/best_model_rot_shaft.pth"
-# BEST_MODEL_REFINE = "weights/best_model_refine_shaft.pth"
+OBJ_NAME = "shaft"
+IMAGE_SAVE_PATH = "data/images/shaft/"
+VERIFY_IMAGE_PATH = "data/raw/shaft/"
+PROCESSED_DATA_PATH = "data/processed/shaft_rot/"
+REFINE_DATA_PATH = "data/processed/shaft_refine/"
+CAD_MODEL = "data/mesh/SSFHRT10-75-M4-FC55-G20.obj"
+SAMPLE_FACE_MODEL = "data/mesh/SSFHRT10-75-M4-FC55-G20.obj"
+BEST_MODEL_FLOWNET = "weights/best_model_flownet_shaft.pth"
+BEST_MODEL_ROT = "weights/best_model_rot_shaft.pth"
+BEST_MODEL_REFINE = "weights/best_model_refine_shaft.pth"
 
 
 # OBJ_NAME = "belt-s-pulley"
@@ -38,14 +38,14 @@ import numpy as np
 # BEST_MODEL_REFINE = "weights/best_model_refine_belt-s-pulley.pth"
 
 
-# CAMERA_MATRIX = np.array(
-#     [
-#         [654.968116289191, 0, 322.67377109101744],
-#         [0, 657.1436336052552, 248.70937432215163],
-#         [0, 0, 1],
-#     ],
-#     dtype="double",
-# )
+CAMERA_MATRIX = np.array(
+    [
+        [654.968116289191, 0, 322.67377109101744],
+        [0, 657.1436336052552, 248.70937432215163],
+        [0, 0, 1],
+    ],
+    dtype="double",
+)
 
 # OBJ_NAME = "nut"
 # IMAGE_SAVE_PATH = "data/images/nut/"
@@ -90,42 +90,43 @@ import numpy as np
 
 ################################ pulley-test##############################################
 
-OBJ_NAME = "pulley-test"
-IMAGE_SAVE_PATH = "/home/cogrob-wrc/wrc-pose-estimation/data/images/pulley-test/"
-VERIFY_IMAGE_PATH = "/home/cogrob-wrc/wrc-pose-estimation/data/raw/pulley-test/"
-PROCESSED_DATA_PATH = (
-    "/home/cogrob-wrc/wrc-pose-estimation/data/processed/pulley-test_rot/"
-)
-REFINE_DATA_PATH = (
-    "/home/cogrob-wrc/wrc-pose-estimation/data/processed/pulley-test_refine/"
-)
-REFINE_ITERATIVE_DATA_PATH = (
-    "/home/cogrob-wrc/wrc-pose-estimation/data/processed/pulley-test_iterative_refine/"
-)
-CAD_MODEL = "/home/cogrob-wrc/wrc-pose-estimation/data/mesh/MBRFA30-2-P6.obj"
-SAMPLE_FACE_MODEL = "/home/cogrob-wrc/wrc-pose-estimation/data/mesh/MBRFA30-2-P6.obj"
-BEST_MODEL_FLOWNET = (
-    "/home/cogrob-wrc/wrc-pose-estimation/weights/best_model_flownet_pulley-test.pth"
-)
-BEST_MODEL_ROT = (
-    "/home/cogrob-wrc/wrc-pose-estimation/weights/best_model_rot_pulley-test.pth"
-)
-BEST_MODEL_REFINE = (
-    "/home/cogrob-wrc/wrc-pose-estimation/weights/best_model_refine_pulley-test.pth"
-)
-BEST_MODEL_ITERATIVE_REFINE = "/home/cogrob-wrc/wrc-pose-estimation/weights/best_model_iterative_refine_pulley-test.pth"
+# OBJ_NAME = "pulley-test"
+# IMAGE_SAVE_PATH = "/home/cogrob-wrc/wrc-pose-estimation/data/images/pulley-test/"
+# VERIFY_IMAGE_PATH = "/home/cogrob-wrc/wrc-pose-estimation/data/raw/pulley-test/"
+# PROCESSED_DATA_PATH = (
+#     "/home/cogrob-wrc/wrc-pose-estimation/data/processed/pulley-test_rot/"
+# )
+# REFINE_DATA_PATH = (
+#     "/home/cogrob-wrc/wrc-pose-estimation/data/processed/pulley-test_refine/"
+# )
+# REFINE_ITERATIVE_DATA_PATH = (
+#     "/home/cogrob-wrc/wrc-pose-estimation/data/processed/pulley-test_iterative_refine/"
+# )
+# CAD_MODEL = "/home/cogrob-wrc/wrc-pose-estimation/data/mesh/MBRFA30-2-P6.obj"
+# SAMPLE_FACE_MODEL = "/home/cogrob-wrc/wrc-pose-estimation/data/mesh/MBRFA30-2-P6.obj"
+# BEST_MODEL_FLOWNET = (
+#     "/home/cogrob-wrc/wrc-pose-estimation/weights/best_model_flownet_pulley-test.pth"
+# )
+# BEST_MODEL_ROT = (
+#     "/home/cogrob-wrc/wrc-pose-estimation/weights/best_model_rot_pulley-test.pth"
+# )
+# BEST_MODEL_REFINE = (
+#     "/home/cogrob-wrc/wrc-pose-estimation/weights/best_model_refine_pulley-test.pth"
+# )
+# BEST_MODEL_ITERATIVE_REFINE = "/home/cogrob-wrc/wrc-pose-estimation/weights/best_model_iterative_refine_pulley-test.pth"
 
-CAMERA_MATRIX = np.array(
-    [
-        [1390.6298269250192, 0, 665.4334864497848],
-        [0, 1389.3521948493603, 314.5310503226418],
-        [0, 0, 1],
-    ],
-    dtype="double",
-)
+# CAMERA_MATRIX = np.array(
+#     [
+#         [1390.6298269250192, 0, 665.4334864497848],
+#         [0, 1389.3521948493603, 314.5310503226418],
+#         [0, 0, 1],
+#     ],
+#     dtype="double",
+# )
 
 CAMERA_ID = 4
-# CAMERA_W = 640
-# CAMERA_H = 480
-CAMERA_W = 1280
-CAMERA_H = 720
+VIEWPOINT_NUM = 642
+CAMERA_W = 640
+CAMERA_H = 480
+# CAMERA_W = 1280
+# CAMERA_H = 720
