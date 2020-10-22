@@ -54,7 +54,7 @@ torch.autograd.set_detect_anomaly(True)
 
 
 def train():
-    print("start training... Nahid habibi")
+    print("start training...")
     pre_loss = None
     for epoch in range(epochs):
         avg_loss = []

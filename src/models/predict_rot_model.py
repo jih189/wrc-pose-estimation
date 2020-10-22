@@ -26,7 +26,7 @@ obj.determineSharpEdges(0.8)
 obj.generateSamplePoints(0.0001, 0.0001)
 
 # load data
-test_file = "001678"  # 1151
+test_file = "008878"  # 1151
 frame = cv2.imread(CFG.PROCESSED_DATA_PATH + test_file + ".png")
 img_path = CFG.PROCESSED_DATA_PATH + "crop" + test_file + ".png"
 boundingbox = np.load(CFG.PROCESSED_DATA_PATH + "bounding" + test_file + ".npy")
