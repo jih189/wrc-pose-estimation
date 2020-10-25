@@ -636,7 +636,6 @@ class ObjectModel:
         return img
 
     def findVisibleSamplePoint(self):
-        boundingtopleft, boundingbuttonright = None, None
         glPushMatrix()
 
         # disable writing to depth buffer
@@ -709,21 +708,9 @@ class ObjectModel:
                 )
                 pt2 = self.project3Dto2D(tuple(self.sharp_sample_points[i]), self.pose)
                 self.sharp_2d_pts.append(pt2)
-                if boundingbuttonright == None:
-                    boundingbuttonright = list(pt2)
-                    boundingtopleft = list(pt2)
-                else:
-                    if pt2[0] < boundingtopleft[0]:
-                        boundingtopleft[0] = pt2[0]
-                    if pt2[1] < boundingtopleft[1]:
-                        boundingtopleft[1] = pt2[1]
-                    if pt2[0] > boundingbuttonright[0]:
-                        boundingbuttonright[0] = pt2[0]
-                    if pt2[1] > boundingbuttonright[1]:
-                        boundingbuttonright[1] = pt2[1]
+
         glDeleteQueriesARB(vQueries)
         glPopMatrix()
-        return boundingtopleft, boundingbuttonright
 
     def setIntrinsicMatrix(self, intrinsic_):
         self.intrinsic = intrinsic_.copy()

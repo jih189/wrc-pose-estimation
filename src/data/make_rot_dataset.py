@@ -93,6 +93,8 @@ def process_data(args):
         center_pt = (int(center_pt[0]), int(center_pt[1]))
         depth = pose[2, 3]
 
+        visibleArea = -1
+
         # generate different rotation to increase the number of data
         for r in range(8):
             inplaneRotate = r * 45.0
@@ -104,11 +106,19 @@ def process_data(args):
                 obj.setModelviewMatrix(rot_pose)
 
                 # random generate a bounding box around the object with given pose
-                upperleft, lowerright = obj.findVisibleSamplePoint()
-                upperleft, lowerright = (
-                    np.array(upperleft).reshape(2),
-                    np.array(lowerright).reshape(2),
-                )
+                obj.findVisibleSamplePoint()
+
+                # ensure the object is not outside of the view
+                visiblemask = obj.getVisibleArea()
+                if visibleArea == -1:
+                    visibleArea = cv2.countNonZero(visiblemask)
+                elif visibleArea * 0.95 > cv2.countNonZero(visiblemask):
+                    continue
+
+                # extract the bounding box
+                bx, by, bw, bh = cv2.boundingRect(visiblemask)
+                upperleft = np.array([bx, by])
+                lowerright = np.array([bx + bw, by + bh])
 
                 high = np.clip(10 / depth, 0, 50)
                 upperleft = (
@@ -242,9 +252,6 @@ def main(input_filepath, output_filepath):
             pose_names.append(str(f))
     image_names.sort()
     pose_names.sort()
-
-    # image_names = image_names[:1]
-    # pose_names = pose_names[:1]
 
     # generate input for function
     datalist = list(zip(image_names, pose_names))

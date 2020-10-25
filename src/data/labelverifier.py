@@ -41,9 +41,10 @@ if __name__ == "__main__":
         pose = np.load(input_path + "{:06d}".format(currentInx) + ".npy")
         obj.setModelviewMatrix(pose)
 
-        upperleft, lowerright = obj.findVisibleSamplePoint()
-        upperleft = (int(upperleft[0]), int(upperleft[1]))
-        lowerright = (int(lowerright[0]), int(lowerright[1]))
+        obj.findVisibleSamplePoint()
+        bx, by, bw, bh = cv2.boundingRect(obj.getVisibleArea())
+        upperleft = (bx, by)
+        lowerright = (bx + bw, by + bh)
 
         cropImg = img.copy()
         for p in obj.sharp_2d_pts:

@@ -24,6 +24,12 @@ SAMPLE_FACE_MODEL = "data/mesh/SSFHRT10-75-M4-FC55-G20.obj"
 BEST_MODEL_FLOWNET = "weights/best_model_flownet_shaft.pth"
 BEST_MODEL_ROT = "weights/best_model_rot_shaft.pth"
 BEST_MODEL_REFINE = "weights/best_model_refine_shaft.pth"
+REFINE_ITERATIVE_DATA_PATH = (
+    "/home/cogrob-wrc/wrc-pose-estimation/data/processed/shaft_iterative_refine/"
+)
+BEST_MODEL_ITERATIVE_REFINE = (
+    "/home/cogrob-wrc/wrc-pose-estimation/weights/best_model_iterative_refine_shaft.pth"
+)
 
 
 # OBJ_NAME = "belt-s-pulley"
@@ -37,7 +43,7 @@ BEST_MODEL_REFINE = "weights/best_model_refine_shaft.pth"
 # BEST_MODEL_ROT = "weights/best_model_rot_belt-s-pulley.pth"
 # BEST_MODEL_REFINE = "weights/best_model_refine_belt-s-pulley.pth"
 
-
+# # camera matrix of realsense
 CAMERA_MATRIX = np.array(
     [
         [654.968116289191, 0, 322.67377109101744],
@@ -115,6 +121,8 @@ CAMERA_MATRIX = np.array(
 # )
 # BEST_MODEL_ITERATIVE_REFINE = "/home/cogrob-wrc/wrc-pose-estimation/weights/best_model_iterative_refine_pulley-test.pth"
 
+
+# # camera matrix of wrist camera
 # CAMERA_MATRIX = np.array(
 #     [
 #         [1390.6298269250192, 0, 665.4334864497848],

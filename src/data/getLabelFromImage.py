@@ -111,12 +111,14 @@ if __name__ == "__main__":
 
             pose = obj.setModelviewMatrix(pose)
 
-            upperleft, lowerright = obj.findVisibleSamplePoint()
-            if upperleft is None or lowerright is None:
+            obj.findVisibleSamplePoint()
+            bx, by, bw, bh = cv2.boundingRect(obj.getVisibleArea())
+            if bh == 0 or bw == 0:
                 frame_captured, frame = capture.read()
                 continue
-            upperleft = (int(upperleft[0]), int(upperleft[1]))
-            lowerright = (int(lowerright[0]), int(lowerright[1]))
+
+            upperleft = (bx, by)
+            lowerright = (bx + bw, by + bh)
 
             # pose = OM.symmetricRemove_housing(pose)
             obj.setModelviewMatrix(pose)

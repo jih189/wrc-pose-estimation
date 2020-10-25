@@ -30,8 +30,8 @@ epochs = 150
 lr = 4e-5
 momentum = 0.9
 w_decay = 0.1
-seglambda = 0.0  # 0.5
-flowlambda = 0.0  # 10.0
+seglambda = 0.5
+flowlambda = 5.0
 train_dir = CFG.REFINE_DATA_PATH
 val_dir = CFG.REFINE_DATA_PATH
 
@@ -57,8 +57,8 @@ mymodel.module.flownet.eval()
 
 
 # validation setup
-mymodel = torch.load(CFG.BEST_MODEL_REFINE)
-mymodel.eval()
+# mymodel = torch.load(CFG.BEST_MODEL_REFINE)
+# mymodel.eval()
 # wandb.watch(mymodel)
 
 seg_criterion = nn.CrossEntropyLoss(reduce=False)
@@ -413,8 +413,8 @@ def val():
 
 
 if __name__ == "__main__":
-    val()
-    # train()
+    # val()
+    train()
     # print("done")
     # initPose rot error = 0.35
 

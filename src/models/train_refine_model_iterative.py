@@ -19,6 +19,7 @@ import src.common.object_model as OM
 import src.configuration as CFG
 import cv2
 import open3d as o3d
+from ctypes import c_bool
 
 # importing shutil module
 import shutil
@@ -29,8 +30,9 @@ torch.multiprocessing.set_sharing_strategy("file_system")
 # initial global varible for processes
 counter = Value("i", 0)
 output_counter = Value("i", 0)
+testTrigger = Value(c_bool, False)
 
-EXPAND_SIZE = 2.0
+EXPAND_SIZE = 2.4
 
 # refine parameters
 batch_size = 64
@@ -38,7 +40,7 @@ epochs = 150
 lr = 4e-5
 momentum = 0.9
 w_decay = 0.1
-seglambda = 1.0
+seglambda = 0.5
 flowlambda = 5.0
 
 # file addresses
@@ -50,12 +52,12 @@ pool_dir = "pred_temp/"
 # initiate the net
 mymodel = DeepIM().cuda()
 mymodel = nn.DataParallel(mymodel)
-# mymodel.module.flownet.load_state_dict(
-#     torch.load(CFG.BEST_MODEL_FLOWNET).module.state_dict()
-# )
-# mymodel.module.flownet.eval()
+mymodel.module.flownet.load_state_dict(
+    torch.load(CFG.BEST_MODEL_FLOWNET).module.state_dict()
+)
+mymodel.module.flownet.eval()
 
-mymodel = torch.load(CFG.BEST_MODEL_ITERATIVE_REFINE)
+# mymodel = torch.load(CFG.BEST_MODEL_ITERATIVE_REFINE)
 
 seg_criterion = nn.CrossEntropyLoss(reduce=False)
 
@@ -80,8 +82,8 @@ def init():
     obj.setIntrinsicMatrix(CFG.CAMERA_MATRIX)
     obj.loadObjectCADModel(CFG.CAD_MODEL)
 
-    obj.determineSharpEdges(0.3)
-    obj.generateSamplePoints(0.0001, 0.0001)
+    obj.determineSharpEdges(0.8)
+    obj.generateSamplePoints(0.00001, 0.00001)
     return obj
 
 
@@ -89,6 +91,7 @@ def init():
 def process_data(args):
     global counter
     global output_counter
+    global testTrigger
 
     obj = init()
 
@@ -97,6 +100,8 @@ def process_data(args):
     (img_names, initpose_names, targetpose_names, mask_names) = list(zip(*datalist))
 
     while True:
+        if testTrigger.value == True:
+            break
         try:
             with counter.get_lock():
                 current_index = counter.value
@@ -106,18 +111,18 @@ def process_data(args):
                 return
 
             # update the progress bar
-            progress = int(50.0 * current_index / len(datalist))
-            rest_progress = 50 - progress
-            print(
-                "Progress: ["
-                + "=" * progress
-                + " " * rest_progress
-                + "]"
-                + str(100.0 * current_index / len(datalist))
-                + "%",
-                end="\r",
-                flush=True,
-            )
+            # progress = int(50.0 * current_index / len(datalist))
+            # rest_progress = 50 - progress
+            # print(
+            #     "Progress: ["
+            #     + "=" * progress
+            #     + " " * rest_progress
+            #     + "]"
+            #     + str(100.0 * current_index / len(datalist))
+            #     + "%",
+            #     end="\r",
+            #     flush=True,
+            # )
 
             # read image and pose
             img = cv2.imread(img_names[current_index])
@@ -146,6 +151,9 @@ def process_data(args):
 
             boundingsize = max(w, h) * EXPAND_SIZE
 
+            # generate the optical flow from intial pose to target pose
+            flowImg = obj.getOptFlowWithPoses(boundingsize, boundingsize, targetpose)
+
             # get center point from pose
             centerPoint = obj.project3Dto2D((0, 0, 0), initpose)
 
@@ -154,25 +162,85 @@ def process_data(args):
             ew = int(boundingsize)
             eh = int(boundingsize)
 
-            if ew == 0 or eh == 0:
-                continue
+            print("ex = ", ex, " ey = ", ey, " ew = ", ew, " eh = ", eh)
+            img = cv2.rectangle(img, (ey, ex), (ey + eh, ex + ew), (255, 0, 0), 1)
+            img = cv2.circle(
+                img,
+                (int(centerPoint[1]), int(centerPoint[0])),
+                radius=2,
+                color=(0, 0, 255),
+                thickness=-1,
+            )
+            cv2.imshow("show", img)
+            cv2.waitKey(0)
 
-            if ex < 0 or ey < 0 or ex + ew >= img.shape[1] or ey + eh >= img.shape[0]:
-                continue
+            crop_img = np.zeros((eh, ew, 3), np.uint8,)
+            crop_init_mask = np.zeros((eh, ew), np.uint8)
+            crop_edge = np.zeros((eh, ew), np.uint8)
+            crop_label_mask = np.zeros((eh, ew, 3), np.uint8)
+            crop_flowImg = np.zeros((eh, ew, 3), np.uint8)
 
-            # generate the optical flow from intial pose to target pose
-            flowImg = obj.getOptFlowWithPoses(boundingsize, boundingsize, targetpose)
-
+            upperleft_crop_inner = [max(0, ey), max(0, ex)]
+            lowerright_crop_inner = [
+                min(img.shape[1], ey + eh),
+                min(img.shape[0], ex + ew),
+            ]
             # cropped image with initial pose as center
-            crop_img = img[ey : ey + eh, ex : ex + ew]
+            crop_img[
+                upperleft_crop_inner[1] - ex : lowerright_crop_inner[1] - ex,
+                upperleft_crop_inner[0] - ey : lowerright_crop_inner[0] - ey,
+            ] = img[
+                int(upperleft_crop_inner[1]) : int(lowerright_crop_inner[1]),
+                int(upperleft_crop_inner[0]) : int(lowerright_crop_inner[0]),
+            ]
+
+            crop_init_mask[
+                upperleft_crop_inner[1] - ex : lowerright_crop_inner[1] - ex,
+                upperleft_crop_inner[0] - ey : lowerright_crop_inner[0] - ey,
+            ] = init_mask[
+                int(upperleft_crop_inner[1]) : int(lowerright_crop_inner[1]),
+                int(upperleft_crop_inner[0]) : int(lowerright_crop_inner[0]),
+            ]
+
+            crop_edge[
+                upperleft_crop_inner[1] - ex : lowerright_crop_inner[1] - ex,
+                upperleft_crop_inner[0] - ey : lowerright_crop_inner[0] - ey,
+            ] = edge[
+                int(upperleft_crop_inner[1]) : int(lowerright_crop_inner[1]),
+                int(upperleft_crop_inner[0]) : int(lowerright_crop_inner[0]),
+            ]
+
+            crop_label_mask[
+                upperleft_crop_inner[1] - ex : lowerright_crop_inner[1] - ex,
+                upperleft_crop_inner[0] - ey : lowerright_crop_inner[0] - ey,
+            ] = target_mask[
+                int(upperleft_crop_inner[1]) : int(lowerright_crop_inner[1]),
+                int(upperleft_crop_inner[0]) : int(lowerright_crop_inner[0]),
+            ]
+
+            crop_flowImg[
+                upperleft_crop_inner[1] - ex : lowerright_crop_inner[1] - ex,
+                upperleft_crop_inner[0] - ey : lowerright_crop_inner[0] - ey,
+            ] = flowImg[
+                int(upperleft_crop_inner[1]) : int(lowerright_crop_inner[1]),
+                int(upperleft_crop_inner[0]) : int(lowerright_crop_inner[0]),
+            ]
+
+            # if ew == 0 or eh == 0:
+            #     continue
+
+            # if ex < 0 or ey < 0 or ex + ew >= img.shape[1] or ey + eh >= img.shape[0]:
+            #     continue
+
+            # crop_img = img[ey : ey + eh, ex : ex + ew]
             # cropped mask for initial pose
-            crop_init_mask = init_mask[ey : ey + eh, ex : ex + ew]
+            # crop_init_mask = init_mask[ey : ey + eh, ex : ex + ew]
             # cropped edges for initial pose
-            crop_edge = edge[ey : ey + eh, ex : ex + ew]
+            # crop_edge = edge[ey : ey + eh, ex : ex + ew]
             # cropped target mask
-            crop_label_mask = target_mask[ey : ey + eh, ex : ex + ew]
+            # crop_label_mask = target_mask[ey : ey + eh, ex : ex + ew]
             # cropped flow from initial pose to target pose
-            crop_flowImg = flowImg[ey : ey + eh, ex : ex + ew]
+            # crop_flowImg = flowImg[ey : ey + eh, ex : ex + ew]
 
             # apply rotation to initial pose
             init_pose_at_center = obj.rotatePoseWithAngle(
@@ -250,6 +318,8 @@ def process_data(args):
 
         except Exception as e:
             print(str(e))
+            testTrigger.value = True
+
     OM.exit()
 
 
@@ -698,7 +768,7 @@ def main():
 
     learningrate = lr
 
-    for iterative in range(6):
+    for iterative in range(5):
         # # generate the processed data
         # read images and poses
         input_path = Path(pool_dir)
@@ -718,6 +788,12 @@ def main():
         mask_names.sort()
         initpose_names.sort()
 
+        # reduce size
+        image_names = image_names[:1]
+        targetpose_names = targetpose_names[:1]
+        mask_names = mask_names[:1]
+        initpose_names = initpose_names[:1]
+
         datalist = list(zip(image_names, initpose_names, targetpose_names, mask_names,))
 
         inputP = []
@@ -736,6 +812,9 @@ def main():
             p.imap_unordered(process_data, inputP)
             p.close()
             p.join()
+
+        # test
+        return
 
         # update the train.txt and val.txt
         numberOfData = output_counter.value
@@ -805,9 +884,9 @@ def main():
         OM.exit()
 
         # reset the learning rate
-        for g in optimizer.param_groups:
-            learningrate = 0.4 * learningrate
-            g["lr"] = learningrate
+        # for g in optimizer.param_groups:
+        #     learningrate = 0.4 * learningrate
+        #     g["lr"] = learningrate
 
 
 if __name__ == "__main__":
