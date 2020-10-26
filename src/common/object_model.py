@@ -553,7 +553,7 @@ class ObjectModel:
         )
         ret = np.frombuffer(buffer, np.float32).reshape(self.height, self.width, 1)
         ret = cv2.flip(ret, 0)
-        ret = ret < 0.99
+        ret = ret < 0.95
         return ret
 
     # generate the visible point cloud on the object surface

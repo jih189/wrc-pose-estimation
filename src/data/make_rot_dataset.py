@@ -66,18 +66,18 @@ def process_data(args):
             return
 
         # update the progress bar
-        progress = int(50.0 * current_index / len(datalist))
-        rest_progress = 50 - progress
-        print(
-            "Progress: ["
-            + "=" * progress
-            + " " * rest_progress
-            + "]"
-            + str(100.0 * current_index / len(datalist))
-            + "%",
-            end="\r",
-            flush=True,
-        )
+        # progress = int(50.0 * current_index / len(datalist))
+        # rest_progress = 50 - progress
+        # print(
+        #     "Progress: ["
+        #     + "=" * progress
+        #     + " " * rest_progress
+        #     + "]"
+        #     + str(100.0 * current_index / len(datalist))
+        #     + "%",
+        #     end="\r",
+        #     flush=True,
+        # )
 
         try:
             # read image and pose
@@ -140,8 +140,8 @@ def process_data(args):
             try:
                 cropImg = np.zeros(
                     (
-                        crop_lowerright[0] - crop_upperleft[0],
                         crop_lowerright[1] - crop_upperleft[1],
+                        crop_lowerright[0] - crop_upperleft[0],
                         3,
                     ),
                     np.uint8,
@@ -252,6 +252,9 @@ def main(input_filepath, output_filepath):
             pose_names.append(str(f))
     image_names.sort()
     pose_names.sort()
+
+    # image_names = image_names[:1]
+    # pose_names = pose_names[:1]
 
     # generate input for function
     datalist = list(zip(image_names, pose_names))

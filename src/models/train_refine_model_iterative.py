@@ -111,18 +111,18 @@ def process_data(args):
                 return
 
             # update the progress bar
-            # progress = int(50.0 * current_index / len(datalist))
-            # rest_progress = 50 - progress
-            # print(
-            #     "Progress: ["
-            #     + "=" * progress
-            #     + " " * rest_progress
-            #     + "]"
-            #     + str(100.0 * current_index / len(datalist))
-            #     + "%",
-            #     end="\r",
-            #     flush=True,
-            # )
+            progress = int(50.0 * current_index / len(datalist))
+            rest_progress = 50 - progress
+            print(
+                "Progress: ["
+                + "=" * progress
+                + " " * rest_progress
+                + "]"
+                + str(100.0 * current_index / len(datalist))
+                + "%",
+                end="\r",
+                flush=True,
+            )
 
             # read image and pose
             img = cv2.imread(img_names[current_index])
@@ -140,8 +140,13 @@ def process_data(args):
             obj.findVisibleSamplePoint()
 
             # generate preprocessed data
-            # inital pose mask
+            # inital pose mask(it may not return any mask because
+            # the init pose is too close to the camera)
             init_mask = obj.getVisibleArea()
+
+            # if the init pose is too close, then continue
+            if cv2.countNonZero(init_mask) == 0:
+                continue
 
             # get edge img
             edge = obj.getEdge(img.shape[0], img.shape[1])
@@ -162,85 +167,58 @@ def process_data(args):
             ew = int(boundingsize)
             eh = int(boundingsize)
 
-            print("ex = ", ex, " ey = ", ey, " ew = ", ew, " eh = ", eh)
-            img = cv2.rectangle(img, (ey, ex), (ey + eh, ex + ew), (255, 0, 0), 1)
-            img = cv2.circle(
-                img,
-                (int(centerPoint[1]), int(centerPoint[0])),
-                radius=2,
-                color=(0, 0, 255),
-                thickness=-1,
-            )
-            cv2.imshow("show", img)
-            cv2.waitKey(0)
-
             crop_img = np.zeros((eh, ew, 3), np.uint8,)
             crop_init_mask = np.zeros((eh, ew), np.uint8)
             crop_edge = np.zeros((eh, ew), np.uint8)
             crop_label_mask = np.zeros((eh, ew, 3), np.uint8)
             crop_flowImg = np.zeros((eh, ew, 3), np.uint8)
 
-            upperleft_crop_inner = [max(0, ey), max(0, ex)]
+            upperleft_crop_inner = [max(0, ex), max(0, ey)]
             lowerright_crop_inner = [
-                min(img.shape[1], ey + eh),
-                min(img.shape[0], ex + ew),
+                min(img.shape[1], ex + ew),
+                min(img.shape[0], ey + eh),
             ]
+
             # cropped image with initial pose as center
             crop_img[
-                upperleft_crop_inner[1] - ex : lowerright_crop_inner[1] - ex,
-                upperleft_crop_inner[0] - ey : lowerright_crop_inner[0] - ey,
+                upperleft_crop_inner[1] - ey : lowerright_crop_inner[1] - ey,
+                upperleft_crop_inner[0] - ex : lowerright_crop_inner[0] - ex,
             ] = img[
                 int(upperleft_crop_inner[1]) : int(lowerright_crop_inner[1]),
                 int(upperleft_crop_inner[0]) : int(lowerright_crop_inner[0]),
             ]
 
             crop_init_mask[
-                upperleft_crop_inner[1] - ex : lowerright_crop_inner[1] - ex,
-                upperleft_crop_inner[0] - ey : lowerright_crop_inner[0] - ey,
+                upperleft_crop_inner[1] - ey : lowerright_crop_inner[1] - ey,
+                upperleft_crop_inner[0] - ex : lowerright_crop_inner[0] - ex,
             ] = init_mask[
                 int(upperleft_crop_inner[1]) : int(lowerright_crop_inner[1]),
                 int(upperleft_crop_inner[0]) : int(lowerright_crop_inner[0]),
             ]
 
             crop_edge[
-                upperleft_crop_inner[1] - ex : lowerright_crop_inner[1] - ex,
-                upperleft_crop_inner[0] - ey : lowerright_crop_inner[0] - ey,
+                upperleft_crop_inner[1] - ey : lowerright_crop_inner[1] - ey,
+                upperleft_crop_inner[0] - ex : lowerright_crop_inner[0] - ex,
             ] = edge[
                 int(upperleft_crop_inner[1]) : int(lowerright_crop_inner[1]),
                 int(upperleft_crop_inner[0]) : int(lowerright_crop_inner[0]),
             ]
 
             crop_label_mask[
-                upperleft_crop_inner[1] - ex : lowerright_crop_inner[1] - ex,
-                upperleft_crop_inner[0] - ey : lowerright_crop_inner[0] - ey,
+                upperleft_crop_inner[1] - ey : lowerright_crop_inner[1] - ey,
+                upperleft_crop_inner[0] - ex : lowerright_crop_inner[0] - ex,
             ] = target_mask[
                 int(upperleft_crop_inner[1]) : int(lowerright_crop_inner[1]),
                 int(upperleft_crop_inner[0]) : int(lowerright_crop_inner[0]),
             ]
 
             crop_flowImg[
-                upperleft_crop_inner[1] - ex : lowerright_crop_inner[1] - ex,
-                upperleft_crop_inner[0] - ey : lowerright_crop_inner[0] - ey,
+                upperleft_crop_inner[1] - ey : lowerright_crop_inner[1] - ey,
+                upperleft_crop_inner[0] - ex : lowerright_crop_inner[0] - ex,
             ] = flowImg[
                 int(upperleft_crop_inner[1]) : int(lowerright_crop_inner[1]),
                 int(upperleft_crop_inner[0]) : int(lowerright_crop_inner[0]),
             ]
-
-            # if ew == 0 or eh == 0:
-            #     continue
-
-            # if ex < 0 or ey < 0 or ex + ew >= img.shape[1] or ey + eh >= img.shape[0]:
-            #     continue
-
-            # crop_img = img[ey : ey + eh, ex : ex + ew]
-            # cropped mask for initial pose
-            # crop_init_mask = init_mask[ey : ey + eh, ex : ex + ew]
-            # cropped edges for initial pose
-            # crop_edge = edge[ey : ey + eh, ex : ex + ew]
-            # cropped target mask
-            # crop_label_mask = target_mask[ey : ey + eh, ex : ex + ew]
-            # cropped flow from initial pose to target pose
-            # crop_flowImg = flowImg[ey : ey + eh, ex : ex + ew]
 
             # apply rotation to initial pose
             init_pose_at_center = obj.rotatePoseWithAngle(
@@ -262,7 +240,6 @@ def process_data(args):
                 + "img_original.png",
                 img,
             )
-
             cv2.imwrite(
                 processed_dir
                 + "{:06d}".format(current_output_index)
@@ -288,7 +265,6 @@ def process_data(args):
                 processed_dir + "{:06d}".format(current_output_index) + "img.png",
                 crop_img,
             )
-
             cv2.imwrite(
                 processed_dir + "{:06d}".format(current_output_index) + "mask.png",
                 crop_init_mask,
@@ -297,6 +273,7 @@ def process_data(args):
                 processed_dir + "{:06d}".format(current_output_index) + "edge.png",
                 crop_edge,
             )
+
             cv2.imwrite(
                 processed_dir + "{:06d}".format(current_output_index) + "labelmask.png",
                 crop_label_mask,
@@ -317,6 +294,7 @@ def process_data(args):
             )
 
         except Exception as e:
+            print("fail in pre-processing")
             print(str(e))
             testTrigger.value = True
 
@@ -789,10 +767,10 @@ def main():
         initpose_names.sort()
 
         # reduce size
-        image_names = image_names[:1]
-        targetpose_names = targetpose_names[:1]
-        mask_names = mask_names[:1]
-        initpose_names = initpose_names[:1]
+        # image_names = image_names[:10]
+        # targetpose_names = targetpose_names[:10]
+        # mask_names = mask_names[:10]
+        # initpose_names = initpose_names[:10]
 
         datalist = list(zip(image_names, initpose_names, targetpose_names, mask_names,))
 
@@ -812,9 +790,6 @@ def main():
             p.imap_unordered(process_data, inputP)
             p.close()
             p.join()
-
-        # test
-        return
 
         # update the train.txt and val.txt
         numberOfData = output_counter.value
