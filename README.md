@@ -1,5 +1,5 @@
 # wrc-pose-estimation
-Warning: the document here is used for old pipeline. i will update it later.
+
 ==============================
 ### Description
 Pose estimation of WRC objects. The pose estimation is splited into four sections.
@@ -7,9 +7,7 @@ Pose estimation of WRC objects. The pose estimation is splited into four section
     we use yolo to detect the object in the image, and crop the object from the image.
 2. Rot-classifier:<br/>
     this classifier will estimate the rough pose of the object.
-3. PSPNet:<br/>
-    from the crop image, it predicts the mask of the object in the image.
-4. RefineNet:<br/>
+3. RefineNet:<br/>
     With the crop image, rendered mask-edge, and the predicted mask, this net will refine the pose estimation.
 
 ### Instruction

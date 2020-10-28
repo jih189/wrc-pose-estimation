@@ -32,12 +32,11 @@ counter = Value("i", 0)
 output_counter = Value("i", 0)
 testTrigger = Value(c_bool, False)
 
-EXPAND_SIZE = 2.4
 
 # refine parameters
 batch_size = 64
 epochs = 150
-lr = 4e-5
+lr = 2e-6
 momentum = 0.9
 w_decay = 0.1
 seglambda = 0.5
@@ -52,12 +51,12 @@ pool_dir = "pred_temp/"
 # initiate the net
 mymodel = DeepIM().cuda()
 mymodel = nn.DataParallel(mymodel)
-mymodel.module.flownet.load_state_dict(
-    torch.load(CFG.BEST_MODEL_FLOWNET).module.state_dict()
-)
-mymodel.module.flownet.eval()
+# mymodel.module.flownet.load_state_dict(
+#     torch.load(CFG.BEST_MODEL_FLOWNET).module.state_dict()
+# )
+# mymodel.module.flownet.eval()
 
-# mymodel = torch.load(CFG.BEST_MODEL_ITERATIVE_REFINE)
+mymodel = torch.load(CFG.BEST_MODEL_ITERATIVE_REFINE)
 
 seg_criterion = nn.CrossEntropyLoss(reduce=False)
 
@@ -154,7 +153,7 @@ def process_data(args):
             # find the crop size
             [_, _, w, h] = cv2.boundingRect(init_mask)
 
-            boundingsize = max(w, h) * EXPAND_SIZE
+            boundingsize = max(w, h) * CFG.EXPAND_SIZE
 
             # generate the optical flow from intial pose to target pose
             flowImg = obj.getOptFlowWithPoses(boundingsize, boundingsize, targetpose)

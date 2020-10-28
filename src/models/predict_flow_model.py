@@ -12,8 +12,6 @@ import torch.nn as nn
 from torch.autograd import Variable
 import src.configuration as CFG
 
-IMG_SIZE = 240
-
 
 def init():
 
@@ -35,10 +33,10 @@ def predict(mymodel, predict_index, view_image):
     img = cv2.imread(img_path)
 
     # calculate the resize scale
-    rescaleValue = float(IMG_SIZE) / img.shape[0]
+    rescaleValue = float(CFG.IMG_SIZE) / img.shape[0]
 
     # resize rgb image
-    img = cv2.resize(img, (IMG_SIZE, IMG_SIZE), interpolation=cv2.INTER_AREA)
+    img = cv2.resize(img, (CFG.IMG_SIZE, CFG.IMG_SIZE), interpolation=cv2.INTER_AREA)
     testimg = img.copy()
     preimg = img.copy()
     img = img[:, :, :3].transpose(2, 0, 1)
@@ -49,7 +47,9 @@ def predict(mymodel, predict_index, view_image):
     # load edge image
     edge_path = processed_data_dir + numForTest + "edge.png"
     edge_img = cv2.imread(edge_path)
-    edge_img = cv2.resize(edge_img, (IMG_SIZE, IMG_SIZE), interpolation=cv2.INTER_AREA)
+    edge_img = cv2.resize(
+        edge_img, (CFG.IMG_SIZE, CFG.IMG_SIZE), interpolation=cv2.INTER_AREA
+    )
     edge_img = edge_img[:, :, :1].transpose(2, 0, 1)
 
     edge_img = Variable(torch.from_numpy(edge_img).cuda()).float()
@@ -58,7 +58,9 @@ def predict(mymodel, predict_index, view_image):
     # load the mask image
     mask_path = processed_data_dir + numForTest + "mask.png"
     mask_img = cv2.imread(mask_path)
-    mask_img = cv2.resize(mask_img, (IMG_SIZE, IMG_SIZE), interpolation=cv2.INTER_AREA)
+    mask_img = cv2.resize(
+        mask_img, (CFG.IMG_SIZE, CFG.IMG_SIZE), interpolation=cv2.INTER_AREA
+    )
     mask_img = mask_img[:, :, :1].transpose(2, 0, 1)
 
     mask_img = Variable(torch.from_numpy(mask_img).cuda()).float()
@@ -67,7 +69,9 @@ def predict(mymodel, predict_index, view_image):
     # load the flow image
     flow_path = processed_data_dir + numForTest + "flow.png"
     flow_img = cv2.imread(flow_path)
-    flow_img = cv2.resize(flow_img, (IMG_SIZE, IMG_SIZE), interpolation=cv2.INTER_AREA)
+    flow_img = cv2.resize(
+        flow_img, (CFG.IMG_SIZE, CFG.IMG_SIZE), interpolation=cv2.INTER_AREA
+    )
 
     # running model
     inputData = torch.cat(
@@ -94,11 +98,13 @@ def predict(mymodel, predict_index, view_image):
 
     edge_test = cv2.imread(edge_path)
     edge_test = cv2.resize(
-        edge_test, (IMG_SIZE, IMG_SIZE), interpolation=cv2.INTER_AREA
+        edge_test, (CFG.IMG_SIZE, CFG.IMG_SIZE), interpolation=cv2.INTER_AREA
     )
 
     oriimg = cv2.imread(img_path)
-    oriimg = cv2.resize(oriimg, (IMG_SIZE, IMG_SIZE), interpolation=cv2.INTER_AREA)
+    oriimg = cv2.resize(
+        oriimg, (CFG.IMG_SIZE, CFG.IMG_SIZE), interpolation=cv2.INTER_AREA
+    )
     invflow = np.zeros(oriimg.shape)
 
     seg_pred = (
@@ -125,8 +131,8 @@ def predict(mymodel, predict_index, view_image):
             # if x % 10 == 0 and y % 10 == 0:
             [mx, my] = predictflow[0, :2, y, x].cpu().detach().numpy()
             if mx != 0.0 or my != 0.0:
-                mx = int((mx - 0.5) * IMG_SIZE)
-                my = int((my - 0.5) * IMG_SIZE)
+                mx = int((mx - 0.5) * CFG.IMG_SIZE)
+                my = int((my - 0.5) * CFG.IMG_SIZE)
                 if (
                     x + mx >= 0
                     and x + mx < oriimg.shape[0]
@@ -160,7 +166,7 @@ def predict(mymodel, predict_index, view_image):
 
     testimg = np.transpose(predictflow[0].cpu().detach().numpy(), (1, 2, 0)).copy()
     oriimg = cv2.resize(
-        oriimg, (IMG_SIZE * 5, IMG_SIZE * 5), interpolation=cv2.INTER_AREA
+        oriimg, (CFG.IMG_SIZE * 5, CFG.IMG_SIZE * 5), interpolation=cv2.INTER_AREA
     )
     cv2.imshow("inv flow", invflow)
     cv2.imshow("test", testimg)

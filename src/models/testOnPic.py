@@ -22,8 +22,6 @@ from poseUtil import getPredictPose
 
 import cv2
 
-IMG_SIZE = 240
-EXPAND_SIZE = 2.0
 
 # ignore warming
 np.seterr(divide="ignore", invalid="ignore")
@@ -186,7 +184,7 @@ if __name__ == "__main__":
             int(upperleft[0]) : int(lowerright[0]),
         ]
 
-        img_crop = cv2.resize(img_crop, (IMG_SIZE, IMG_SIZE))
+        img_crop = cv2.resize(img_crop, (CFG.IMG_SIZE, CFG.IMG_SIZE))
         cv2.imshow("crop", img_crop)
         cv2.waitKey(0)
 
@@ -232,7 +230,7 @@ if __name__ == "__main__":
             # find the crop size
             [x, y, w, h] = cv2.boundingRect(mask)
 
-            boundingsize = max(w, h) * EXPAND_SIZE
+            boundingsize = max(w, h) * CFG.EXPAND_SIZE
 
             # get center point from pose
             centerPoint = obj.project3Dto2D((0, 0, 0), rough_pred_pose)
@@ -264,11 +262,11 @@ if __name__ == "__main__":
             )
 
             # calculate the resize scale
-            rescaleValue = float(IMG_SIZE) / crop_img.shape[0]
+            rescaleValue = float(CFG.IMG_SIZE) / crop_img.shape[0]
 
             # resize rgb image
             crop_img = cv2.resize(
-                crop_img, (IMG_SIZE, IMG_SIZE), interpolation=cv2.INTER_AREA
+                crop_img, (CFG.IMG_SIZE, CFG.IMG_SIZE), interpolation=cv2.INTER_AREA
             )
 
             crop_img = crop_img[:, :, :3].transpose(2, 0, 1)
@@ -278,7 +276,7 @@ if __name__ == "__main__":
 
             # load edge image
             edge_img = cv2.resize(
-                crop_edge, (IMG_SIZE, IMG_SIZE), interpolation=cv2.INTER_AREA
+                crop_edge, (CFG.IMG_SIZE, CFG.IMG_SIZE), interpolation=cv2.INTER_AREA
             )
             edge_img = edge_img[:, :, np.newaxis].transpose(2, 0, 1)
 
@@ -287,7 +285,7 @@ if __name__ == "__main__":
 
             # load the mask image
             mask_img = cv2.resize(
-                crop_mask, (IMG_SIZE, IMG_SIZE), interpolation=cv2.INTER_AREA
+                crop_mask, (CFG.IMG_SIZE, CFG.IMG_SIZE), interpolation=cv2.INTER_AREA
             )
             mask_img = mask_img[:, :, np.newaxis].transpose(2, 0, 1)
 

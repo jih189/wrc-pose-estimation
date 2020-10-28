@@ -25,7 +25,6 @@ from src.utils.utils import (
 
 torch.multiprocessing.set_sharing_strategy("file_system")
 
-EXPAND_SIZE = 2.0
 RANDOM_NUM = 4
 
 counter = Value("i", 0)
@@ -220,7 +219,7 @@ def process_data(args):
                 # find the crop size
                 [_, _, w, h] = cv2.boundingRect(mask)
 
-                boundingsize = max(w, h) * EXPAND_SIZE
+                boundingsize = max(w, h) * CFG.EXPAND_SIZE
 
                 # get center point from pose
                 centerPoint = obj.project3Dto2D((0, 0, 0), random_pose)

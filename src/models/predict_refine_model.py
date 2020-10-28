@@ -18,8 +18,6 @@ from torch.autograd import Variable
 from tqdm import tqdm
 import src.configuration as CFG
 
-IMG_SIZE = 240
-
 
 def init():
     mymodel = DeepIM().cuda()
@@ -43,10 +41,10 @@ def predict(mymodel, predict_index, view_image):
     img = cv2.imread(img_path)
 
     # calculate the resize scale
-    rescaleValue = Variable(torch.Tensor([float(IMG_SIZE) / img.shape[0]])).cuda()
+    rescaleValue = Variable(torch.Tensor([float(CFG.IMG_SIZE) / img.shape[0]])).cuda()
 
     # resize rgb image
-    img = cv2.resize(img, (IMG_SIZE, IMG_SIZE), interpolation=cv2.INTER_AREA)
+    img = cv2.resize(img, (CFG.IMG_SIZE, CFG.IMG_SIZE), interpolation=cv2.INTER_AREA)
     testimg = img.copy()
     img = img[:, :, :3].transpose(2, 0, 1)
 
@@ -56,7 +54,9 @@ def predict(mymodel, predict_index, view_image):
     # load edge image
     edge_path = processed_data_dir + numForTest + "edge.png"
     edge_img = cv2.imread(edge_path)
-    edge_img = cv2.resize(edge_img, (IMG_SIZE, IMG_SIZE), interpolation=cv2.INTER_AREA)
+    edge_img = cv2.resize(
+        edge_img, (CFG.IMG_SIZE, CFG.IMG_SIZE), interpolation=cv2.INTER_AREA
+    )
     edge_img = edge_img[:, :, :1].transpose(2, 0, 1)
 
     edge_img = Variable(torch.from_numpy(edge_img).cuda()).float() / 255.0
@@ -65,7 +65,9 @@ def predict(mymodel, predict_index, view_image):
     # load the mask image
     mask_path = processed_data_dir + numForTest + "mask.png"
     mask_img = cv2.imread(mask_path)
-    mask_img = cv2.resize(mask_img, (IMG_SIZE, IMG_SIZE), interpolation=cv2.INTER_AREA)
+    mask_img = cv2.resize(
+        mask_img, (CFG.IMG_SIZE, CFG.IMG_SIZE), interpolation=cv2.INTER_AREA
+    )
     mask_img = mask_img[:, :, :1].transpose(2, 0, 1)
 
     mask_img = Variable(torch.from_numpy(mask_img).cuda()).float() / 255.0
