@@ -1,11 +1,15 @@
 import numpy as np
 import torch
+from torch.autograd import Variable
 
 import open3d as o3d
 import torchgeometry as tgm
 import kornia
 import src.configuration as CFG
 from scipy.spatial.transform import Rotation as R
+import cv2
+import math
+from src.common.iou import iou
 
 # from chamfer3D.dist_chamfer_3D import chamfer_3DDist
 
@@ -198,3 +202,78 @@ def ADDS_error(pred_pose, targetPose):
     # calculate the matching rate
     return result
 
+
+# calculate the confidence of the refinement prediction
+def getConfid(
+    obj, init_pose, segmentMask, opticalFlow, mask_img, test_img, ex, ey, rescaleValue,
+):
+
+    seg_pred = (
+        torch.argmax(segmentMask, 1, keepdim=True)
+        .float()
+        .squeeze(1)
+        .cpu()
+        .detach()
+        .numpy()
+    )
+
+    obj.setModelviewMatrix(init_pose)
+    obj.findVisibleSamplePoint()
+    obj.getVisiblePointCloud()
+
+    opticalFlow = torch.sigmoid(opticalFlow)
+
+    padding = Variable(
+        torch.zeros(opticalFlow.shape[0], 1, opticalFlow.shape[2], opticalFlow.shape[3])
+    ).cuda()
+
+    opticalFlow = torch.cat((opticalFlow, padding), 1)
+
+    opticalFlow = opticalFlow * (mask_img.cuda() == 1.0)
+
+    # predicted matching error
+    matchingError = []
+    for i in range(len(obj.pointcloud)):
+        y2d, x2d, x3d, y3d, z3d = obj.pointcloud[i]
+        y2d = (y2d - ey) * rescaleValue
+        x2d = (x2d - ex) * rescaleValue
+        [mx, my] = opticalFlow[0, :2, int(y2d), int(x2d)].cpu().detach().numpy()
+        if mx != 0.0 or my != 0.0:
+            mx = (mx - 0.5) * CFG.IMG_SIZE
+            my = (my - 0.5) * CFG.IMG_SIZE
+            if (
+                x2d + mx >= 0
+                and x2d + mx < CFG.IMG_SIZE
+                and y2d + my >= 0
+                and y2d + my < CFG.IMG_SIZE
+                and seg_pred[0, int(y2d + my), int(x2d + mx)] == 1.0
+                and int(x2d) % 10 == 0
+                and int(y2d) % 10 == 0
+            ):
+                matchingError.append(math.sqrt(mx ** 2 + my ** 2))
+                test_img = cv2.line(
+                    test_img,
+                    (int(x2d + mx), int(y2d + my)),
+                    (int(x2d), int(y2d)),
+                    (0, 255, 255),
+                    1,
+                )
+                test_img = cv2.circle(
+                    test_img,
+                    (int(x2d + mx), int(y2d + my)),
+                    radius=1,
+                    color=(255, 0, 0),
+                    thickness=-1,
+                )
+
+    flowError = sum(matchingError) / len(matchingError) / opticalFlow.shape[3]
+    print("matching Error = ", flowError)
+    iou_value = (
+        1.0 - iou(mask_img.cuda().squeeze(1), segmentMask.squeeze(1), 1).cpu().numpy()
+    )
+    print("iou error = ", iou_value)
+    print(
+        "probability = ",
+        math.exp(-(CFG.LAMBDA_E * flowError + CFG.LAMBDA_V * iou_value)),
+    )
+    cv2.imshow("flow", test_img)

@@ -17,8 +17,8 @@ np.seterr(divide="ignore", invalid="ignore")
 
 # wandb.init(project="wrc-rot-classifier")
 
-batch_size = 64
-epochs = 1000
+batch_size = 32
+epochs = 500
 lr = 2e-4
 momentum = 0.9
 w_decay = 4e-3

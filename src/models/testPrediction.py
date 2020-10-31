@@ -31,6 +31,7 @@ counter = Value("i", 0)
 
 viewpt_class = CFG.VIEWPOINT_NUM
 rot_class = 60
+DIAG_PARAM = 0.5
 
 # ignore warming
 np.seterr(divide="ignore", invalid="ignore")
@@ -88,7 +89,103 @@ def generateBoundingbox(obj, pose):
     )
 
     crop_upperleft, crop_lowerright = OM.get_centered_crop(upperleft, lowerright)
-    return True, crop_upperleft, crop_lowerright
+
+    predictDiag = math.sqrt(bw ** 2 + bh ** 2)
+    return True, predictDiag, crop_upperleft, crop_lowerright
+
+
+def poseEstimationWithFlow(
+    obj,
+    rough_pred_pose,
+    segmentMask,
+    opticalFlow,
+    mask_img,
+    test_img,
+    ex,
+    ey,
+    rescaleValue,
+):
+    seg_pred = (
+        torch.argmax(segmentMask, 1, keepdim=True)
+        .float()
+        .squeeze(1)
+        .cpu()
+        .detach()
+        .numpy()
+    )
+    obj.setModelviewMatrix(rough_pred_pose)
+    obj.findVisibleSamplePoint()
+    obj.getVisiblePointCloud()
+
+    opticalFlow = torch.sigmoid(opticalFlow)
+
+    padding = Variable(
+        torch.zeros(opticalFlow.shape[0], 1, opticalFlow.shape[2], opticalFlow.shape[3])
+    ).cuda()
+
+    opticalFlow = torch.cat((opticalFlow, padding), 1)
+
+    opticalFlow = opticalFlow * (mask_img.cuda() == 1.0)
+
+    objectPoints = []
+    imagePoints = []
+
+    for i in range(len(obj.pointcloud)):
+        y2d, x2d, x3d, y3d, z3d = obj.pointcloud[i]
+        y2d = (y2d - ey) * rescaleValue
+        x2d = (x2d - ex) * rescaleValue
+        [mx, my] = opticalFlow[0, :2, int(y2d), int(x2d)].cpu().detach().numpy()
+        if mx != 0.0 or my != 0.0:
+            mx = (mx - 0.5) * CFG.IMG_SIZE
+            my = (my - 0.5) * CFG.IMG_SIZE
+            if (
+                x2d + mx >= 0
+                and x2d + mx < CFG.IMG_SIZE
+                and y2d + my >= 0
+                and y2d + my < CFG.IMG_SIZE
+                and seg_pred[0, int(y2d + my), int(x2d + mx)] == 1.0
+                and int(x2d) % 10 == 0
+                and int(y2d) % 10 == 0
+            ):
+                objectPoints.append([x3d, y3d, z3d])
+                imagePoints.append(
+                    [(x2d + mx) / rescaleValue + ex, (y2d + my) / rescaleValue + ey,]
+                )
+                test_img = cv2.line(
+                    test_img,
+                    (int(x2d + mx), int(y2d + my)),
+                    (int(x2d), int(y2d)),
+                    (0, 255, 255),
+                    1,
+                )
+                test_img = cv2.circle(
+                    test_img,
+                    (int(x2d + mx), int(y2d + my)),
+                    radius=1,
+                    color=(255, 0, 0),
+                    thickness=-1,
+                )
+    cv2.imshow("test", test_img)
+
+    objectPoints = np.array(objectPoints)
+    imagePoints = np.array(imagePoints)
+
+    _, rvec, tvec = cv2.solvePnP(
+        objectPoints,
+        imagePoints,
+        CFG.CAMERA_MATRIX,
+        np.zeros((4, 1)),
+        flags=cv2.SOLVEPNP_EPNP,
+    )
+
+    rotMat, _ = cv2.Rodrigues(rvec)
+    pnppose = np.identity(4)
+    pnppose[:3, :3] = rotMat
+    pnppose[0, 3] = tvec[0][0]
+    pnppose[1, 3] = tvec[1][0]
+    pnppose[2, 3] = tvec[2][0]
+
+    return pnppose
 
 
 def testData(obj, yolo_model, rot_model, refine_model, d):
@@ -105,36 +202,39 @@ def testData(obj, yolo_model, rot_model, refine_model, d):
     targetPose_temp = targetPose.copy()
 
     # use obj model to generate the bounding box
-    foundObject, croptopleft, croplowright = generateBoundingbox(obj, targetPose)
-
-    print("target pose")
-    print(targetPose)
+    foundObject, predictDiag, croptopleft, croplowright = generateBoundingbox(
+        obj, targetPose
+    )
 
     targetPose = torch.from_numpy(targetPose)
 
     if foundObject:
-        # rot classifier
-        upperleft_rand, lowerright_rand = OM.get_centered_crop(
-            croptopleft, croplowright
+
+        img_crop = np.zeros(
+            (croplowright[1] - croptopleft[1], croplowright[0] - croptopleft[0], 3,),
+            np.uint8,
         )
-
-        if (
-            int(upperleft_rand[1]) < 0
-            or int(lowerright_rand[1]) >= demo.shape[0]
-            or int(upperleft_rand[0]) < 0
-            or int(lowerright_rand[0]) > demo.shape[1]
-        ):
-            return
-
-        # crop the image for rot classifier
-        img_crop = rot_frame[
-            int(upperleft_rand[1]) : int(lowerright_rand[1]),
-            int(upperleft_rand[0]) : int(lowerright_rand[0]),
+        upperleft_crop_inner = [
+            max(0, croptopleft[0]),
+            max(0, croptopleft[1]),
+        ]
+        lowerright_crop_inner = [
+            min(img.shape[1], croplowright[0]),
+            min(img.shape[0], croplowright[1]),
+        ]
+        img_crop[
+            upperleft_crop_inner[1]
+            - croptopleft[1] : lowerright_crop_inner[1]
+            - croptopleft[1],
+            upperleft_crop_inner[0]
+            - croptopleft[0] : lowerright_crop_inner[0]
+            - croptopleft[0],
+        ] = img[
+            int(upperleft_crop_inner[1]) : int(lowerright_crop_inner[1]),
+            int(upperleft_crop_inner[0]) : int(lowerright_crop_inner[0]),
         ]
 
-        # cv2.imshow("cropped image", img_crop)
-
-        l = int(lowerright_rand[0]) - int(upperleft_rand[0])
+        crop_width = int(croplowright[0]) - int(croptopleft[0])
 
         # resize the image so rot classifier can process
         img_crop = cv2.resize(img_crop, (CFG.IMG_SIZE, CFG.IMG_SIZE))
@@ -158,15 +258,9 @@ def testData(obj, yolo_model, rot_model, refine_model, d):
         position = (
             torch.sigmoid(output[:, viewpt_class + rot_class :]).cpu().data.numpy()
         )
-        position *= l
+        position *= crop_width
         offset = position[:, :2]
-        offset = np.array(upperleft_rand) + offset.reshape(2) - principle_pt
-
-        # get predict diagonal
-        predictDiag = math.sqrt(
-            (croplowright[0] - croptopleft[0]) ** 2
-            + (croplowright[1] - croptopleft[1]) ** 2
-        )
+        offset = np.array(croptopleft) + offset.reshape(2) - principle_pt
 
         # get the rough pose from view point, rotation, offset, and depth
         rough_pred_pose = obj.label2pose(viewpt, rot, offset, 0.5)
@@ -175,8 +269,9 @@ def testData(obj, yolo_model, rot_model, refine_model, d):
         obj.findVisibleSamplePoint()
         _, _, w_temp, h_temp = cv2.boundingRect(obj.getVisibleArea())
         currentDiag = math.sqrt(w_temp ** 2 + h_temp ** 2)
+
         rough_pred_pose = obj.label2pose(
-            viewpt, rot, offset, 0.5 * predictDiag / currentDiag * 0.5
+            viewpt, rot, offset, 0.5 * predictDiag / currentDiag * DIAG_PARAM
         )
 
         obj.setModelviewMatrix(rough_pred_pose)
@@ -189,6 +284,8 @@ def testData(obj, yolo_model, rot_model, refine_model, d):
             rough_demo = cv2.circle(
                 rough_demo, p, radius=0, color=(0, 255, 0), thickness=-1
             )
+        cv2.imshow("rough pose", rough_demo)
+        # cv2.waitKey(0)
 
         # # pose refinement
         for t in range(5):
@@ -198,13 +295,13 @@ def testData(obj, yolo_model, rot_model, refine_model, d):
             horizontalR_ori, verticalR_ori = obj.getCenterAngle(rough_pred_pose)
 
             # get init mask
-            mask = obj.getVisibleArea()
+            init_mask = obj.getVisibleArea()
 
             # get edge img
             edge = obj.getEdge(refine_frame.shape[0], refine_frame.shape[1])
 
             # find the crop size
-            [x, y, w, h] = cv2.boundingRect(mask)
+            [x, y, w, h] = cv2.boundingRect(init_mask)
 
             boundingsize = max(w, h) * CFG.EXPAND_SIZE
 
@@ -216,18 +313,40 @@ def testData(obj, yolo_model, rot_model, refine_model, d):
             ew = int(boundingsize)
             eh = int(boundingsize)
 
-            # cropped image with initial pose as center
-            crop_img = refine_frame[ey : ey + eh, ex : ex + ew].copy()
-            if crop_img.shape[0] != boundingsize or crop_img.shape[1] != boundingsize:
-                return
+            crop_img = np.zeros((eh, ew, 3), np.uint8,)
+            crop_init_mask = np.zeros((eh, ew), np.uint8)
+            crop_edge = np.zeros((eh, ew), np.uint8)
 
-            if crop_img.shape[0] == 0 or crop_img.shape[1] == 0:
-                return
-            # cropped mask for initial pose
-            crop_mask = mask[ey : ey + eh, ex : ex + ew]
-            # cropped edges for initial pose
-            crop_edge = edge[ey : ey + eh, ex : ex + ew]
-            # cv2.imshow("edge image", crop_edge)
+            upperleft_crop_inner = [max(0, ex), max(0, ey)]
+            lowerright_crop_inner = [
+                min(img.shape[1], ex + ew),
+                min(img.shape[0], ey + eh),
+            ]
+
+            # cropped image with initial pose as center
+            crop_img[
+                upperleft_crop_inner[1] - ey : lowerright_crop_inner[1] - ey,
+                upperleft_crop_inner[0] - ex : lowerright_crop_inner[0] - ex,
+            ] = img[
+                int(upperleft_crop_inner[1]) : int(lowerright_crop_inner[1]),
+                int(upperleft_crop_inner[0]) : int(lowerright_crop_inner[0]),
+            ]
+
+            crop_init_mask[
+                upperleft_crop_inner[1] - ey : lowerright_crop_inner[1] - ey,
+                upperleft_crop_inner[0] - ex : lowerright_crop_inner[0] - ex,
+            ] = init_mask[
+                int(upperleft_crop_inner[1]) : int(lowerright_crop_inner[1]),
+                int(upperleft_crop_inner[0]) : int(lowerright_crop_inner[0]),
+            ]
+
+            crop_edge[
+                upperleft_crop_inner[1] - ey : lowerright_crop_inner[1] - ey,
+                upperleft_crop_inner[0] - ex : lowerright_crop_inner[0] - ex,
+            ] = edge[
+                int(upperleft_crop_inner[1]) : int(lowerright_crop_inner[1]),
+                int(upperleft_crop_inner[0]) : int(lowerright_crop_inner[0]),
+            ]
 
             # apply rotation on the initial pose to move to it to the center
             rough_pose_at_center = obj.rotatePoseWithAngle(
@@ -239,10 +358,10 @@ def testData(obj, yolo_model, rot_model, refine_model, d):
 
             # resize rgb image
             crop_img = cv2.resize(
-                crop_img, (CFG.MG_SIZE, CFG.IMG_SIZE), interpolation=cv2.INTER_AREA
+                crop_img, (CFG.IMG_SIZE, CFG.IMG_SIZE), interpolation=cv2.INTER_AREA
             )
 
-            demo_img = crop_img.copy()
+            test_img = crop_img.copy()
 
             crop_img = crop_img[:, :, :3].transpose(2, 0, 1)
 
@@ -260,7 +379,9 @@ def testData(obj, yolo_model, rot_model, refine_model, d):
 
             # load the mask image
             mask_img = cv2.resize(
-                crop_mask, (CFG.IMG_SIZE, CFG.IMG_SIZE), interpolation=cv2.INTER_AREA
+                crop_init_mask,
+                (CFG.IMG_SIZE, CFG.IMG_SIZE),
+                interpolation=cv2.INTER_AREA,
             )
             mask_img = mask_img[:, :, np.newaxis].transpose(2, 0, 1)
 
@@ -305,111 +426,41 @@ def testData(obj, yolo_model, rot_model, refine_model, d):
                 pred_pose[0].detach().cpu().numpy(), -horizontalR_ori, -verticalR_ori,
             )
 
-            seg_pred = (
-                torch.argmax(segmentMask, 1, keepdim=True)
-                .float()
-                .squeeze(1)
-                .cpu()
-                .detach()
-                .numpy()
+            pnppose = poseEstimationWithFlow(
+                obj,
+                rough_pred_pose,
+                segmentMask,
+                opticalFlow,
+                mask_img,
+                test_img,
+                ex,
+                ey,
+                rescaleValue,
             )
 
-            cv2.imshow("mask", seg_pred[0])
-
-            demo_temp = demo.copy()
-            # obj.setModelviewMatrix(pred_pose)
-            # obj.findVisibleSamplePoint()
-            # # draw image
-            # for p in obj.sharp_2d_pts:
-            #     p = (int(p[0]), int(p[1]))
-            #     demo_temp = cv2.circle(
-            #         demo_temp, p, radius=0, color=(0, 255, 0), thickness=-1
-            #     )
-
-            obj.setModelviewMatrix(rough_pred_pose)
+            refine_demo = demo.copy()
+            obj.setModelviewMatrix(pred_pose)
             obj.findVisibleSamplePoint()
-            obj.getVisiblePointCloud()
-
-            opticalFlow = torch.sigmoid(opticalFlow)
-
-            padding = Variable(
-                torch.zeros(
-                    opticalFlow.shape[0], 1, opticalFlow.shape[2], opticalFlow.shape[3]
+            # draw image
+            for p in obj.sharp_2d_pts:
+                p = (int(p[0]), int(p[1]))
+                refine_demo = cv2.circle(
+                    refine_demo, p, radius=0, color=(0, 255, 0), thickness=-1
                 )
-            ).cuda()
-
-            opticalFlow = torch.cat((opticalFlow, padding), 1)
-
-            opticalFlow = opticalFlow * (mask_img.cuda() == 1.0)
-
-            testimg = np.transpose(opticalFlow[0].cpu().detach().numpy(), (1, 2, 0))
-
-            cv2.imshow("flow", testimg)
-            objectPoints = []
-            imagePoints = []
-
-            for i in range(len(obj.pointcloud)):
-                y2d, x2d, x3d, y3d, z3d = obj.pointcloud[i]
-                y2d = int((y2d - ey) * rescaleValue)
-                x2d = int((x2d - ex) * rescaleValue)
-                [mx, my] = opticalFlow[0, :2, y2d, x2d].cpu().detach().numpy()
-                if mx != 0.0 or my != 0.0:
-                    mx = int((mx - 0.5) * CFG.IMG_SIZE)
-                    my = int((my - 0.5) * CFG.IMG_SIZE)
-                    if (
-                        x + mx >= 0
-                        and x2d + mx < testimg.shape[0]
-                        and y2d + my >= 0
-                        and y2d + my < testimg.shape[1]
-                        and seg_pred[0, y2d + my, x2d + mx] == 1.0
-                    ):
-                        objectPoints.append([x3d, y3d, z3d])
-                        imagePoints.append(
-                            [
-                                float(x2d + mx) / rescaleValue + ex,
-                                float(y2d + my) / rescaleValue + ey,
-                            ]
-                        )
-
-            objectPoints = np.array(objectPoints)
-            imagePoints = np.array(imagePoints)
-
-            _, rvec, tvec = cv2.solvePnP(
-                objectPoints,
-                imagePoints,
-                CFG.CAMERA_MATRIX,
-                np.zeros((4, 1)),
-                flags=cv2.SOLVEPNP_ITERATIVE,
-            )
-
-            rotMat, _ = cv2.Rodrigues(rvec)
-            pnppose = np.identity(4)
-            pnppose[:3, :3] = rotMat
-            pnppose[0, 3] = tvec[0][0]
-            pnppose[1, 3] = tvec[1][0]
-            pnppose[2, 3] = tvec[2][0]
-            print("predict pose ")
-            print(pnppose)
 
             obj.setModelviewMatrix(pnppose)
             obj.findVisibleSamplePoint()
             # draw image
             for p in obj.sharp_2d_pts:
                 p = (int(p[0]), int(p[1]))
-                demo_temp = cv2.circle(
-                    demo_temp, p, radius=0, color=(0, 255, 0), thickness=-1
+                refine_demo = cv2.circle(
+                    refine_demo, p, radius=0, color=(0, 0, 255), thickness=-1
                 )
 
-            cv2.imshow("demo", demo_temp)
+            cv2.imshow("demo", refine_demo)
             cv2.waitKey(0)
 
-            rough_pred_pose = pnppose
-
-            _, croptopleft, croplowright = generateBoundingbox(obj, pred_pose)
-
-            upperleft_rand, lowerright_rand = OM.get_centered_crop(
-                croptopleft, croplowright
-            )
+            rough_pred_pose = pred_pose
 
 
 if __name__ == "__main__":
@@ -428,7 +479,7 @@ if __name__ == "__main__":
     image_names.sort()
     pose_names.sort()
 
-    indexnum = 100
+    indexnum = 60
     image_names = image_names[indexnum : indexnum + 1]
     pose_names = pose_names[indexnum : indexnum + 1]
 

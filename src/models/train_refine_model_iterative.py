@@ -35,7 +35,7 @@ testTrigger = Value(c_bool, False)
 
 # refine parameters
 batch_size = 64
-epochs = 150
+epochs = 90
 lr = 2e-6
 momentum = 0.9
 w_decay = 0.1
@@ -838,7 +838,7 @@ def main():
             elif pre_loss > valtem:
                 torch.save(mymodel, CFG.BEST_MODEL_ITERATIVE_REFINE)
                 pre_loss = valtem
-            if (epoch + 1) % 50 == 0:
+            if (epoch + 1) % 30 == 0:
                 scheduler.step()
 
         print("training process done for interation ", iterative)

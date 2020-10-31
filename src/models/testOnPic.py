@@ -18,7 +18,8 @@ from src.utils.utils import (
     scale_coords,
     plot_one_box,
 )
-from poseUtil import getPredictPose
+from poseUtil import getPredictPose, getConfid
+import math
 
 import cv2
 
@@ -81,8 +82,8 @@ if __name__ == "__main__":
     obj.loadObjectCADModel(CFG.CAD_MODEL)
     obj.setIntrinsicMatrix(CFG.CAMERA_MATRIX)
 
-    obj.determineSharpEdges(0.5)
-    obj.generateSamplePoints(0.0001, 0.000001)
+    obj.determineSharpEdges(0.8)
+    obj.generateSamplePoints(0.00001, 0.00001)
 
     ###################### yolo ########################
     webcam = "4"
@@ -93,6 +94,7 @@ if __name__ == "__main__":
     device = "cuda"
     obj_names = "data/wrs-wrc.names"
     image_size = 416
+    DIAG_PARAM = 0.3
 
     names = load_classes(obj_names)
     colors = [[random.randint(0, 255) for _ in range(3)] for _ in range(len(names))]
@@ -122,7 +124,7 @@ if __name__ == "__main__":
     refine_model.eval()
 
     # read image
-    frame = cv2.imread("input-5.jpg")
+    frame = cv2.imread("input-1.jpg")
     demo = frame.copy()
     rot_frame = frame.copy()
     refine_frame = frame.copy()
@@ -154,6 +156,7 @@ if __name__ == "__main__":
     croptopleft, croplowright = None, None
 
     foundObject = False
+
     # Process detections
     if pred is not None and len(pred):
         # Rescale boxes from img_size to demo size
@@ -174,6 +177,11 @@ if __name__ == "__main__":
                 ]
 
     if foundObject:
+        # find the diagnal of the bounding box
+        objectDiag = math.sqrt(
+            (croplowright[0] - croptopleft[0]) ** 2
+            + (croplowright[1] - croptopleft[1]) ** 2
+        )
         # rot classifier
         upperleft, lowerright = OM.get_centered_crop(croptopleft, croplowright)
         l = int(lowerright[0]) - int(upperleft[0])
@@ -185,9 +193,6 @@ if __name__ == "__main__":
         ]
 
         img_crop = cv2.resize(img_crop, (CFG.IMG_SIZE, CFG.IMG_SIZE))
-        cv2.imshow("crop", img_crop)
-        cv2.waitKey(0)
-
         img_crop = img_crop[:, :, :3].transpose(2, 0, 1)
         img_crop = img_crop[np.newaxis, ...]
 
@@ -211,11 +216,20 @@ if __name__ == "__main__":
         offset = position[:, :2]
         offset = np.array(upperleft) + offset.reshape(2) - principle_pt
 
-        depth = 0.4
-        rough_pred_pose = obj.label2pose(viewpt, rot, offset, depth)
+        # get the rough pose from view point, rotation, offset, and depth
+        rough_pred_pose = obj.label2pose(viewpt, rot, offset, 0.5)
+
+        obj.setModelviewMatrix(rough_pred_pose)
+        obj.findVisibleSamplePoint()
+        _, _, w_temp, h_temp = cv2.boundingRect(obj.getVisibleArea())
+        currentDiag = math.sqrt(w_temp ** 2 + h_temp ** 2)
+
+        rough_pred_pose = obj.label2pose(
+            viewpt, rot, offset, 0.5 * objectDiag / currentDiag * DIAG_PARAM
+        )
 
         # pose refinement
-        for t in range(20):
+        for t in range(10):
             obj.setModelviewMatrix(rough_pred_pose)
             obj.findVisibleSamplePoint()
 
@@ -240,21 +254,40 @@ if __name__ == "__main__":
             ew = int(boundingsize)
             eh = int(boundingsize)
 
+            crop_img = np.zeros((eh, ew, 3), np.uint8,)
+            crop_mask = np.zeros((eh, ew), np.uint8)
+            crop_edge = np.zeros((eh, ew), np.uint8)
+
+            upperleft_crop_inner = [max(0, ex), max(0, ey)]
+            lowerright_crop_inner = [
+                min(refine_frame.shape[1], ex + ew),
+                min(refine_frame.shape[0], ey + eh),
+            ]
+
             # cropped image with initial pose as center
-            crop_img = refine_frame[ey : ey + eh, ex : ex + ew].copy()
-            if crop_img.shape[0] != boundingsize or crop_img.shape[1] != boundingsize:
-                print("crop error!!")
-                exit()
+            crop_img[
+                upperleft_crop_inner[1] - ey : lowerright_crop_inner[1] - ey,
+                upperleft_crop_inner[0] - ex : lowerright_crop_inner[0] - ex,
+            ] = refine_frame[
+                int(upperleft_crop_inner[1]) : int(lowerright_crop_inner[1]),
+                int(upperleft_crop_inner[0]) : int(lowerright_crop_inner[0]),
+            ].copy()
 
-            if crop_img.shape[0] == 0 or crop_img.shape[1] == 0:
-                print("no image")
-                exit()
+            crop_mask[
+                upperleft_crop_inner[1] - ey : lowerright_crop_inner[1] - ey,
+                upperleft_crop_inner[0] - ex : lowerright_crop_inner[0] - ex,
+            ] = mask[
+                int(upperleft_crop_inner[1]) : int(lowerright_crop_inner[1]),
+                int(upperleft_crop_inner[0]) : int(lowerright_crop_inner[0]),
+            ].copy()
 
-            # cv2.imshow("expand img", crop_img)
-            # cropped mask for initial pose
-            crop_mask = mask[ey : ey + eh, ex : ex + ew]
-            # cropped edges for initial pose
-            crop_edge = edge[ey : ey + eh, ex : ex + ew]
+            crop_edge[
+                upperleft_crop_inner[1] - ey : lowerright_crop_inner[1] - ey,
+                upperleft_crop_inner[0] - ex : lowerright_crop_inner[0] - ex,
+            ] = edge[
+                int(upperleft_crop_inner[1]) : int(lowerright_crop_inner[1]),
+                int(upperleft_crop_inner[0]) : int(lowerright_crop_inner[0]),
+            ].copy()
 
             # apply rotation on the initial pose to move to it to the center
             rough_pose_at_center = obj.rotatePoseWithAngle(
@@ -268,6 +301,7 @@ if __name__ == "__main__":
             crop_img = cv2.resize(
                 crop_img, (CFG.IMG_SIZE, CFG.IMG_SIZE), interpolation=cv2.INTER_AREA
             )
+            test_img = crop_img.copy()
 
             crop_img = crop_img[:, :, :3].transpose(2, 0, 1)
 
@@ -329,6 +363,19 @@ if __name__ == "__main__":
             rough_pose_at_center = torch.from_numpy(rough_pose_at_center)
             rough_pose_at_center = rough_pose_at_center.unsqueeze(0)
 
+            # get the confidence
+            getConfid(
+                obj,
+                rough_pred_pose,
+                segmentMask,
+                opticalFlow,
+                mask_img,
+                test_img,
+                ex,
+                ey,
+                rescaleValue,
+            )
+
             pred_pose = getPredictPose(
                 rough_pose_at_center,
                 rot,
@@ -358,8 +405,8 @@ if __name__ == "__main__":
             cv2.waitKey(0)
     else:
         print("can't find object!!")
-    cv2.imshow("demo", demo)
-    cv2.waitKey(0)
+    # cv2.imshow("demo", demo)
+    # cv2.waitKey(0)
     cv2.destroyAllWindows()
 
 print(pred_pose)

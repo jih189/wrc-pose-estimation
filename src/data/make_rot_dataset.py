@@ -66,18 +66,18 @@ def process_data(args):
             return
 
         # update the progress bar
-        # progress = int(50.0 * current_index / len(datalist))
-        # rest_progress = 50 - progress
-        # print(
-        #     "Progress: ["
-        #     + "=" * progress
-        #     + " " * rest_progress
-        #     + "]"
-        #     + str(100.0 * current_index / len(datalist))
-        #     + "%",
-        #     end="\r",
-        #     flush=True,
-        # )
+        progress = int(50.0 * current_index / len(datalist))
+        rest_progress = 50 - progress
+        print(
+            "Progress: ["
+            + "=" * progress
+            + " " * rest_progress
+            + "]"
+            + str(100.0 * current_index / len(datalist))
+            + "%",
+            end="\r",
+            flush=True,
+        )
 
         try:
             # read image and pose
