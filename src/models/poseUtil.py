@@ -205,7 +205,7 @@ def ADDS_error(pred_pose, targetPose):
 
 # calculate the confidence of the refinement prediction
 def getConfid(
-    obj, init_pose, segmentMask, opticalFlow, mask_img, test_img, ex, ey, rescaleValue,
+    obj, init_pose, segmentMask, opticalFlow, mask_img, ex, ey, rescaleValue,
 ):
 
     seg_pred = (
@@ -251,29 +251,10 @@ def getConfid(
                 and int(y2d) % 10 == 0
             ):
                 matchingError.append(math.sqrt(mx ** 2 + my ** 2))
-                test_img = cv2.line(
-                    test_img,
-                    (int(x2d + mx), int(y2d + my)),
-                    (int(x2d), int(y2d)),
-                    (0, 255, 255),
-                    1,
-                )
-                test_img = cv2.circle(
-                    test_img,
-                    (int(x2d + mx), int(y2d + my)),
-                    radius=1,
-                    color=(255, 0, 0),
-                    thickness=-1,
-                )
 
     flowError = sum(matchingError) / len(matchingError) / opticalFlow.shape[3]
-    print("matching Error = ", flowError)
     iou_value = (
         1.0 - iou(mask_img.cuda().squeeze(1), segmentMask.squeeze(1), 1).cpu().numpy()
     )
-    print("iou error = ", iou_value)
-    print(
-        "probability = ",
-        math.exp(-(CFG.LAMBDA_E * flowError + CFG.LAMBDA_V * iou_value)),
-    )
-    cv2.imshow("flow", test_img)
+
+    return math.exp(-(CFG.LAMBDA_E * flowError + CFG.LAMBDA_V * iou_value))

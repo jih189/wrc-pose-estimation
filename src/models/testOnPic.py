@@ -124,7 +124,7 @@ if __name__ == "__main__":
     refine_model.eval()
 
     # read image
-    frame = cv2.imread("input-1.jpg")
+    frame = cv2.imread("input-6.jpg")
     demo = frame.copy()
     rot_frame = frame.copy()
     refine_frame = frame.copy()
@@ -187,10 +187,34 @@ if __name__ == "__main__":
         l = int(lowerright[0]) - int(upperleft[0])
 
         # crop the image for rot classifier
-        img_crop = rot_frame[
-            int(upperleft[1]) : int(lowerright[1]),
-            int(upperleft[0]) : int(lowerright[0]),
+        # img_crop = rot_frame[
+        #     int(upperleft[1]) : int(lowerright[1]),
+        #     int(upperleft[0]) : int(lowerright[0]),
+        # ]
+
+        img_crop = np.zeros(
+            (lowerright[1] - upperleft[1], lowerright[0] - upperleft[0], 3), np.uint8,
+        )
+        upperleft_crop_inner = [
+            max(0, upperleft[0]),
+            max(0, upperleft[1]),
         ]
+        lowerright_crop_inner = [
+            min(rot_frame.shape[1], lowerright[0]),
+            min(rot_frame.shape[0], lowerright[1]),
+        ]
+        img_crop[
+            upperleft_crop_inner[1]
+            - upperleft[1] : lowerright_crop_inner[1]
+            - upperleft[1],
+            upperleft_crop_inner[0]
+            - upperleft[0] : lowerright_crop_inner[0]
+            - upperleft[0],
+        ] = rot_frame[
+            int(upperleft_crop_inner[1]) : int(lowerright_crop_inner[1]),
+            int(upperleft_crop_inner[0]) : int(lowerright_crop_inner[0]),
+        ]
+        cv2.imshow("crop_test", img_crop)
 
         img_crop = cv2.resize(img_crop, (CFG.IMG_SIZE, CFG.IMG_SIZE))
         img_crop = img_crop[:, :, :3].transpose(2, 0, 1)
@@ -364,17 +388,17 @@ if __name__ == "__main__":
             rough_pose_at_center = rough_pose_at_center.unsqueeze(0)
 
             # get the confidence
-            getConfid(
+            confidence = getConfid(
                 obj,
                 rough_pred_pose,
                 segmentMask,
                 opticalFlow,
                 mask_img,
-                test_img,
                 ex,
                 ey,
                 rescaleValue,
             )
+            print("confidence = ", confidence)
 
             pred_pose = getPredictPose(
                 rough_pose_at_center,

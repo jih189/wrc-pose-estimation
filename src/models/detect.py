@@ -18,7 +18,8 @@ from src.utils.utils import (
     scale_coords,
     plot_one_box,
 )
-from src.models.poseUtil import getPredictPose
+from src.models.poseUtil import getPredictPose, getConfid
+import math
 
 import cv2
 
@@ -32,8 +33,8 @@ obj = OM.ObjectModel()
 obj.loadObjectCADModel(CFG.CAD_MODEL)
 obj.setIntrinsicMatrix(CFG.CAMERA_MATRIX)
 
-obj.determineSharpEdges(0.5)
-obj.generateSamplePoints(0.0001, 0.000001)
+obj.determineSharpEdges(0.6)
+obj.generateSamplePoints(0.00001, 0.00001)
 
 ###################### yolo ########################
 webcam = "4"
@@ -172,13 +173,30 @@ def detect(object_id, img, estimated_depth):
         l = int(lowerright[0]) - int(upperleft[0])
 
         # crop the image for rot classifier
-        img_crop = rot_frame[
-            int(upperleft[1]) : int(lowerright[1]),
-            int(upperleft[0]) : int(lowerright[0]),
+        img_crop = np.zeros(
+            (lowerright[1] - upperleft[1], lowerright[0] - upperleft[0], 3), np.uint8,
+        )
+        upperleft_crop_inner = [
+            max(0, upperleft[0]),
+            max(0, upperleft[1]),
+        ]
+        lowerright_crop_inner = [
+            min(rot_frame.shape[1], lowerright[0]),
+            min(rot_frame.shape[0], lowerright[1]),
+        ]
+        img_crop[
+            upperleft_crop_inner[1]
+            - upperleft[1] : lowerright_crop_inner[1]
+            - upperleft[1],
+            upperleft_crop_inner[0]
+            - upperleft[0] : lowerright_crop_inner[0]
+            - upperleft[0],
+        ] = rot_frame[
+            int(upperleft_crop_inner[1]) : int(lowerright_crop_inner[1]),
+            int(upperleft_crop_inner[0]) : int(lowerright_crop_inner[0]),
         ]
 
         img_crop = cv2.resize(img_crop, (CFG.IMG_SIZE, CFG.IMG_SIZE))
-
         img_crop = img_crop[:, :, :3].transpose(2, 0, 1)
         img_crop = img_crop[np.newaxis, ...]
 
@@ -202,11 +220,10 @@ def detect(object_id, img, estimated_depth):
         offset = position[:, :2]
         offset = np.array(upperleft) + offset.reshape(2) - principle_pt
 
-        depth = estimated_depth
-        rough_pred_pose = obj.label2pose(viewpt, rot, offset, depth)
+        rough_pred_pose = obj.label2pose(viewpt, rot, offset, estimated_depth)
 
         # pose refinement
-        for t in range(15):
+        for t in range(5):
             obj.setModelviewMatrix(rough_pred_pose)
             obj.findVisibleSamplePoint()
 
@@ -231,22 +248,40 @@ def detect(object_id, img, estimated_depth):
             ew = int(boundingsize)
             eh = int(boundingsize)
 
+            crop_img = np.zeros((eh, ew, 3), np.uint8,)
+            crop_mask = np.zeros((eh, ew), np.uint8)
+            crop_edge = np.zeros((eh, ew), np.uint8)
+
+            upperleft_crop_inner = [max(0, ex), max(0, ey)]
+            lowerright_crop_inner = [
+                min(refine_frame.shape[1], ex + ew),
+                min(refine_frame.shape[0], ey + eh),
+            ]
+
             # cropped image with initial pose as center
-            crop_img = refine_frame[ey : ey + eh, ex : ex + ew].copy()
-            if crop_img.shape[0] != boundingsize or crop_img.shape[1] != boundingsize:
-                print("crop error!!")
-                exit()
+            crop_img[
+                upperleft_crop_inner[1] - ey : lowerright_crop_inner[1] - ey,
+                upperleft_crop_inner[0] - ex : lowerright_crop_inner[0] - ex,
+            ] = refine_frame[
+                int(upperleft_crop_inner[1]) : int(lowerright_crop_inner[1]),
+                int(upperleft_crop_inner[0]) : int(lowerright_crop_inner[0]),
+            ].copy()
 
-            if crop_img.shape[0] == 0 or crop_img.shape[1] == 0:
-                print("no image")
-                exit()
+            crop_mask[
+                upperleft_crop_inner[1] - ey : lowerright_crop_inner[1] - ey,
+                upperleft_crop_inner[0] - ex : lowerright_crop_inner[0] - ex,
+            ] = mask[
+                int(upperleft_crop_inner[1]) : int(lowerright_crop_inner[1]),
+                int(upperleft_crop_inner[0]) : int(lowerright_crop_inner[0]),
+            ].copy()
 
-            # cv2.imshow("expand img", crop_img)
-            # cropped mask for initial pose
-            crop_mask = mask[ey : ey + eh, ex : ex + ew]
-            # cropped edges for initial pose
-            crop_edge = edge[ey : ey + eh, ex : ex + ew]
-            # cv2.imshow("edge image", crop_edge)
+            crop_edge[
+                upperleft_crop_inner[1] - ey : lowerright_crop_inner[1] - ey,
+                upperleft_crop_inner[0] - ex : lowerright_crop_inner[0] - ex,
+            ] = edge[
+                int(upperleft_crop_inner[1]) : int(lowerright_crop_inner[1]),
+                int(upperleft_crop_inner[0]) : int(lowerright_crop_inner[0]),
+            ].copy()
 
             # apply rotation on the initial pose to move to it to the center
             rough_pose_at_center = obj.rotatePoseWithAngle(
@@ -260,6 +295,7 @@ def detect(object_id, img, estimated_depth):
             crop_img = cv2.resize(
                 crop_img, (CFG.IMG_SIZE, CFG.IMG_SIZE), interpolation=cv2.INTER_AREA
             )
+            test_img = crop_img.copy()
 
             crop_img = crop_img[:, :, :3].transpose(2, 0, 1)
 
@@ -290,6 +326,15 @@ def detect(object_id, img, estimated_depth):
 
             rot, trans, dist, opticalFlow, segmentMask = refine_model(flow_input)
 
+            seg_pred = (
+                torch.argmax(segmentMask, 1, keepdim=True)
+                .float()
+                .squeeze(1)
+                .cpu()
+                .detach()
+                .numpy()
+            )
+
             trans = trans.unsqueeze(1)
             dist = dist.unsqueeze(1)
 
@@ -310,6 +355,19 @@ def detect(object_id, img, estimated_depth):
             rough_pose_at_center = torch.from_numpy(rough_pose_at_center)
             rough_pose_at_center = rough_pose_at_center.unsqueeze(0)
 
+            # get the confidence
+            confidence = getConfid(
+                obj,
+                rough_pred_pose,
+                segmentMask,
+                opticalFlow,
+                mask_img,
+                ex,
+                ey,
+                rescaleValue,
+            )
+            print("confidence = ", confidence)
+
             pred_pose = getPredictPose(
                 rough_pose_at_center,
                 rot,
@@ -324,6 +382,7 @@ def detect(object_id, img, estimated_depth):
             )
 
             rough_pred_pose = pred_pose
+            rough_pred_pose = OM.symmetricRemove(rough_pred_pose)
 
         obj.setModelviewMatrix(pred_pose)
         obj.findVisibleSamplePoint()
@@ -333,8 +392,8 @@ def detect(object_id, img, estimated_depth):
         cv2.imshow("demo", demo)
         cv2.waitKey(0)
 
-        return pred_pose
+        return pred_pose, confidence
     else:
         # can't detect the object
         print("can't detect object!!")
-        return None
+        return None, 0.0
