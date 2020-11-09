@@ -38,12 +38,12 @@ obj.generateSamplePoints(0.0001, 0.0001)
 
 ###################### yolo ########################
 webcam = "4"
-cfg = "/home/cogrob-wrc/wrc-pose-estimation/cfg/yolov3-tiny3.cfg"
-weights = "/home/cogrob-wrc/wrc-pose-estimation/weights/best_yolo_model_wrc.pt"
+cfg = CFG.CURRENT_POSE_ESITMATION_DIR + "cfg/yolov3-tiny3.cfg"
+weights = CFG.CURRENT_POSE_ESITMATION_DIR + "weights/best_yolo_model_wrc.pt"
 conf_thres = 0.7
 iou_thres = 0.4
 device = "cuda"
-obj_names = "/home/cogrob-wrc/wrc-pose-estimation/data/wrs-wrc.names"
+obj_names = CFG.CURRENT_POSE_ESITMATION_DIR + "data/wrs-wrc.names"
 image_size = 416
 
 names = load_classes(obj_names)
@@ -68,7 +68,7 @@ refine_model = DeepIM().cuda()
 # refine_model = torch.load(CFG.BEST_MODEL_ITERATIVE_REFINE)
 refine_model.load_state_dict(
     torch.load(
-        "/home/cogrob-wrc/wrc-pose-estimation/best_model_iterative_refine_pulley-test.pth"
+        CFG.CURRENT_POSE_ESITMATION_DIR + "best_model_iterative_refine_pulley-test.pth"
     )
 )
 refine_model.eval()
