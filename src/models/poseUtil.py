@@ -7,7 +7,6 @@ import torchgeometry as tgm
 import kornia
 import src.configuration as CFG
 from scipy.spatial.transform import Rotation as R
-import cv2
 import math
 from src.common.iou import iou
 
@@ -204,9 +203,7 @@ def ADDS_error(pred_pose, targetPose):
 
 
 # calculate the confidence of the refinement prediction
-def getConfid(
-    obj, init_pose, segmentMask, opticalFlow, mask_img, ex, ey, rescaleValue,
-):
+def getConfid(segmentMask, opticalFlow, mask_img):
 
     seg_pred = (
         torch.argmax(segmentMask, 1, keepdim=True)
@@ -217,40 +214,28 @@ def getConfid(
         .numpy()
     )
 
-    obj.setModelviewMatrix(init_pose)
-    obj.findVisibleSamplePoint()
-    obj.getVisiblePointCloud()
-
     opticalFlow = torch.sigmoid(opticalFlow)
-
-    padding = Variable(
-        torch.zeros(opticalFlow.shape[0], 1, opticalFlow.shape[2], opticalFlow.shape[3])
-    ).cuda()
-
-    opticalFlow = torch.cat((opticalFlow, padding), 1)
-
     opticalFlow = opticalFlow * (mask_img.cuda() == 1.0)
 
     # predicted matching error
     matchingError = []
-    for i in range(len(obj.pointcloud)):
-        y2d, x2d, x3d, y3d, z3d = obj.pointcloud[i]
-        y2d = (y2d - ey) * rescaleValue
-        x2d = (x2d - ex) * rescaleValue
-        [mx, my] = opticalFlow[0, :2, int(y2d), int(x2d)].cpu().detach().numpy()
-        if mx != 0.0 or my != 0.0:
-            mx = (mx - 0.5) * CFG.IMG_SIZE
-            my = (my - 0.5) * CFG.IMG_SIZE
-            if (
-                x2d + mx >= 0
-                and x2d + mx < CFG.IMG_SIZE
-                and y2d + my >= 0
-                and y2d + my < CFG.IMG_SIZE
-                and seg_pred[0, int(y2d + my), int(x2d + mx)] == 1.0
-                and int(x2d) % 10 == 0
-                and int(y2d) % 10 == 0
-            ):
-                matchingError.append(math.sqrt(mx ** 2 + my ** 2))
+
+    for y2d in range(CFG.IMG_SIZE):
+        for x2d in range(CFG.IMG_SIZE):
+            if mask_img[0, 0, y2d, x2d] == 1.0:
+                [mx, my] = opticalFlow[0, :2, y2d, x2d].cpu().detach().numpy()
+                mx = (mx - 0.5) * CFG.IMG_SIZE
+                my = (my - 0.5) * CFG.IMG_SIZE
+                if (
+                    x2d + mx >= 0
+                    and x2d + mx < CFG.IMG_SIZE
+                    and y2d + my >= 0
+                    and y2d + my < CFG.IMG_SIZE
+                    and seg_pred[0, int(y2d + my), int(x2d + mx)] == 1.0
+                    and int(x2d) % 5 == 0
+                    and int(y2d) % 5 == 0
+                ):
+                    matchingError.append(math.sqrt(mx ** 2 + my ** 2))
 
     flowError = sum(matchingError) / len(matchingError) / opticalFlow.shape[3]
     iou_value = (

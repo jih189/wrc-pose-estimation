@@ -23,6 +23,7 @@ import math
 
 import cv2
 
+import time
 
 # ignore warming
 np.seterr(divide="ignore", invalid="ignore")
@@ -110,21 +111,23 @@ if __name__ == "__main__":
     rot_class = 60
 
     rot_model = Magic_Net(viewpt_class=viewpt_class, rot_class=rot_class).cuda()
-    rot_model = nn.DataParallel(rot_model)
     rot_model = torch.load(CFG.BEST_MODEL_ROT)
-    torch.save(rot_model.module.state_dict(), "best_model_rot_pulley-test.pth")
+    # torch.save(rot_model.module.state_dict(), "best_model_rot_pulley-test.pth")
     rot_model.eval()
 
     ################# refine net ###########################
-    refine_model = DeepIM()
+    refine_model = DeepIM().cuda()
+    # refine_model.load_state_dict(
+    #     torch.load("best_model_iterative_refine_pulley-test.pth")
+    # )
     refine_model = torch.load(CFG.BEST_MODEL_ITERATIVE_REFINE)
-    torch.save(
-        refine_model.module.state_dict(), "best_model_iterative_refine_pulley-test.pth"
-    )
+    # torch.save(
+    #     refine_model.module.state_dict(), "best_model_iterative_refine_pulley-test.pth"
+    # )
     refine_model.eval()
 
     # read image
-    frame = cv2.imread("input-6.jpg")
+    frame = cv2.imread("input-4.jpg")
     demo = frame.copy()
     rot_frame = frame.copy()
     refine_frame = frame.copy()
@@ -177,6 +180,7 @@ if __name__ == "__main__":
                 ]
 
     if foundObject:
+        # rough_pose_estimation_start = time.time()
         # find the diagnal of the bounding box
         objectDiag = math.sqrt(
             (croplowright[0] - croptopleft[0]) ** 2
@@ -184,13 +188,7 @@ if __name__ == "__main__":
         )
         # rot classifier
         upperleft, lowerright = OM.get_centered_crop(croptopleft, croplowright)
-        l = int(lowerright[0]) - int(upperleft[0])
-
-        # crop the image for rot classifier
-        # img_crop = rot_frame[
-        #     int(upperleft[1]) : int(lowerright[1]),
-        #     int(upperleft[0]) : int(lowerright[0]),
-        # ]
+        crop_width = int(lowerright[0]) - int(upperleft[0])
 
         img_crop = np.zeros(
             (lowerright[1] - upperleft[1], lowerright[0] - upperleft[0], 3), np.uint8,
@@ -214,7 +212,6 @@ if __name__ == "__main__":
             int(upperleft_crop_inner[1]) : int(lowerright_crop_inner[1]),
             int(upperleft_crop_inner[0]) : int(lowerright_crop_inner[0]),
         ]
-        cv2.imshow("crop_test", img_crop)
 
         img_crop = cv2.resize(img_crop, (CFG.IMG_SIZE, CFG.IMG_SIZE))
         img_crop = img_crop[:, :, :3].transpose(2, 0, 1)
@@ -236,7 +233,7 @@ if __name__ == "__main__":
         position = (
             torch.sigmoid(output[:, viewpt_class + rot_class :]).data.cpu().numpy()
         )
-        position *= l
+        position *= crop_width
         offset = position[:, :2]
         offset = np.array(upperleft) + offset.reshape(2) - principle_pt
 
@@ -244,18 +241,29 @@ if __name__ == "__main__":
         rough_pred_pose = obj.label2pose(viewpt, rot, offset, 0.5)
 
         obj.setModelviewMatrix(rough_pred_pose)
-        obj.findVisibleSamplePoint()
+        obj.renderVisibleFaces()
         _, _, w_temp, h_temp = cv2.boundingRect(obj.getVisibleArea())
+
         currentDiag = math.sqrt(w_temp ** 2 + h_temp ** 2)
 
         rough_pred_pose = obj.label2pose(
             viewpt, rot, offset, 0.5 * objectDiag / currentDiag * DIAG_PARAM
         )
+        # rough_pose_estimation_end = time.time()
+        # print("time for rought pose estimation: ")
+        # print(rough_pose_estimation_end - rough_pose_estimation_start)
+
+        numOfRefine = 10
 
         # pose refinement
-        for t in range(10):
+        for t in range(numOfRefine):
+            # pose_refinement_start = time.time()
             obj.setModelviewMatrix(rough_pred_pose)
+            # find_visible_sample_points_start = time.time()
             obj.findVisibleSamplePoint()
+            # find_visible_sample_points_end = time.time()
+            # print("time for visible points:")
+            # print(find_visible_sample_points_end - find_visible_sample_points_start)
 
             horizontalR_ori, verticalR_ori = obj.getCenterAngle(rough_pred_pose)
 
@@ -352,7 +360,7 @@ if __name__ == "__main__":
 
             flow_inputData = torch.cat((mask_img, edge_img, crop_img), 1,)
 
-            flow_input = Variable(flow_inputData)
+            flow_input = Variable(flow_inputData).cuda()
 
             rot, trans, dist, opticalFlow, segmentMask = refine_model(flow_input)
 
@@ -364,8 +372,6 @@ if __name__ == "__main__":
                 .detach()
                 .numpy()
             )
-
-            cv2.imshow("mask", seg_pred[0])
 
             trans = trans.unsqueeze(1)
             dist = dist.unsqueeze(1)
@@ -387,18 +393,14 @@ if __name__ == "__main__":
             rough_pose_at_center = torch.from_numpy(rough_pose_at_center)
             rough_pose_at_center = rough_pose_at_center.unsqueeze(0)
 
-            # get the confidence
-            confidence = getConfid(
-                obj,
-                rough_pred_pose,
-                segmentMask,
-                opticalFlow,
-                mask_img,
-                ex,
-                ey,
-                rescaleValue,
-            )
-            print("confidence = ", confidence)
+            if t == numOfRefine - 1:
+                # get the confidence
+                # confidence_estimation_time_start = time.time()
+                confidence = getConfid(segmentMask, opticalFlow, mask_img,)
+                # confidence_estimation_time_end = time.time()
+                # print("confidence estimation time:")
+                # print(confidence_estimation_time_end - confidence_estimation_time_start)
+                print("confidence ", confidence)
 
             pred_pose = getPredictPose(
                 rough_pose_at_center,
@@ -414,23 +416,27 @@ if __name__ == "__main__":
             )
 
             rough_pred_pose = pred_pose
+            # pose_refinement_end = time.time()
+            # print("time for pose refinement: ")
+            # print(pose_refinement_end - pose_refinement_start)
             rough_pred_pose = OM.symmetricRemove(rough_pred_pose)
 
-            demotemp = demo.copy()
+            temp_demo = demo.copy()
+            obj.setModelviewMatrix(rough_pred_pose)
+            obj.findVisibleSamplePoint()
 
-            # draw image
+            # test
             for p in obj.sharp_2d_pts:
-                p = (int(p[0]), int(p[1]))
-                demotemp = cv2.circle(
-                    demotemp, p, radius=2, color=(0, 0, 255), thickness=-1
+                temp_demo = cv2.circle(
+                    temp_demo,
+                    (int(p[0]), int(p[1])),
+                    radius=1,
+                    color=(0, 255, 0),
+                    thickness=-1,
                 )
-
-            cv2.imshow("demo", demotemp)
+            cv2.imshow("test", temp_demo)
             cv2.waitKey(0)
+
     else:
         print("can't find object!!")
-    # cv2.imshow("demo", demo)
-    # cv2.waitKey(0)
     cv2.destroyAllWindows()
-
-print(pred_pose)

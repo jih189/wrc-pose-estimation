@@ -36,7 +36,7 @@ testTrigger = Value(c_bool, False)
 # refine parameters
 batch_size = 64
 epochs = 90
-lr = 2e-6
+lr = 4e-5
 momentum = 0.9
 w_decay = 0.1
 seglambda = 0.5
@@ -51,12 +51,12 @@ pool_dir = "pred_temp/"
 # initiate the net
 mymodel = DeepIM().cuda()
 mymodel = nn.DataParallel(mymodel)
-# mymodel.module.flownet.load_state_dict(
-#     torch.load(CFG.BEST_MODEL_FLOWNET).module.state_dict()
-# )
-# mymodel.module.flownet.eval()
+mymodel.module.flownet.load_state_dict(
+    torch.load(CFG.BEST_MODEL_FLOWNET).module.state_dict()
+)
+mymodel.module.flownet.eval()
 
-mymodel = torch.load(CFG.BEST_MODEL_ITERATIVE_REFINE)
+# mymodel = torch.load(CFG.BEST_MODEL_ITERATIVE_REFINE)
 
 seg_criterion = nn.CrossEntropyLoss(reduce=False)
 
@@ -73,7 +73,7 @@ samplepoints = np.asarray(o3d.io.read_triangle_mesh(CFG.CAD_MODEL).vertices)
 diameter = np.linalg.norm(np.amax(samplepoints, axis=0) - np.amin(samplepoints, axis=0))
 
 # object init.
-def init():
+def init(sampleValue):
     # load the object mesh
     OM.setup(CFG.CAMERA_W, CFG.CAMERA_H)
     OM.setProjectMatrixWithIntr(CFG.CAMERA_MATRIX, CFG.CAMERA_W, CFG.CAMERA_H)
@@ -82,7 +82,7 @@ def init():
     obj.loadObjectCADModel(CFG.CAD_MODEL)
 
     obj.determineSharpEdges(0.8)
-    obj.generateSamplePoints(0.00001, 0.00001)
+    obj.generateSamplePoints(0.0001, sampleValue)
     return obj
 
 
@@ -92,7 +92,7 @@ def process_data(args):
     global output_counter
     global testTrigger
 
-    obj = init()
+    obj = init(0.0001)
 
     # parse input
     (id, datalist) = args
@@ -682,14 +682,14 @@ def generateData(obj, sample_points):
             for p in obj.sharp_2d_pts:
                 p = (int(p[0]), int(p[1]))
                 original_img = cv2.circle(
-                    original_img, p, radius=2, color=(0, 0, 255), thickness=-1
+                    original_img, p, radius=1, color=(0, 0, 255), thickness=-1
                 )
 
             cv2.imwrite(
                 pool_dir + "{:06d}".format(savedIndex) + "demo.png", original_img,
             )
 
-            global_pred_pose = OM.symmetricRemove(global_pred_pose)
+            global_pred_pose = OM.symmetricRemove_housing(global_pred_pose)
 
             np.save(
                 pool_dir + "{:06d}".format(savedIndex) + "initPose.npy",
@@ -744,8 +744,9 @@ def main():
         )
 
     learningrate = lr
+    numOfTotalIteration = 6
 
-    for iterative in range(5):
+    for iteration in range(numOfTotalIteration):
         # # generate the processed data
         # read images and poses
         input_path = Path(pool_dir)
@@ -806,7 +807,7 @@ def main():
         f.close()
 
         # initialize the object
-        obj = init()
+        obj = init(0.00001)
 
         sample_points = torch.as_tensor(obj.sharp_sample_points)
 
@@ -841,7 +842,9 @@ def main():
             if (epoch + 1) % 30 == 0:
                 scheduler.step()
 
-        print("training process done for interation ", iterative)
+        print("training process done for interation ", iteration)
+        if iteration == numberOfData - 1:
+            break
 
         # # generate next dataset
         # generate the new val file for generate data set
@@ -852,6 +855,7 @@ def main():
         f.close()
 
         removeFilesInDir(pool_dir)
+        obj = init(0.001)
         generateData(obj, sample_points)
         removeFilesInDir(processed_dir)
         print("data generation done!")

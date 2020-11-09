@@ -25,7 +25,7 @@ from src.utils.utils import (
 )
 import tqdm
 import cv2
-from poseUtil import getPredictPose, getRotationError, ADD_error, ADDS_error
+from poseUtil import getPredictPose, ADD_error, getConfid
 
 counter = Value("i", 0)
 
@@ -113,17 +113,18 @@ def poseEstimationWithFlow(
         .detach()
         .numpy()
     )
+    cv2.imshow("mask", seg_pred[0])
     obj.setModelviewMatrix(rough_pred_pose)
     obj.findVisibleSamplePoint()
     obj.getVisiblePointCloud()
 
     opticalFlow = torch.sigmoid(opticalFlow)
 
-    padding = Variable(
-        torch.zeros(opticalFlow.shape[0], 1, opticalFlow.shape[2], opticalFlow.shape[3])
-    ).cuda()
+    # padding = Variable(
+    #     torch.zeros(opticalFlow.shape[0], 1, opticalFlow.shape[2], opticalFlow.shape[3])
+    # ).cuda()
 
-    opticalFlow = torch.cat((opticalFlow, padding), 1)
+    # opticalFlow = torch.cat((opticalFlow, padding), 1)
 
     opticalFlow = opticalFlow * (mask_img.cuda() == 1.0)
 
@@ -167,25 +168,25 @@ def poseEstimationWithFlow(
                 )
     cv2.imshow("test", test_img)
 
-    objectPoints = np.array(objectPoints)
-    imagePoints = np.array(imagePoints)
+    # objectPoints = np.array(objectPoints)
+    # imagePoints = np.array(imagePoints)
 
-    _, rvec, tvec = cv2.solvePnP(
-        objectPoints,
-        imagePoints,
-        CFG.CAMERA_MATRIX,
-        np.zeros((4, 1)),
-        flags=cv2.SOLVEPNP_EPNP,
-    )
+    # _, rvec, tvec = cv2.solvePnP(
+    #     objectPoints,
+    #     imagePoints,
+    #     CFG.CAMERA_MATRIX,
+    #     np.zeros((4, 1)),
+    #     flags=cv2.SOLVEPNP_EPNP,
+    # )
 
-    rotMat, _ = cv2.Rodrigues(rvec)
-    pnppose = np.identity(4)
-    pnppose[:3, :3] = rotMat
-    pnppose[0, 3] = tvec[0][0]
-    pnppose[1, 3] = tvec[1][0]
-    pnppose[2, 3] = tvec[2][0]
+    # rotMat, _ = cv2.Rodrigues(rvec)
+    # pnppose = np.identity(4)
+    # pnppose[:3, :3] = rotMat
+    # pnppose[0, 3] = tvec[0][0]
+    # pnppose[1, 3] = tvec[1][0]
+    # pnppose[2, 3] = tvec[2][0]
 
-    return pnppose
+    # return pnppose
 
 
 def testData(obj, yolo_model, rot_model, refine_model, d):
@@ -266,7 +267,7 @@ def testData(obj, yolo_model, rot_model, refine_model, d):
         rough_pred_pose = obj.label2pose(viewpt, rot, offset, 0.5)
 
         obj.setModelviewMatrix(rough_pred_pose)
-        obj.findVisibleSamplePoint()
+        obj.renderVisibleFaces()
         _, _, w_temp, h_temp = cv2.boundingRect(obj.getVisibleArea())
         currentDiag = math.sqrt(w_temp ** 2 + h_temp ** 2)
 
@@ -274,23 +275,21 @@ def testData(obj, yolo_model, rot_model, refine_model, d):
             viewpt, rot, offset, 0.5 * predictDiag / currentDiag * DIAG_PARAM
         )
 
-        obj.setModelviewMatrix(rough_pred_pose)
-        obj.findVisibleSamplePoint()
-
-        rough_demo = demo.copy()
-        # draw image
-        for p in obj.sharp_2d_pts:
-            p = (int(p[0]), int(p[1]))
-            rough_demo = cv2.circle(
-                rough_demo, p, radius=0, color=(0, 255, 0), thickness=-1
-            )
-        cv2.imshow("rough pose", rough_demo)
-        # cv2.waitKey(0)
+        numOfRefine = 10
 
         # # pose refinement
-        for t in range(5):
+        for t in range(numOfRefine):
             obj.setModelviewMatrix(rough_pred_pose)
             obj.findVisibleSamplePoint()
+
+            refine_demo = demo.copy()
+
+            # # draw image
+            for p in obj.sharp_2d_pts:
+                p = (int(p[0]), int(p[1]))
+                refine_demo = cv2.circle(
+                    refine_demo, p, radius=0, color=(0, 0, 255), thickness=-1
+                )
 
             horizontalR_ori, verticalR_ori = obj.getCenterAngle(rough_pred_pose)
 
@@ -383,6 +382,7 @@ def testData(obj, yolo_model, rot_model, refine_model, d):
                 (CFG.IMG_SIZE, CFG.IMG_SIZE),
                 interpolation=cv2.INTER_AREA,
             )
+            cv2.imshow("mask img", mask_img)
             mask_img = mask_img[:, :, np.newaxis].transpose(2, 0, 1)
 
             mask_img = Variable(torch.from_numpy(mask_img)).float() / 255.0
@@ -414,6 +414,23 @@ def testData(obj, yolo_model, rot_model, refine_model, d):
             rough_pose_at_center = torch.from_numpy(rough_pose_at_center)
             rough_pose_at_center = rough_pose_at_center.unsqueeze(0)
 
+            # poseEstimationWithFlow(
+            #     obj,
+            #     rough_pred_pose,
+            #     segmentMask,
+            #     opticalFlow,
+            #     mask_img,
+            #     test_img,
+            #     ex,
+            #     ey,
+            #     rescaleValue,
+            # )
+
+            # if t == numOfRefine - 1:
+            # get the confidence
+            confidence = getConfid(segmentMask, opticalFlow, mask_img,)
+            print("confidence ", confidence)
+
             pred_pose = getPredictPose(
                 rough_pose_at_center,
                 rot,
@@ -426,36 +443,16 @@ def testData(obj, yolo_model, rot_model, refine_model, d):
                 pred_pose[0].detach().cpu().numpy(), -horizontalR_ori, -verticalR_ori,
             )
 
-            pnppose = poseEstimationWithFlow(
-                obj,
-                rough_pred_pose,
-                segmentMask,
-                opticalFlow,
-                mask_img,
-                test_img,
-                ex,
-                ey,
-                rescaleValue,
-            )
+            # refine_demo = demo.copy()
+            # obj.setModelviewMatrix(pred_pose)
+            # obj.findVisibleSamplePoint()
 
-            refine_demo = demo.copy()
-            obj.setModelviewMatrix(pred_pose)
-            obj.findVisibleSamplePoint()
-            # draw image
-            for p in obj.sharp_2d_pts:
-                p = (int(p[0]), int(p[1]))
-                refine_demo = cv2.circle(
-                    refine_demo, p, radius=0, color=(0, 255, 0), thickness=-1
-                )
-
-            obj.setModelviewMatrix(pnppose)
-            obj.findVisibleSamplePoint()
-            # draw image
-            for p in obj.sharp_2d_pts:
-                p = (int(p[0]), int(p[1]))
-                refine_demo = cv2.circle(
-                    refine_demo, p, radius=0, color=(0, 0, 255), thickness=-1
-                )
+            # # draw image
+            # for p in obj.sharp_2d_pts:
+            #     p = (int(p[0]), int(p[1]))
+            #     refine_demo = cv2.circle(
+            #         refine_demo, p, radius=0, color=(0, 0, 255), thickness=-1
+            #     )
 
             cv2.imshow("demo", refine_demo)
             cv2.waitKey(0)

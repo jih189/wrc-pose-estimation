@@ -33,8 +33,8 @@ obj = OM.ObjectModel()
 obj.loadObjectCADModel(CFG.CAD_MODEL)
 obj.setIntrinsicMatrix(CFG.CAMERA_MATRIX)
 
-obj.determineSharpEdges(0.6)
-obj.generateSamplePoints(0.00001, 0.00001)
+obj.determineSharpEdges(0.4)
+obj.generateSamplePoints(0.0001, 0.0001)
 
 ###################### yolo ########################
 webcam = "4"
@@ -64,8 +64,13 @@ rot_model = torch.load(CFG.BEST_MODEL_ROT)
 rot_model.eval()
 
 ################# refine net ###########################
-refine_model = DeepIM()
-refine_model = torch.load(CFG.BEST_MODEL_ITERATIVE_REFINE)
+refine_model = DeepIM().cuda()
+# refine_model = torch.load(CFG.BEST_MODEL_ITERATIVE_REFINE)
+refine_model.load_state_dict(
+    torch.load(
+        "/home/cogrob-wrc/wrc-pose-estimation/best_model_iterative_refine_pulley-test.pth"
+    )
+)
 refine_model.eval()
 
 
@@ -170,7 +175,7 @@ def detect(object_id, img, estimated_depth):
     if foundObject:
         # rot classifier
         upperleft, lowerright = OM.get_centered_crop(croptopleft, croplowright)
-        l = int(lowerright[0]) - int(upperleft[0])
+        crop_width = int(lowerright[0]) - int(upperleft[0])
 
         # crop the image for rot classifier
         img_crop = np.zeros(
@@ -216,14 +221,14 @@ def detect(object_id, img, estimated_depth):
         position = (
             torch.sigmoid(output[:, viewpt_class + rot_class :]).data.cpu().numpy()
         )
-        position *= l
+        position *= crop_width
         offset = position[:, :2]
         offset = np.array(upperleft) + offset.reshape(2) - principle_pt
 
         rough_pred_pose = obj.label2pose(viewpt, rot, offset, estimated_depth)
 
         # pose refinement
-        for t in range(5):
+        for t in range(20):
             obj.setModelviewMatrix(rough_pred_pose)
             obj.findVisibleSamplePoint()
 
@@ -322,7 +327,7 @@ def detect(object_id, img, estimated_depth):
 
             flow_inputData = torch.cat((mask_img, edge_img, crop_img), 1,)
 
-            flow_input = Variable(flow_inputData)
+            flow_input = Variable(flow_inputData).cuda()
 
             rot, trans, dist, opticalFlow, segmentMask = refine_model(flow_input)
 
@@ -356,17 +361,18 @@ def detect(object_id, img, estimated_depth):
             rough_pose_at_center = rough_pose_at_center.unsqueeze(0)
 
             # get the confidence
-            confidence = getConfid(
-                obj,
-                rough_pred_pose,
-                segmentMask,
-                opticalFlow,
-                mask_img,
-                ex,
-                ey,
-                rescaleValue,
-            )
-            print("confidence = ", confidence)
+            if t == 9:
+                confidence = getConfid(segmentMask, opticalFlow, mask_img,)
+                print("confidence = ", confidence)
+                cv2.putText(
+                    demo,
+                    "confidence score = " + str(confidence * 100.0),
+                    (0, 60),
+                    cv2.FONT_HERSHEY_SIMPLEX,
+                    1.5,
+                    (0, 0, 255),
+                    2,
+                )
 
             pred_pose = getPredictPose(
                 rough_pose_at_center,
@@ -386,11 +392,14 @@ def detect(object_id, img, estimated_depth):
 
         obj.setModelviewMatrix(pred_pose)
         obj.findVisibleSamplePoint()
+
         for p in obj.sharp_2d_pts:
             p = (int(p[0]), int(p[1]))
             demo = cv2.circle(demo, p, radius=2, color=(0, 0, 255), thickness=-1)
-        cv2.imshow("demo", demo)
-        cv2.waitKey(0)
+        cv2.namedWindow("window", cv2.WND_PROP_FULLSCREEN)
+        cv2.setWindowProperty("window", cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN)
+        cv2.imshow("window", demo)
+        cv2.waitKey(2000)
 
         return pred_pose, confidence
     else:

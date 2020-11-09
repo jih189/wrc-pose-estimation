@@ -589,6 +589,38 @@ class ObjectModel:
                         (y, x, result[y, x, 0], result[y, x, 1], result[y, x, 2])
                     )
 
+    def getVisiblePointCloud_test(self):
+        self.pointcloud.clear()
+        model = glGetDoublev(GL_MODELVIEW_MATRIX)
+        proj = glGetDoublev(GL_PROJECTION_MATRIX)
+        view = glGetIntegerv(GL_VIEWPORT)
+        z = glReadPixels(0, 0, self.width, self.height, GL_DEPTH_COMPONENT, GL_FLOAT)
+
+        z = np.frombuffer(z, np.float32).reshape(self.height, self.width, 1)
+
+        result = np.zeros((self.height, self.width, 3))  # x y z
+        for x in range(self.width):
+            for y in range(self.height):
+                x3d, y3d, z3d = gluUnProject(x, y, z[y, x], model, proj, view)
+                result[y, x, 0] = x3d
+                result[y, x, 1] = y3d
+                result[y, x, 2] = z3d
+
+        result = cv2.flip(result, 0)
+        for x in range(self.width):
+            for y in range(self.height):
+                if (
+                    result[y, x, 0] > -3.0
+                    and result[y, x, 0] < 3.0
+                    and result[y, x, 1] > -3.0
+                    and result[y, x, 1] < 3.0
+                    and result[y, x, 2] > -3.0
+                    and result[y, x, 2] < 3.0
+                ):
+                    self.pointcloud.append(
+                        (y, x, result[y, x, 0], result[y, x, 1], result[y, x, 2])
+                    )
+
     # after the object is rendered, the optical flow can be calculated to the
     def getOptFlowWithPoses(self, height, width, targetpose):
 
@@ -634,6 +666,24 @@ class ObjectModel:
             )
 
         return img
+
+    def renderVisibleFaces(self):
+        glPushMatrix()
+
+        # disable writing to depth buffer
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
+
+        # Draw the face (fill) with offset
+        glPolygonMode(GL_FRONT_AND_BACK, GL_FILL)
+        glEnable(GL_POLYGON_OFFSET_FILL)
+        glPolygonOffset(1.0, 1.0)
+        glColor3f(1.0, 1.0, 1.0)
+
+        # draw object model saved in display list
+        glCallList(self.dl)
+
+        glDisable(GL_POLYGON_OFFSET_FILL)
+        glPopMatrix()
 
     def findVisibleSamplePoint(self):
         glPushMatrix()
@@ -708,6 +758,84 @@ class ObjectModel:
                 )
                 pt2 = self.project3Dto2D(tuple(self.sharp_sample_points[i]), self.pose)
                 self.sharp_2d_pts.append(pt2)
+
+        glDeleteQueriesARB(vQueries)
+        glPopMatrix()
+
+    def findVisibleSamplePoint_test(self):
+        glPushMatrix()
+
+        # disable writing to depth buffer
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
+
+        # Draw the face (fill) with offset
+        glPolygonMode(GL_FRONT_AND_BACK, GL_FILL)
+        glEnable(GL_POLYGON_OFFSET_FILL)
+        glPolygonOffset(1.0, 1.0)
+        glColor3f(1.0, 1.0, 1.0)
+
+        # draw object model saved in display list
+        glCallList(self.dl)
+
+        glDisable(GL_POLYGON_OFFSET_FILL)
+
+        # Occlusion test
+        N = len(self.sharp_sample_points)  # number of test points
+        if N <= 0:
+            print("no sample points!!!")
+            return
+
+        # create a query
+        vQueries = glGenQueriesARB(N)
+        # Turn on occlusion testing
+        # disable rendering to screen (set the color mask of all channels to False)
+        glColorMask(GL_FALSE, GL_FALSE, GL_FALSE, GL_FALSE)
+        glDepthMask(GL_FALSE)
+        glPointSize(1)
+
+        k = 0
+        i = 0
+
+        while i < N:
+            glBeginQueryARB(GL_SAMPLES_PASSED_ARB, vQueries[k])
+            k += 1
+            glBegin(GL_POINTS)
+            glVertex3f(
+                self.sharp_sample_points[i][0],
+                self.sharp_sample_points[i][1],
+                self.sharp_sample_points[i][2],
+            )
+            glEnd()
+            glEndQueryARB(GL_SAMPLES_PASSED_ARB)
+            i += 1
+
+        i = int(N * 3 / 4)
+
+        ready = 0
+        while not ready:
+            ready = glGetQueryObjectivARB(vQueries[i], GL_QUERY_RESULT_AVAILABLE_ARB)
+
+        # turn off occlusion testing
+        glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE)
+        glDepthMask(GL_TRUE)
+
+        # k = 0  # start index
+
+        # self.visible_sharpedge_samplepoint.clear()
+        # self.visible_sharpedge_samplepoint_edge_membership.clear()
+
+        # # clear sharp 2d points
+        # self.sharp_2d_pts.clear()
+        # for i in range(N):
+        #     passed = glGetQueryObjectuivARB(vQueries[k], GL_QUERY_RESULT_ARB)
+        #     k += 1
+        #     if passed:
+        #         self.visible_sharpedge_samplepoint.append(self.sharp_sample_points[i])
+        #         self.visible_sharpedge_samplepoint_edge_membership.append(
+        #             self.sharp_sample_points_edge_indices[i]
+        #         )
+        #         pt2 = self.project3Dto2D(tuple(self.sharp_sample_points[i]), self.pose)
+        #         self.sharp_2d_pts.append(pt2)
 
         glDeleteQueriesARB(vQueries)
         glPopMatrix()
