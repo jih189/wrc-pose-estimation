@@ -1,8 +1,8 @@
 # this is the configuration file of pose estimation
 import numpy as np
+import os
 
-CURRENT_POSE_ESITMATION_DIR = "/home/cogrob-wrc/wrc-pose-estimation/"
-
+CURRENT_POSE_ESITMATION_DIR = os.getcwd() + "/"
 
 # OBJ_NAME = "pulley"
 # IMAGE_SAVE_PATH = CURRENT_POSE_ESITMATION_DIR + "data/images/pulley/"
@@ -133,7 +133,7 @@ CAMERA_MATRIX = np.array(
 # BEST_MODEL_ITERATIVE_REFINE = CURRENT_POSE_ESITMATION_DIR + "weights/best_model_iterative_refine_pulley-test.pth"
 
 
-# # camera matrix of wrist camera
+# camera matrix of wrist camera
 # CAMERA_MATRIX = np.array(
 #     [
 #         [1390.6298269250192, 0, 665.4334864497848],

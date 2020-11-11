@@ -87,7 +87,6 @@ if __name__ == "__main__":
     obj.generateSamplePoints(0.00001, 0.00001)
 
     ###################### yolo ########################
-    webcam = "4"
     cfg = "cfg/yolov3-tiny3.cfg"
     weights = "weights/best_yolo_model_wrc.pt"
     conf_thres = 0.3
@@ -95,7 +94,7 @@ if __name__ == "__main__":
     device = "cuda"
     obj_names = "data/wrs-wrc.names"
     image_size = 416
-    DIAG_PARAM = 0.3
+    DIAG_PARAM = 1.0
 
     names = load_classes(obj_names)
     colors = [[random.randint(0, 255) for _ in range(3)] for _ in range(len(names))]
@@ -127,7 +126,7 @@ if __name__ == "__main__":
     refine_model.eval()
 
     # read image
-    frame = cv2.imread("input-4.jpg")
+    frame = cv2.imread("input-8.jpg")
     demo = frame.copy()
     rot_frame = frame.copy()
     refine_frame = frame.copy()
@@ -168,7 +167,7 @@ if __name__ == "__main__":
         for *xyxy, conf, cls in pred:
             label = "%s %.2f" % (names[int(cls)], conf)
             # plot_one_box(xyxy, demo, label=label, color=colors[int(cls)])
-            if names[int(cls)] == "pulley":
+            if names[int(cls)] == "Shaft":
                 foundObject = True
                 croptopleft = [
                     int(xyxy[0].cpu().detach().numpy()),
@@ -186,6 +185,7 @@ if __name__ == "__main__":
             (croplowright[0] - croptopleft[0]) ** 2
             + (croplowright[1] - croptopleft[1]) ** 2
         )
+
         # rot classifier
         upperleft, lowerright = OM.get_centered_crop(croptopleft, croplowright)
         crop_width = int(lowerright[0]) - int(upperleft[0])
@@ -240,15 +240,33 @@ if __name__ == "__main__":
         # get the rough pose from view point, rotation, offset, and depth
         rough_pred_pose = obj.label2pose(viewpt, rot, offset, 0.5)
 
+        temp_demo = demo.copy()
+
         obj.setModelviewMatrix(rough_pred_pose)
         obj.renderVisibleFaces()
-        _, _, w_temp, h_temp = cv2.boundingRect(obj.getVisibleArea())
+        bx, by, w_temp, h_temp = cv2.boundingRect(obj.getVisibleArea())
 
         currentDiag = math.sqrt(w_temp ** 2 + h_temp ** 2)
 
         rough_pred_pose = obj.label2pose(
-            viewpt, rot, offset, 0.5 * objectDiag / currentDiag * DIAG_PARAM
+            viewpt, rot, offset, 0.5 * currentDiag / objectDiag * DIAG_PARAM
         )
+
+        obj.setModelviewMatrix(rough_pred_pose)
+        obj.findVisibleSamplePoint()
+
+        # test
+        for p in obj.sharp_2d_pts:
+            temp_demo = cv2.circle(
+                temp_demo,
+                (int(p[0]), int(p[1])),
+                radius=1,
+                color=(255, 0, 0),
+                thickness=-1,
+            )
+        cv2.imshow("test", temp_demo)
+        cv2.waitKey(0)
+
         # rough_pose_estimation_end = time.time()
         # print("time for rought pose estimation: ")
         # print(rough_pose_estimation_end - rough_pose_estimation_start)

@@ -17,7 +17,7 @@ np.seterr(divide="ignore", invalid="ignore")
 
 # wandb.init(project="wrc-rot-classifier")
 
-batch_size = 32
+batch_size = 64
 epochs = 500
 lr = 2e-4
 momentum = 0.9
@@ -55,7 +55,7 @@ viewpt_criterion = nn.CrossEntropyLoss(weight=vp_class_weights)
 rot_class_weights = torch.FloatTensor(rot_weights).cuda()
 rot_criterion = nn.CrossEntropyLoss(weight=rot_class_weights)
 offset_criterion = nn.MSELoss(reduction="sum")
-rot_lamda = 2.0
+rot_lamda = 5.0
 offset_lamda = 1.0
 
 optimizer = optim.SGD(model.parameters(), lr=lr, momentum=momentum)
