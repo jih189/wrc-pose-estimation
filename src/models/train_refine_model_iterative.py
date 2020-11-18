@@ -35,7 +35,7 @@ testTrigger = Value(c_bool, False)
 
 # refine parameters
 batch_size = 64
-epochs = 90
+epochs = 120
 lr = 4e-5
 momentum = 0.9
 w_decay = 0.1
@@ -51,12 +51,12 @@ pool_dir = "pred_temp/"
 # initiate the net
 mymodel = DeepIM().cuda()
 mymodel = nn.DataParallel(mymodel)
-mymodel.module.flownet.load_state_dict(
-    torch.load(CFG.BEST_MODEL_FLOWNET).module.state_dict()
-)
-mymodel.module.flownet.eval()
+# mymodel.module.flownet.load_state_dict(
+#     torch.load(CFG.BEST_MODEL_FLOWNET).module.state_dict()
+# )
+# mymodel.module.flownet.eval()
 
-# mymodel = torch.load(CFG.BEST_MODEL_ITERATIVE_REFINE)
+mymodel = torch.load(CFG.BEST_MODEL_ITERATIVE_REFINE)
 
 seg_criterion = nn.CrossEntropyLoss(reduce=False)
 
@@ -82,7 +82,7 @@ def init(sampleValue):
     obj.loadObjectCADModel(CFG.CAD_MODEL)
 
     obj.determineSharpEdges(0.8)
-    obj.generateSamplePoints(0.0001, sampleValue)
+    obj.generateSamplePoints(0.00001, sampleValue)
     return obj
 
 
@@ -689,7 +689,7 @@ def generateData(obj, sample_points):
                 pool_dir + "{:06d}".format(savedIndex) + "demo.png", original_img,
             )
 
-            global_pred_pose = OM.symmetricRemove_housing(global_pred_pose)
+            global_pred_pose = OM.symmetricRemove(global_pred_pose)
 
             np.save(
                 pool_dir + "{:06d}".format(savedIndex) + "initPose.npy",
@@ -744,7 +744,7 @@ def main():
         )
 
     learningrate = lr
-    numOfTotalIteration = 6
+    numOfTotalIteration = 8
 
     for iteration in range(numOfTotalIteration):
         # # generate the processed data
@@ -839,7 +839,7 @@ def main():
             elif pre_loss > valtem:
                 torch.save(mymodel, CFG.BEST_MODEL_ITERATIVE_REFINE)
                 pre_loss = valtem
-            if (epoch + 1) % 30 == 0:
+            if (epoch + 1) % 40 == 0:
                 scheduler.step()
 
         print("training process done for interation ", iteration)

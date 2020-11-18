@@ -11,7 +11,6 @@ import math
 from scipy.spatial.transform import Rotation as R
 import torch
 from torch.nn import functional as F
-import time
 import src.configuration as CFG
 
 import sys
