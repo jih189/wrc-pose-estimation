@@ -5,38 +5,33 @@ from ar_markers import detect_markers
 import src.common.object_model as OM
 import src.configuration as CFG
 import os
+from scipy.spatial.transform import Rotation as R
 
 # ignore warming
 np.seterr(divide="ignore", invalid="ignore")
 
 # you need to update the table points for your case###
-tablex = 0.12
+tablex = -0.04
 tabley = -0.0045
 tablez = 0.0
-# tablePoints = [
-#     [0.019565+tablex, 0.0+tabley, -0.019565+tablez],
-#     [0.019565+tablex, 0.0+tabley, -0.006521+tablez],
-#     [0.019565+tablex, 0.0+tabley, 0.006521+tablez],
-#     [0.019565+tablex, 0.0+tabley, 0.019565+tablez],
-#     [0.006521+tablex, 0.0+tabley, -0.019565+tablez],
-#     [0.006521+tablex, 0.0+tabley, -0.006521+tablez],
-#     [0.006521+tablex, 0.0+tabley, 0.006521+tablez],
-#     [0.006521+tablex, 0.0+tabley, 0.019565+tablez],
-#     [-0.006521+tablex, 0.0+tabley, -0.019565+tablez],
-#     [-0.006521+tablex, 0.0+tabley, -0.006521+tablez],
-#     [-0.006521+tablex, 0.0+tabley, 0.006521+tablez],
-#     [-0.006521+tablex, 0.0+tabley, 0.019565+tablez],
-#     [-0.019565+tablex, 0.0+tabley, -0.019565+tablez],
-#     [-0.019565+tablex, 0.0+tabley, -0.006521+tablez],
-#     [-0.019565+tablex, 0.0+tabley, 0.006521+tablez],
-#     [-0.019565+tablex, 0.0+tabley, 0.019565+tablez],
-# ]
-# tablePoints = [
-#     [0.03386, -0.00, -0.11386],
-#     [0.03386, -0.00, -0.05386],
-#     [-0.03386, -0.00, -0.11386],
-#     [-0.03386, -0.00, -0.05386],
-# ]
+tablePoints_base = [
+    [0.019565, 0.0, -0.019565],
+    [0.019565, 0.0, -0.006521],
+    [0.019565, 0.0, 0.006521],
+    [0.019565, 0.0, 0.019565],
+    [0.006521, 0.0, -0.019565],
+    [0.006521, 0.0, -0.006521],
+    [0.006521, 0.0, 0.006521],
+    [0.006521, 0.0, 0.019565],
+    [-0.006521, 0.0, -0.019565],
+    [-0.006521, 0.0, -0.006521],
+    [-0.006521, 0.0, 0.006521],
+    [-0.006521, 0.0, 0.019565],
+    [-0.019565, 0.0, -0.019565],
+    [-0.019565, 0.0, -0.006521],
+    [-0.019565, 0.0, 0.006521],
+    [-0.019565, 0.0, 0.019565],
+]
 #######################################################
 
 dist_coefs = np.zeros((4, 1))
@@ -78,24 +73,15 @@ if __name__ == "__main__":
     usingMarker = False
     
     while True:
-        tablePoints = [
-            [0.019565+tablex, 0.0+tabley, -0.019565+tablez],
-            [0.019565+tablex, 0.0+tabley, -0.006521+tablez],
-            [0.019565+tablex, 0.0+tabley, 0.006521+tablez],
-            [0.019565+tablex, 0.0+tabley, 0.019565+tablez],
-            [0.006521+tablex, 0.0+tabley, -0.019565+tablez],
-            [0.006521+tablex, 0.0+tabley, -0.006521+tablez],
-            [0.006521+tablex, 0.0+tabley, 0.006521+tablez],
-            [0.006521+tablex, 0.0+tabley, 0.019565+tablez],
-            [-0.006521+tablex, 0.0+tabley, -0.019565+tablez],
-            [-0.006521+tablex, 0.0+tabley, -0.006521+tablez],
-            [-0.006521+tablex, 0.0+tabley, 0.006521+tablez],
-            [-0.006521+tablex, 0.0+tabley, 0.019565+tablez],
-            [-0.019565+tablex, 0.0+tabley, -0.019565+tablez],
-            [-0.019565+tablex, 0.0+tabley, -0.006521+tablez],
-            [-0.019565+tablex, 0.0+tabley, 0.006521+tablez],
-            [-0.019565+tablex, 0.0+tabley, 0.019565+tablez],
-        ]
+        transform = np.identity(4)
+        transform[:3,:3] = (R.from_euler("X", 3.14159)).as_matrix()
+        transform[0][3] = tablex
+        transform[1][3] = tabley
+        transform[2][3] = tablez
+        points = np.array(tablePoints_base)
+        points_h = np.append(points, np.ones((points.shape[0],1)), 1).T
+        tablePoints = np.delete(transform.dot(points_h).T, -1, axis=1).tolist()
+
         if capture.isOpened():  # try to get the first frame
             _, frame = capture.read()
         else:
@@ -306,9 +292,9 @@ if __name__ == "__main__":
         elif ch & 0xFF == ord("q"):
             break
         elif ch & 0xFF == ord("m"):
-            tabley += 0.001
-        elif ch & 0xFF == ord("n"):
             tabley -= 0.001
+        elif ch & 0xFF == ord("n"):
+            tabley += 0.001
 
     # When everything done, release the capture
     capture.release()
