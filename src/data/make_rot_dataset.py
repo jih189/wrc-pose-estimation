@@ -33,8 +33,8 @@ def init():
     obj.setIntrinsicMatrix(CFG.CAMERA_MATRIX)
     obj.loadObjectCADModel(CFG.CAD_MODEL)
 
-    obj.determineSharpEdges(0.8)
-    obj.generateSamplePoints(0.0001)
+    obj.determineSharpEdges(0.6)
+    obj.generateSamplePoints(0.001)
 
     return obj
 
@@ -136,93 +136,105 @@ def process_data(args):
             crop_upperleft, crop_lowerright = OM.get_centered_crop(
                 upperleft, lowerright
             )
+            for b in range(3):
+                try:
+                    brightness = random.uniform(
+                        -CFG.COLOR_AUGMENTATION_BRIGHTNESS,
+                        CFG.COLOR_AUGMENTATION_BRIGHTNESS,
+                    )
+                    contrast = random.uniform(
+                        1.0 - CFG.COLOR_AUGMENTATION_CONTRAST,
+                        1.0 + CFG.COLOR_AUGMENTATION_CONTRAST,
+                    )
 
-            try:
-                cropImg = np.zeros(
-                    (
-                        crop_lowerright[1] - crop_upperleft[1],
-                        crop_lowerright[0] - crop_upperleft[0],
-                        3,
-                    ),
-                    np.uint8,
-                )
-                upperleft_crop_inner = [
-                    max(0, crop_upperleft[0]),
-                    max(0, crop_upperleft[1]),
-                ]
-                lowerright_crop_inner = [
-                    min(rot_img.shape[1], crop_lowerright[0]),
-                    min(rot_img.shape[0], crop_lowerright[1]),
-                ]
-                cropImg[
-                    upperleft_crop_inner[1]
-                    - crop_upperleft[1] : lowerright_crop_inner[1]
-                    - crop_upperleft[1],
-                    upperleft_crop_inner[0]
-                    - crop_upperleft[0] : lowerright_crop_inner[0]
-                    - crop_upperleft[0],
-                ] = rot_img[
-                    int(upperleft_crop_inner[1]) : int(lowerright_crop_inner[1]),
-                    int(upperleft_crop_inner[0]) : int(lowerright_crop_inner[0]),
-                ]
+                    rot_contrast_img = rot_img * contrast + brightness
+                    rot_contrast_img = np.uint8(np.clip(rot_contrast_img, 0, 255))
 
-                # get view point, inplance rotation, offset from center, and depth from the pose
-                viewPoint, inplaneRotation, offsetFromCenter, depth = obj.getLabel()
-                inplaneRotation = inplaneRotation % (2 * np.pi) / (np.pi / 30)
-                if np.isnan(inplaneRotation):
-                    # the inplane rotation is invalid when y axis is pointing to camera
-                    continue
-            except Exception as e:
-                print("error in cropping image!!!")
-                print(str(e))
-                testTrigger.value = True
-                cv2.waitKey(0)
-
-            with output_counter.get_lock():
-                current_output_index = output_counter.value
-                output_counter.value += 1
-
-            np.save(
-                output_filepath
-                + "bounding"
-                + "{:06d}".format(current_output_index)
-                + ".npy",
-                np.array(
-                    [
-                        int(crop_upperleft[0]),
-                        int(crop_upperleft[1]),
-                        int(crop_lowerright[0]),
-                        int(crop_lowerright[1]),
+                    cropImg = np.zeros(
+                        (
+                            crop_lowerright[1] - crop_upperleft[1],
+                            crop_lowerright[0] - crop_upperleft[0],
+                            3,
+                        ),
+                        np.uint8,
+                    )
+                    upperleft_crop_inner = [
+                        max(0, crop_upperleft[0]),
+                        max(0, crop_upperleft[1]),
                     ]
-                ),
-            )
+                    lowerright_crop_inner = [
+                        min(rot_contrast_img.shape[1], crop_lowerright[0]),
+                        min(rot_contrast_img.shape[0], crop_lowerright[1]),
+                    ]
+                    cropImg[
+                        upperleft_crop_inner[1]
+                        - crop_upperleft[1] : lowerright_crop_inner[1]
+                        - crop_upperleft[1],
+                        upperleft_crop_inner[0]
+                        - crop_upperleft[0] : lowerright_crop_inner[0]
+                        - crop_upperleft[0],
+                    ] = rot_contrast_img[
+                        int(upperleft_crop_inner[1]) : int(lowerright_crop_inner[1]),
+                        int(upperleft_crop_inner[0]) : int(lowerright_crop_inner[0]),
+                    ]
 
-            np.save(
-                output_filepath + "{:06d}".format(current_output_index) + ".npy",
-                rot_pose,
-            )
+                    # get view point, inplance rotation, offset from center, and depth from the pose
+                    viewPoint, inplaneRotation, offsetFromCenter, depth = obj.getLabel()
+                    inplaneRotation = inplaneRotation % (2 * np.pi) / (np.pi / 30)
+                    if np.isnan(inplaneRotation):
+                        # the inplane rotation is invalid when y axis is pointing to camera
+                        continue
+                except Exception as e:
+                    print("error in cropping image!!!")
+                    print(str(e))
+                    testTrigger.value = True
+                    cv2.waitKey(0)
 
-            cv2.imwrite(
-                output_filepath
-                + "crop"
-                + "{:06d}".format(current_output_index)
-                + ".png",
-                cropImg,
-            )
+                with output_counter.get_lock():
+                    current_output_index = output_counter.value
+                    output_counter.value += 1
 
-            cv2.imwrite(
-                output_filepath + "{:06d}".format(current_output_index) + ".png",
-                rot_img,
-            )
+                np.save(
+                    output_filepath
+                    + "bounding"
+                    + "{:06d}".format(current_output_index)
+                    + ".npy",
+                    np.array(
+                        [
+                            int(crop_upperleft[0]),
+                            int(crop_upperleft[1]),
+                            int(crop_lowerright[0]),
+                            int(crop_lowerright[1]),
+                        ]
+                    ),
+                )
 
-            inplaneRotation = int(inplaneRotation)
-            vpidx = OM.cal_idx(viewPoint)
+                np.save(
+                    output_filepath + "{:06d}".format(current_output_index) + ".npy",
+                    rot_pose,
+                )
 
-            with vparr.get_lock():
-                vparr[vpidx] += 1
+                cv2.imwrite(
+                    output_filepath
+                    + "crop"
+                    + "{:06d}".format(current_output_index)
+                    + ".png",
+                    cropImg,
+                )
 
-            with rotarr.get_lock():
-                rotarr[inplaneRotation] += 1
+                cv2.imwrite(
+                    output_filepath + "{:06d}".format(current_output_index) + ".png",
+                    rot_contrast_img,
+                )
+
+                inplaneRotation = int(inplaneRotation)
+                vpidx = OM.cal_idx(viewPoint)
+
+                with vparr.get_lock():
+                    vparr[vpidx] += 1
+
+                with rotarr.get_lock():
+                    rotarr[inplaneRotation] += 1
 
 
 @click.command()

@@ -16,26 +16,26 @@ CURRENT_POSE_ESITMATION_DIR = os.getcwd() + "/"
 # BEST_MODEL_REFINE = CURRENT_POSE_ESITMATION_DIR + "weights/best_model_refine_pulley.pth"
 
 
-# OBJ_NAME = "shaft"
-# IMAGE_SAVE_PATH = CURRENT_POSE_ESITMATION_DIR + "data/images/shaft/"
-# VERIFY_IMAGE_PATH = CURRENT_POSE_ESITMATION_DIR + "data/raw/shaft/"
-# PROCESSED_DATA_PATH = CURRENT_POSE_ESITMATION_DIR + "data/processed/shaft_rot/"
-# REFINE_DATA_PATH = CURRENT_POSE_ESITMATION_DIR + "data/processed/shaft_refine/"
-# CAD_MODEL = CURRENT_POSE_ESITMATION_DIR + "data/mesh/SSFHRT10-75-M4-FC55-G20.obj"
-# SAMPLE_FACE_MODEL = (
-#     CURRENT_POSE_ESITMATION_DIR + "data/mesh/SSFHRT10-75-M4-FC55-G20.obj"
-# )
-# BEST_MODEL_FLOWNET = (
-#     CURRENT_POSE_ESITMATION_DIR + "weights/best_model_flownet_shaft.pth"
-# )
-# BEST_MODEL_ROT = CURRENT_POSE_ESITMATION_DIR + "weights/best_model_rot_shaft.pth"
-# BEST_MODEL_REFINE = CURRENT_POSE_ESITMATION_DIR + "weights/best_model_refine_shaft.pth"
-# REFINE_ITERATIVE_DATA_PATH = (
-#     CURRENT_POSE_ESITMATION_DIR + "data/processed/shaft_iterative_refine/"
-# )
-# BEST_MODEL_ITERATIVE_REFINE = (
-#     CURRENT_POSE_ESITMATION_DIR + "weights/best_model_iterative_refine_shaft.pth"
-# )
+OBJ_NAME = "shaft"
+IMAGE_SAVE_PATH = CURRENT_POSE_ESITMATION_DIR + "data/images/shaft/"
+VERIFY_IMAGE_PATH = CURRENT_POSE_ESITMATION_DIR + "data/raw/shaft/"
+PROCESSED_DATA_PATH = CURRENT_POSE_ESITMATION_DIR + "data/processed/shaft_rot/"
+REFINE_DATA_PATH = CURRENT_POSE_ESITMATION_DIR + "data/processed/shaft_refine/"
+CAD_MODEL = CURRENT_POSE_ESITMATION_DIR + "data/mesh/SSFHRT10-75-M4-FC55-G20.obj"
+SAMPLE_FACE_MODEL = (
+    CURRENT_POSE_ESITMATION_DIR + "data/mesh/SSFHRT10-75-M4-FC55-G20.obj"
+)
+BEST_MODEL_FLOWNET = (
+    CURRENT_POSE_ESITMATION_DIR + "weights/best_model_flownet_shaft.pth"
+)
+BEST_MODEL_ROT = CURRENT_POSE_ESITMATION_DIR + "weights/best_model_rot_shaft.pth"
+BEST_MODEL_REFINE = CURRENT_POSE_ESITMATION_DIR + "weights/best_model_refine_shaft.pth"
+REFINE_ITERATIVE_DATA_PATH = (
+    CURRENT_POSE_ESITMATION_DIR + "data/processed/shaft_iterative_refine/"
+)
+BEST_MODEL_ITERATIVE_REFINE = (
+    CURRENT_POSE_ESITMATION_DIR + "weights/best_model_iterative_refine_shaft.pth"
+)
 
 
 # OBJ_NAME = "belt-s-pulley"
@@ -108,27 +108,27 @@ CURRENT_POSE_ESITMATION_DIR = os.getcwd() + "/"
 
 ################################ pulley-test##############################################
 
-OBJ_NAME = "pulley-test"
-IMAGE_SAVE_PATH = CURRENT_POSE_ESITMATION_DIR + "data/images/pulley-test/"
-VERIFY_IMAGE_PATH = CURRENT_POSE_ESITMATION_DIR + "data/raw/pulley-test/"
-PROCESSED_DATA_PATH = CURRENT_POSE_ESITMATION_DIR + "data/processed/pulley-test_rot/"
+# OBJ_NAME = "pulley-test"
+# IMAGE_SAVE_PATH = CURRENT_POSE_ESITMATION_DIR + "data/images/pulley-test/"
+# VERIFY_IMAGE_PATH = CURRENT_POSE_ESITMATION_DIR + "data/raw/pulley-test/"
+# PROCESSED_DATA_PATH = CURRENT_POSE_ESITMATION_DIR + "data/processed/pulley-test_rot/"
 
-REFINE_DATA_PATH = CURRENT_POSE_ESITMATION_DIR + "data/processed/pulley-test_refine/"
-REFINE_ITERATIVE_DATA_PATH = (
-    CURRENT_POSE_ESITMATION_DIR + "data/processed/pulley-test_iterative_refine/"
-)
-CAD_MODEL = CURRENT_POSE_ESITMATION_DIR + "data/mesh/MBRFA30-2-P6.obj"
-SAMPLE_FACE_MODEL = CURRENT_POSE_ESITMATION_DIR + "data/mesh/MBRFA30-2-P6.obj"
-BEST_MODEL_FLOWNET = (
-    CURRENT_POSE_ESITMATION_DIR + "weights/best_model_flownet_pulley-test.pth"
-)
-BEST_MODEL_ROT = CURRENT_POSE_ESITMATION_DIR + "weights/best_model_rot_pulley-test.pth"
-BEST_MODEL_REFINE = (
-    CURRENT_POSE_ESITMATION_DIR + "weights/best_model_refine_pulley-test.pth"
-)
-BEST_MODEL_ITERATIVE_REFINE = (
-    CURRENT_POSE_ESITMATION_DIR + "weights/best_model_iterative_refine_pulley-test.pth"
-)
+# REFINE_DATA_PATH = CURRENT_POSE_ESITMATION_DIR + "data/processed/pulley-test_refine/"
+# REFINE_ITERATIVE_DATA_PATH = (
+#     CURRENT_POSE_ESITMATION_DIR + "data/processed/pulley-test_iterative_refine/"
+# )
+# CAD_MODEL = CURRENT_POSE_ESITMATION_DIR + "data/mesh/MBRFA30-2-P6.obj"
+# SAMPLE_FACE_MODEL = CURRENT_POSE_ESITMATION_DIR + "data/mesh/MBRFA30-2-P6.obj"
+# BEST_MODEL_FLOWNET = (
+#     CURRENT_POSE_ESITMATION_DIR + "weights/best_model_flownet_pulley-test.pth"
+# )
+# BEST_MODEL_ROT = CURRENT_POSE_ESITMATION_DIR + "weights/best_model_rot_pulley-test.pth"
+# BEST_MODEL_REFINE = (
+#     CURRENT_POSE_ESITMATION_DIR + "weights/best_model_refine_pulley-test.pth"
+# )
+# BEST_MODEL_ITERATIVE_REFINE = (
+#     CURRENT_POSE_ESITMATION_DIR + "weights/best_model_iterative_refine_pulley-test.pth"
+# )
 
 
 # camera matrix of wrist camera
@@ -153,3 +153,6 @@ EXPAND_SIZE = 2.4
 
 LAMBDA_E = 6.0
 LAMBDA_V = 6.0
+
+COLOR_AUGMENTATION_BRIGHTNESS = 15
+COLOR_AUGMENTATION_CONTRAST = 0.15
