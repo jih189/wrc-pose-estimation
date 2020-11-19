@@ -47,7 +47,7 @@ class Rot_data(Dataset):
         self.obj.setIntrinsicMatrix(CFG.CAMERA_MATRIX)
 
         self.obj.determineSharpEdges(0.05)
-        self.obj.generateSamplePoints(0.001, 0.001)
+        self.obj.generateSamplePoints(0.001)
 
     def __len__(self):
         return len(self.dataNames)

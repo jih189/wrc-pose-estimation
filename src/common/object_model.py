@@ -151,7 +151,6 @@ class ObjectModel:
         self.sharp_sample_points = []
         self.sharp_sample_points_edge_indices = []
         self.visible_sharpedge_samplepoint = []
-        self.visible_sharpedge_samplepoint_edge_membership = []
         self.dl = 0
         self.intrinsic = None
         self.pose = None
@@ -337,7 +336,7 @@ class ObjectModel:
                         )
 
     # generate sample points on the edges of the object
-    def generateSamplePoints(self, sample_step, sample_th):
+    def generateSamplePoints(self, sample_th):
         self.sharp_sample_points.clear()
         self.sharp_sample_points_edge_indices.clear()
         for l in range(len(self.sharp_edges)):
@@ -356,12 +355,11 @@ class ObjectModel:
                 self.sharp_sample_points_edge_indices.append(l)
                 continue
             u = dis / length
-            step = u * sample_step
-            j = 0
-            while np.linalg.norm(step) * j <= length:
-                self.sharp_sample_points.append(self.sharp_edges[l][0] + step * j)
+            numOfStep = int(length / sample_th)
+            step = u * sample_th
+            for s in range(numOfStep):
+                self.sharp_sample_points.append(self.sharp_edges[l][0] + step * s)
                 self.sharp_sample_points_edge_indices.append(l)
-                j += 1
 
     # calculate the angles of the pose so it can be rotated to the center view
     def getCenterAngle(self, pose):
@@ -703,6 +701,7 @@ class ObjectModel:
 
         # Occlusion test
         N = len(self.sharp_sample_points)  # number of test points
+
         if N <= 0:
             print("no sample points!!!")
             return
@@ -730,6 +729,8 @@ class ObjectModel:
             glEndQueryARB(GL_SAMPLES_PASSED_ARB)
             i += 1
 
+        glFlush()
+
         i = int(N * 3 / 4)
 
         ready = 0
@@ -741,20 +742,14 @@ class ObjectModel:
         glDepthMask(GL_TRUE)
 
         k = 0  # start index
-
         self.visible_sharpedge_samplepoint.clear()
-        self.visible_sharpedge_samplepoint_edge_membership.clear()
 
         # clear sharp 2d points
         self.sharp_2d_pts.clear()
         for i in range(N):
-            passed = glGetQueryObjectuivARB(vQueries[k], GL_QUERY_RESULT_ARB)
-            k += 1
+            passed = glGetQueryObjectuivARB(vQueries[i], GL_QUERY_RESULT_ARB)
             if passed:
                 self.visible_sharpedge_samplepoint.append(self.sharp_sample_points[i])
-                self.visible_sharpedge_samplepoint_edge_membership.append(
-                    self.sharp_sample_points_edge_indices[i]
-                )
                 pt2 = self.project3Dto2D(tuple(self.sharp_sample_points[i]), self.pose)
                 self.sharp_2d_pts.append(pt2)
 
@@ -778,65 +773,6 @@ class ObjectModel:
 
         glDisable(GL_POLYGON_OFFSET_FILL)
 
-        # Occlusion test
-        N = len(self.sharp_sample_points)  # number of test points
-        if N <= 0:
-            print("no sample points!!!")
-            return
-
-        # create a query
-        vQueries = glGenQueriesARB(N)
-        # Turn on occlusion testing
-        # disable rendering to screen (set the color mask of all channels to False)
-        glColorMask(GL_FALSE, GL_FALSE, GL_FALSE, GL_FALSE)
-        glDepthMask(GL_FALSE)
-        glPointSize(1)
-
-        k = 0
-        i = 0
-
-        while i < N:
-            glBeginQueryARB(GL_SAMPLES_PASSED_ARB, vQueries[k])
-            k += 1
-            glBegin(GL_POINTS)
-            glVertex3f(
-                self.sharp_sample_points[i][0],
-                self.sharp_sample_points[i][1],
-                self.sharp_sample_points[i][2],
-            )
-            glEnd()
-            glEndQueryARB(GL_SAMPLES_PASSED_ARB)
-            i += 1
-
-        i = int(N * 3 / 4)
-
-        ready = 0
-        while not ready:
-            ready = glGetQueryObjectivARB(vQueries[i], GL_QUERY_RESULT_AVAILABLE_ARB)
-
-        # turn off occlusion testing
-        glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE)
-        glDepthMask(GL_TRUE)
-
-        # k = 0  # start index
-
-        # self.visible_sharpedge_samplepoint.clear()
-        # self.visible_sharpedge_samplepoint_edge_membership.clear()
-
-        # # clear sharp 2d points
-        # self.sharp_2d_pts.clear()
-        # for i in range(N):
-        #     passed = glGetQueryObjectuivARB(vQueries[k], GL_QUERY_RESULT_ARB)
-        #     k += 1
-        #     if passed:
-        #         self.visible_sharpedge_samplepoint.append(self.sharp_sample_points[i])
-        #         self.visible_sharpedge_samplepoint_edge_membership.append(
-        #             self.sharp_sample_points_edge_indices[i]
-        #         )
-        #         pt2 = self.project3Dto2D(tuple(self.sharp_sample_points[i]), self.pose)
-        #         self.sharp_2d_pts.append(pt2)
-
-        glDeleteQueriesARB(vQueries)
         glPopMatrix()
 
     def setIntrinsicMatrix(self, intrinsic_):
@@ -1163,6 +1099,7 @@ class ObjectModel:
             print(setGroup[s])
 
 
+# display the rendered object
 def testInPygame():
     pygame.display.flip()
     pygame.time.wait(10)

@@ -3,6 +3,7 @@ import numpy as np
 import cv2
 import src.common.object_model as OM
 from pathlib import Path
+
 # importing shutil module
 import shutil
 import os
@@ -27,14 +28,13 @@ if __name__ == "__main__":
     obj.setIntrinsicMatrix(CFG.CAMERA_MATRIX)
 
     obj.determineSharpEdges(0.9)
-    obj.generateSamplePoints(0.001, 0.0001)
+    obj.generateSamplePoints(0.0001)
 
     print("s key: save all correct image and pose pairs")
     print("m key: next image")
     print("n key: last image")
     print("k key: keep the current pose in the frame")
     print("c key: set correct or incorrect")
-
 
     # read all pose and image names
 
@@ -50,10 +50,10 @@ if __name__ == "__main__":
     if len(image_names) == 0:
         print("there is no image and pose")
         exit()
-    
+
     images_and_poses = list(zip(image_names, pose_names))
 
-    isCorrect = [True] * len(image_names) # bit which means the pose is correct
+    isCorrect = [True] * len(image_names)  # bit which means the pose is correct
 
     currentInx = 0
     isSave = False
@@ -74,9 +74,7 @@ if __name__ == "__main__":
             img = cv2.circle(img, p, radius=0, color=(0, 0, 255), thickness=-1)
 
         # adjust the bounding box
-        crop_upperleft, crop_lowerright = OM.get_centered_crop(
-            upperleft, lowerright
-        )
+        crop_upperleft, crop_lowerright = OM.get_centered_crop(upperleft, lowerright)
 
         cropImg = np.zeros(
             (
@@ -106,11 +104,7 @@ if __name__ == "__main__":
             int(upperleft_crop_inner[0]) : int(lowerright_crop_inner[0]),
         ]
 
-        cropImg = cv2.resize(
-            cropImg,
-            (300, 300),
-            interpolation=cv2.INTER_AREA,
-        )
+        cropImg = cv2.resize(cropImg, (300, 300), interpolation=cv2.INTER_AREA,)
         cv2.putText(
             img,
             "current index: " + str(currentInx),
@@ -131,7 +125,7 @@ if __name__ == "__main__":
         )
         cv2.imshow("view", img)
         cv2.imshow("crop", cropImg)
-        
+
         ch = cv2.waitKey(0)
         if ch & 0xFF == ord("c"):
             isCorrect[currentInx] = not isCorrect[currentInx]
@@ -147,7 +141,7 @@ if __name__ == "__main__":
         elif ch & 0xFF == ord("m"):
             if currentInx < len(image_names) - 1:
                 currentInx += 1
-        
+
     if isSave:
         # move correct image, pose pairs to des
         saveInx = 0

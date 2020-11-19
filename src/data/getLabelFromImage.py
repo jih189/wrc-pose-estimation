@@ -42,7 +42,7 @@ if __name__ == "__main__":
     obj.setIntrinsicMatrix(CFG.CAMERA_MATRIX)
 
     obj.determineSharpEdges(0.8)
-    obj.generateSamplePoints(0.001, 0.0001)
+    obj.generateSamplePoints(0.0001)
 
     current_index = 0
     # read the index if it exists

@@ -67,7 +67,7 @@ def obj_init():
     obj.setIntrinsicMatrix(CFG.CAMERA_MATRIX)
 
     obj.determineSharpEdges(0.8)
-    obj.generateSamplePoints(0.00001, 0.00001)
+    obj.generateSamplePoints(0.00001)
     return obj
 
 

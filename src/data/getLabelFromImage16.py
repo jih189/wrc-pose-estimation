@@ -45,8 +45,8 @@ if __name__ == "__main__":
 
     # init camera
     capture = cv2.VideoCapture(CFG.CAMERA_ID)
-    capture.set(3,CFG.CAMERA_W)
-    capture.set(4,CFG.CAMERA_H)
+    capture.set(3, CFG.CAMERA_W)
+    capture.set(4, CFG.CAMERA_H)
 
     # init object model
     OM.setup(CFG.CAMERA_W, CFG.CAMERA_H)
@@ -58,7 +58,7 @@ if __name__ == "__main__":
     obj.setIntrinsicMatrix(CFG.CAMERA_MATRIX)
 
     obj.determineSharpEdges(0.8)
-    obj.generateSamplePoints(0.001, 0.0001)
+    obj.generateSamplePoints(0.0001)
 
     current_index = 0
     # read the index if it exists
@@ -71,15 +71,15 @@ if __name__ == "__main__":
     gotPose = False
     pose = None
     usingMarker = False
-    
+
     while True:
         transform = np.identity(4)
-        transform[:3,:3] = (R.from_euler("X", 3.14159)).as_matrix()
+        transform[:3, :3] = (R.from_euler("X", 3.14159)).as_matrix()
         transform[0][3] = tablex
         transform[1][3] = tabley
         transform[2][3] = tablez
         points = np.array(tablePoints_base)
-        points_h = np.append(points, np.ones((points.shape[0],1)), 1).T
+        points_h = np.append(points, np.ones((points.shape[0], 1)), 1).T
         tablePoints = np.delete(transform.dot(points_h).T, -1, axis=1).tolist()
 
         if capture.isOpened():  # try to get the first frame
@@ -102,15 +102,52 @@ if __name__ == "__main__":
         elif not usingMarker:
             # using the marker in the image to infer the pose of the object
             markers = detect_markers(frame)
-            imagePoints = [None, None, None, None, None, None, None, None,None, None, None, None,None, None, None, None]
-            objectPoints = [None, None, None, None,None, None, None, None,None, None, None, None,None, None, None, None]
+            imagePoints = [
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+            ]
+            objectPoints = [
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+            ]
 
             for marker in markers:
-                marker.highlite_marker(frame, linewidth=1,text_thickness=1)
+                marker.highlite_marker(frame, linewidth=1, text_thickness=1)
                 cv2.circle(frame, marker.center, 2, (0, 0, 255), -1)
                 for b in range(16):
                     if marker.id == b + 1:
-                        imagePoints[b] = [float(marker.center[0]), float(marker.center[1])]
+                        imagePoints[b] = [
+                            float(marker.center[0]),
+                            float(marker.center[1]),
+                        ]
                         objectPoints[b] = tablePoints[b]
                         break
 
@@ -131,7 +168,11 @@ if __name__ == "__main__":
                 objectPoints = np.array(objectPoints)
                 imagePoints = np.array(imagePoints)
                 _, rvec, tvec, _ = cv2.solvePnPRansac(
-                    objectPoints, imagePoints, CFG.CAMERA_MATRIX, dist_coefs, flags=cv2.SOLVEPNP_ITERATIVE
+                    objectPoints,
+                    imagePoints,
+                    CFG.CAMERA_MATRIX,
+                    dist_coefs,
+                    flags=cv2.SOLVEPNP_ITERATIVE,
                 )
                 rotMat, _ = cv2.Rodrigues(rvec)
                 pose = np.identity(4)
@@ -268,7 +309,7 @@ if __name__ == "__main__":
             0.6,
             (255, 0, 255),
             2,
-        )    
+        )
         cv2.imshow("Test Frame", frame)
         ch = cv2.waitKey(1)
         if ch & 0xFF == ord("c"):  # collect data

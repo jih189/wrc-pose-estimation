@@ -34,7 +34,7 @@ def init():
     obj.loadObjectCADModel(CFG.CAD_MODEL)
 
     obj.determineSharpEdges(0.8)
-    obj.generateSamplePoints(0.001, 0.0001)
+    obj.generateSamplePoints(0.0001)
 
     return obj
 

@@ -84,7 +84,7 @@ if __name__ == "__main__":
     obj.setIntrinsicMatrix(CFG.CAMERA_MATRIX)
 
     obj.determineSharpEdges(0.8)
-    obj.generateSamplePoints(0.00001, 0.00001)
+    obj.generateSamplePoints(0.0001)
 
     ###################### yolo ########################
     cfg = "cfg/yolov3-tiny3.cfg"
@@ -275,7 +275,7 @@ if __name__ == "__main__":
 
         # pose refinement
         for t in range(numOfRefine):
-            # pose_refinement_start = time.time()
+            pose_refinement_start = time.time()
             obj.setModelviewMatrix(rough_pred_pose)
             # find_visible_sample_points_start = time.time()
             obj.findVisibleSamplePoint()
@@ -434,9 +434,9 @@ if __name__ == "__main__":
             )
 
             rough_pred_pose = pred_pose
-            # pose_refinement_end = time.time()
-            # print("time for pose refinement: ")
-            # print(pose_refinement_end - pose_refinement_start)
+            pose_refinement_end = time.time()
+            print("time for pose refinement: ")
+            print(pose_refinement_end - pose_refinement_start)
             rough_pred_pose = OM.symmetricRemove(rough_pred_pose)
 
             temp_demo = demo.copy()
@@ -453,7 +453,7 @@ if __name__ == "__main__":
                     thickness=-1,
                 )
             cv2.imshow("test", temp_demo)
-            cv2.waitKey(0)
+            cv2.waitKey(1)
 
     else:
         print("can't find object!!")
