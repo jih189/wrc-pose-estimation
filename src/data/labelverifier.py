@@ -33,8 +33,8 @@ if __name__ == "__main__":
     print("s key: save all correct image and pose pairs")
     print("m key: next image")
     print("n key: last image")
-    print("k key: keep the current pose in the frame")
     print("c key: set correct or incorrect")
+    print("q key: quit the program without save")
 
     # read all pose and image names
 
