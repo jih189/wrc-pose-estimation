@@ -89,7 +89,6 @@ data/
 wandb/
 *.pth
 *.pt
-cfg/
 
 temp
 pred_temp
