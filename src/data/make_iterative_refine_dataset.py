@@ -93,8 +93,8 @@ def process_data(args):
             visibleArea = -1
 
             # rotate the plane so it can increase the number of data
-            for r in range(4):
-                inplaneRotate = r * 90.0
+            for r in range(8):
+                inplaneRotate = r * 45.0
 
                 rot_img = OM.rotate_image(img, inplaneRotate, center_pt)
                 rot_pose = OM.rotateAngle(pose, inplaneRotate)

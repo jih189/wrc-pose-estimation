@@ -126,7 +126,7 @@ if __name__ == "__main__":
     refine_model.eval()
 
     # read image
-    frame = cv2.imread("input-3.jpg")
+    frame = cv2.imread("input-11.jpg")
     demo = frame.copy()
     rot_frame = frame.copy()
     refine_frame = frame.copy()
@@ -167,7 +167,7 @@ if __name__ == "__main__":
         for *xyxy, conf, cls in pred:
             label = "%s %.2f" % (names[int(cls)], conf)
             # plot_one_box(xyxy, demo, label=label, color=colors[int(cls)])
-            if names[int(cls)] == "Pulley":
+            if names[int(cls)] == CFG.OBJ_NAME:
                 foundObject = True
                 croptopleft = [
                     int(xyxy[0].cpu().detach().numpy()),
@@ -212,6 +212,8 @@ if __name__ == "__main__":
             int(upperleft_crop_inner[1]) : int(lowerright_crop_inner[1]),
             int(upperleft_crop_inner[0]) : int(lowerright_crop_inner[0]),
         ]
+        # cv2.imshow("crop", img_crop)
+        # cv2.waitKey(0)
 
         img_crop = cv2.resize(img_crop, (CFG.IMG_SIZE, CFG.IMG_SIZE))
         img_crop = img_crop[:, :, :3].transpose(2, 0, 1)
@@ -271,7 +273,7 @@ if __name__ == "__main__":
         # print("time for rought pose estimation: ")
         # print(rough_pose_estimation_end - rough_pose_estimation_start)
 
-        numOfRefine = 5
+        numOfRefine = 15
 
         # pose refinement
         for t in range(numOfRefine):
@@ -453,7 +455,7 @@ if __name__ == "__main__":
                     thickness=-1,
                 )
             cv2.imshow("test", temp_demo)
-            cv2.waitKey(1)
+            cv2.waitKey(0)
 
     else:
         print("can't find object!!")

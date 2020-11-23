@@ -5,51 +5,58 @@ import os
 CURRENT_POSE_ESITMATION_DIR = os.getcwd() + "/"
 
 # OBJ_NAME = "pulley"
-# IMAGE_SAVE_PATH = CURRENT_POSE_ESITMATION_DIR + "data/images/pulley/"
-# VERIFY_IMAGE_PATH = CURRENT_POSE_ESITMATION_DIR + "data/raw/pulley/"
-# PROCESSED_DATA_PATH = CURRENT_POSE_ESITMATION_DIR + "data/processed/pulley_rot/"
-# REFINE_DATA_PATH = CURRENT_POSE_ESITMATION_DIR + "data/processed/pulley_refine/"
 # CAD_MODEL = CURRENT_POSE_ESITMATION_DIR + "data/mesh/MBRFA30-2-P6.obj"
 # SAMPLE_FACE_MODEL = CURRENT_POSE_ESITMATION_DIR + "data/mesh/MBRFA30-2-P6.obj"
-# BEST_MODEL_FLOWNET = CURRENT_POSE_ESITMATION_DIR + "weights/best_model_flownet_pulley.pth"
-# BEST_MODEL_ROT = CURRENT_POSE_ESITMATION_DIR + "weights/best_model_rot_pulley.pth"
-# BEST_MODEL_REFINE = CURRENT_POSE_ESITMATION_DIR + "weights/best_model_refine_pulley.pth"
 
 
 OBJ_NAME = "shaft"
-IMAGE_SAVE_PATH = CURRENT_POSE_ESITMATION_DIR + "data/images/shaft/"
-VERIFY_IMAGE_PATH = CURRENT_POSE_ESITMATION_DIR + "data/raw/shaft/"
-PROCESSED_DATA_PATH = CURRENT_POSE_ESITMATION_DIR + "data/processed/shaft_rot/"
-REFINE_DATA_PATH = CURRENT_POSE_ESITMATION_DIR + "data/processed/shaft_refine/"
 CAD_MODEL = CURRENT_POSE_ESITMATION_DIR + "data/mesh/SSFHRT10-75-M4-FC55-G20.obj"
 SAMPLE_FACE_MODEL = (
     CURRENT_POSE_ESITMATION_DIR + "data/mesh/SSFHRT10-75-M4-FC55-G20.obj"
 )
-BEST_MODEL_FLOWNET = (
-    CURRENT_POSE_ESITMATION_DIR + "weights/best_model_flownet_shaft.pth"
-)
-BEST_MODEL_ROT = CURRENT_POSE_ESITMATION_DIR + "weights/best_model_rot_shaft.pth"
-BEST_MODEL_REFINE = CURRENT_POSE_ESITMATION_DIR + "weights/best_model_refine_shaft.pth"
-REFINE_ITERATIVE_DATA_PATH = (
-    CURRENT_POSE_ESITMATION_DIR + "data/processed/shaft_iterative_refine/"
-)
-BEST_MODEL_ITERATIVE_REFINE = (
-    CURRENT_POSE_ESITMATION_DIR + "weights/best_model_iterative_refine_shaft.pth"
-)
-
 
 # OBJ_NAME = "belt-s-pulley"
-# IMAGE_SAVE_PATH = CURRENT_POSE_ESITMATION_DIR + "data/images/belt-s-pulley/"
-# VERIFY_IMAGE_PATH = CURRENT_POSE_ESITMATION_DIR + "data/raw/belt-s-pulley/"
-# PROCESSED_DATA_PATH = CURRENT_POSE_ESITMATION_DIR + "data/processed/belt-s-pulley_rot/"
-# REFINE_DATA_PATH = CURRENT_POSE_ESITMATION_DIR + "data/processed/belt-s-pulley_refine/"
 # CAD_MODEL = CURRENT_POSE_ESITMATION_DIR + "data/mesh/MBGNA30-2.obj"
 # SAMPLE_FACE_MODEL = CURRENT_POSE_ESITMATION_DIR + "data/mesh/MBGNA30-2.obj"
-# BEST_MODEL_FLOWNET = CURRENT_POSE_ESITMATION_DIR + "weights/best_model_flownet_belt-s-pulley.pth"
-# BEST_MODEL_ROT = CURRENT_POSE_ESITMATION_DIR + "weights/best_model_rot_belt-s-pulley.pth"
-# BEST_MODEL_REFINE = CURRENT_POSE_ESITMATION_DIR + "weights/best_model_refine_belt-s-pulley.pth"
-# REFINE_ITERATIVE_DATA_PATH = CURRENT_POSE_ESITMATION_DIR + "data/processed/belt-s-pulley_iterative_refine/"
-# BEST_MODEL_ITERATIVE_REFINE = CURRENT_POSE_ESITMATION_DIR + "weights/best_model_iterative_refine_belt-s-pulley.pth"
+
+# OBJ_NAME = "nut"
+# CAD_MODEL = CURRENT_POSE_ESITMATION_DIR + "data/mesh/SLBNR6.obj"
+# SAMPLE_FACE_MODEL = CURRENT_POSE_ESITMATION_DIR + "data/mesh/SLBNR6.obj"
+
+# OBJ_NAME = "housing"
+# CAD_MODEL = CURRENT_POSE_ESITMATION_DIR + "data/mesh/SBARB6200ZZ-30.obj"
+# SAMPLE_FACE_MODEL = CURRENT_POSE_ESITMATION_DIR + "data/mesh/SBARB6200ZZ-30.obj"
+
+# OBJ_NAME = "pulley-test"
+# CAD_MODEL = CURRENT_POSE_ESITMATION_DIR + "data/mesh/MBRFA30-2-P6.obj"
+# SAMPLE_FACE_MODEL = CURRENT_POSE_ESITMATION_DIR + "data/mesh/MBRFA30-2-P6.obj"
+
+IMAGE_SAVE_PATH = CURRENT_POSE_ESITMATION_DIR + "data/images/" + OBJ_NAME + "/"
+VERIFY_IMAGE_PATH = CURRENT_POSE_ESITMATION_DIR + "data/raw/" + OBJ_NAME + "/"
+PROCESSED_DATA_PATH = CURRENT_POSE_ESITMATION_DIR + "data/processed/" + OBJ_NAME + "/"
+REFINE_DATA_PATH = (
+    CURRENT_POSE_ESITMATION_DIR + "data/processed/" + OBJ_NAME + "_refine/"
+)
+BEST_MODEL_FLOWNET = (
+    CURRENT_POSE_ESITMATION_DIR + "weights/best_model_flownet_" + OBJ_NAME + ".pth"
+)
+BEST_MODEL_ROT = (
+    CURRENT_POSE_ESITMATION_DIR + "weights/best_model_rot_" + OBJ_NAME + ".pth"
+)
+BEST_MODEL_REFINE = (
+    CURRENT_POSE_ESITMATION_DIR + "weights/best_model_refine_" + OBJ_NAME + ".pth"
+)
+REFINE_ITERATIVE_DATA_PATH = (
+    CURRENT_POSE_ESITMATION_DIR + "data/processed/" + OBJ_NAME + "_iterative_refine/"
+)
+BEST_MODEL_ITERATIVE_REFINE = (
+    CURRENT_POSE_ESITMATION_DIR
+    + "weights/best_model_iterative_refine_"
+    + OBJ_NAME
+    + ".pth"
+)
+
+######################################## camera information ######################################################
 
 # # camera matrix of realsense
 # CAMERA_MATRIX = np.array(
@@ -59,75 +66,6 @@ BEST_MODEL_ITERATIVE_REFINE = (
 #         [0, 0, 1],
 #     ],
 #     dtype="double",
-# )
-
-# OBJ_NAME = "nut"
-# IMAGE_SAVE_PATH = CURRENT_POSE_ESITMATION_DIR + "data/images/nut/"
-# VERIFY_IMAGE_PATH = CURRENT_POSE_ESITMATION_DIR + "data/raw/nut/"
-# PROCESSED_DATA_PATH = CURRENT_POSE_ESITMATION_DIR + "data/processed/nut_rot/"
-# REFINE_DATA_PATH = CURRENT_POSE_ESITMATION_DIR + "data/processed/nut_refine/"
-# CAD_MODEL = CURRENT_POSE_ESITMATION_DIR + "data/mesh/SLBNR6.obj"
-# SAMPLE_FACE_MODEL = CURRENT_POSE_ESITMATION_DIR + "data/mesh/SLBNR6.obj"
-# BEST_MODEL_FLOWNET = CURRENT_POSE_ESITMATION_DIR + "weights/best_model_flownet_nut.pth"
-# BEST_MODEL_ROT = CURRENT_POSE_ESITMATION_DIR + "weights/best_model_rot_nut.pth"
-# BEST_MODEL_REFINE = CURRENT_POSE_ESITMATION_DIR + "weights/best_model_refine_nut.pth"
-
-# OBJ_NAME = "housing"
-# IMAGE_SAVE_PATH = CURRENT_POSE_ESITMATION_DIR + "data/images/housing/"
-# VERIFY_IMAGE_PATH = CURRENT_POSE_ESITMATION_DIR + "data/raw/housing/"
-# PROCESSED_DATA_PATH = CURRENT_POSE_ESITMATION_DIR + "data/processed/housing_rot/"
-# REFINE_DATA_PATH = CURRENT_POSE_ESITMATION_DIR + "data/processed/housing_refine/"
-# CAD_MODEL = CURRENT_POSE_ESITMATION_DIR + "data/mesh/SBARB6200ZZ-30.obj"
-# SAMPLE_FACE_MODEL = CURRENT_POSE_ESITMATION_DIR + "data/mesh/SBARB6200ZZ-30.obj"
-# BEST_MODEL_FLOWNET = CURRENT_POSE_ESITMATION_DIR + "weights/best_model_flownet_housing.pth"
-# BEST_MODEL_ROT = CURRENT_POSE_ESITMATION_DIR + "weights/best_model_rot_housing.pth"
-# BEST_MODEL_REFINE = CURRENT_POSE_ESITMATION_DIR + "weights/best_model_refine_housing.pth"
-# REFINE_ITERATIVE_DATA_PATH = (
-#     CURRENT_POSE_ESITMATION_DIR + "data/processed/housing_iterative_refine/"
-# )
-# BEST_MODEL_ITERATIVE_REFINE = CURRENT_POSE_ESITMATION_DIR + "weights/best_model_iterative_refine_housing.pth"
-
-
-#################################### ycb dataset###############################################
-# CAMERA_MATRIX = np.array(
-#     [[1066.778, 0, 312.9869], [0, 1067.487, 241.3109], [0, 0, 1],], dtype="double",
-# )
-
-# OBJ_NAME = "009_gelatin_box"
-# IMAGE_SAVE_PATH = CURRENT_POSE_ESITMATION_DIR + "data/images/009_gelatin_box/"
-# VERIFY_IMAGE_PATH = CURRENT_POSE_ESITMATION_DIR + "data/raw/009_gelatin_box/"
-# PROCESSED_DATA_PATH = CURRENT_POSE_ESITMATION_DIR + "data/processed/009_gelatin_box_rot/"
-# REFINE_DATA_PATH = CURRENT_POSE_ESITMATION_DIR + "data/processed/009_gelatin_box_refine/"
-# REFINE_DATA_PATH_CLOSE = CURRENT_POSE_ESITMATION_DIR + "data/processed/009_gelatin_box_refine_close/"
-# CAD_MODEL = CURRENT_POSE_ESITMATION_DIR + "data/mesh/009_gelatin_box.obj"
-# SAMPLE_FACE_MODEL = CURRENT_POSE_ESITMATION_DIR + "data/external/YCB_dataset/models/009_gelatin_box/textured.obj"
-# BEST_MODEL_FLOWNET = CURRENT_POSE_ESITMATION_DIR + "weights/best_model_flownet_009_gelatin_box.pth"
-# BEST_MODEL_ROT = CURRENT_POSE_ESITMATION_DIR + "weights/best_model_rot_009_gelatin_box.pth"
-# BEST_MODEL_REFINE = CURRENT_POSE_ESITMATION_DIR + "weights/best_model_refine_009_gelatin_box.pth"
-# BEST_MODEL_REFINE_CLOSE = CURRENT_POSE_ESITMATION_DIR + "weights/best_model_refine_009_gelatin_box_close.pth"
-
-################################ pulley-test##############################################
-
-# OBJ_NAME = "pulley-test"
-# IMAGE_SAVE_PATH = CURRENT_POSE_ESITMATION_DIR + "data/images/pulley-test/"
-# VERIFY_IMAGE_PATH = CURRENT_POSE_ESITMATION_DIR + "data/raw/pulley-test/"
-# PROCESSED_DATA_PATH = CURRENT_POSE_ESITMATION_DIR + "data/processed/pulley-test_rot/"
-
-# REFINE_DATA_PATH = CURRENT_POSE_ESITMATION_DIR + "data/processed/pulley-test_refine/"
-# REFINE_ITERATIVE_DATA_PATH = (
-#     CURRENT_POSE_ESITMATION_DIR + "data/processed/pulley-test_iterative_refine/"
-# )
-# CAD_MODEL = CURRENT_POSE_ESITMATION_DIR + "data/mesh/MBRFA30-2-P6.obj"
-# SAMPLE_FACE_MODEL = CURRENT_POSE_ESITMATION_DIR + "data/mesh/MBRFA30-2-P6.obj"
-# BEST_MODEL_FLOWNET = (
-#     CURRENT_POSE_ESITMATION_DIR + "weights/best_model_flownet_pulley-test.pth"
-# )
-# BEST_MODEL_ROT = CURRENT_POSE_ESITMATION_DIR + "weights/best_model_rot_pulley-test.pth"
-# BEST_MODEL_REFINE = (
-#     CURRENT_POSE_ESITMATION_DIR + "weights/best_model_refine_pulley-test.pth"
-# )
-# BEST_MODEL_ITERATIVE_REFINE = (
-#     CURRENT_POSE_ESITMATION_DIR + "weights/best_model_iterative_refine_pulley-test.pth"
 # )
 
 
@@ -141,18 +79,19 @@ CAMERA_MATRIX = np.array(
     dtype="double",
 )
 
-CAMERA_ID = 4
-VIEWPOINT_NUM = 642
+CAMERA_ID = 0
 # CAMERA_W = 640
 # CAMERA_H = 480
 CAMERA_W = 1280
 CAMERA_H = 720
 
+################################## hyper-parameters #######################################################
+VIEWPOINT_NUM = 642
 IMG_SIZE = 240
 EXPAND_SIZE = 2.4
 
-LAMBDA_E = 6.0
-LAMBDA_V = 6.0
+LAMBDA_E = 1.0
+LAMBDA_V = 1.0
 
 COLOR_AUGMENTATION_BRIGHTNESS = 15
 COLOR_AUGMENTATION_CONTRAST = 0.15

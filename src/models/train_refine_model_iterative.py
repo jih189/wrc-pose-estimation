@@ -51,12 +51,12 @@ pool_dir = "pred_temp/"
 # initiate the net
 mymodel = DeepIM().cuda()
 mymodel = nn.DataParallel(mymodel)
-# mymodel.module.flownet.load_state_dict(
-#     torch.load(CFG.BEST_MODEL_FLOWNET).module.state_dict()
-# )
-# mymodel.module.flownet.eval()
+mymodel.module.flownet.load_state_dict(
+    torch.load(CFG.BEST_MODEL_FLOWNET).module.state_dict()
+)
+mymodel.module.flownet.eval()
 
-mymodel = torch.load(CFG.BEST_MODEL_ITERATIVE_REFINE)
+# mymodel = torch.load(CFG.BEST_MODEL_ITERATIVE_REFINE)
 
 seg_criterion = nn.CrossEntropyLoss(reduce=False)
 
@@ -166,7 +166,7 @@ def process_data(args):
             ew = int(boundingsize)
             eh = int(boundingsize)
 
-            crop_img = np.zeros((eh, ew, 3), np.uint8,)
+            crop_img = np.zeros((eh, ew, 3), np.uint8)
             crop_init_mask = np.zeros((eh, ew), np.uint8)
             crop_edge = np.zeros((eh, ew), np.uint8)
             crop_label_mask = np.zeros((eh, ew, 3), np.uint8)
@@ -178,11 +178,23 @@ def process_data(args):
                 min(img.shape[0], ey + eh),
             ]
 
+            # color space augmentation
+            brightness = random.uniform(
+                -CFG.COLOR_AUGMENTATION_BRIGHTNESS, CFG.COLOR_AUGMENTATION_BRIGHTNESS,
+            )
+            contrast = random.uniform(
+                1.0 - CFG.COLOR_AUGMENTATION_CONTRAST,
+                1.0 + CFG.COLOR_AUGMENTATION_CONTRAST,
+            )
+
+            rot_contrast_img = img * contrast + brightness
+            rot_contrast_img = np.uint8(np.clip(rot_contrast_img, 0, 255))
+
             # cropped image with initial pose as center
             crop_img[
                 upperleft_crop_inner[1] - ey : lowerright_crop_inner[1] - ey,
                 upperleft_crop_inner[0] - ex : lowerright_crop_inner[0] - ex,
-            ] = img[
+            ] = rot_contrast_img[
                 int(upperleft_crop_inner[1]) : int(lowerright_crop_inner[1]),
                 int(upperleft_crop_inner[0]) : int(lowerright_crop_inner[0]),
             ]
@@ -210,6 +222,12 @@ def process_data(args):
                 int(upperleft_crop_inner[1]) : int(lowerright_crop_inner[1]),
                 int(upperleft_crop_inner[0]) : int(lowerright_crop_inner[0]),
             ]
+
+            # ensure the crop image containing enough part of the object
+            if cv2.countNonZero(target_mask[:, :, 0]) * 0.8 > cv2.countNonZero(
+                crop_label_mask[:, :, 0]
+            ):
+                continue
 
             crop_flowImg[
                 upperleft_crop_inner[1] - ey : lowerright_crop_inner[1] - ey,
@@ -689,7 +707,7 @@ def generateData(obj, sample_points):
                 pool_dir + "{:06d}".format(savedIndex) + "demo.png", original_img,
             )
 
-            global_pred_pose = OM.symmetricRemove(global_pred_pose)
+            # global_pred_pose = OM.symmetricRemove(global_pred_pose)
 
             np.save(
                 pool_dir + "{:06d}".format(savedIndex) + "initPose.npy",
@@ -767,10 +785,10 @@ def main():
         initpose_names.sort()
 
         # reduce size
-        # image_names = image_names[:10]
-        # targetpose_names = targetpose_names[:10]
-        # mask_names = mask_names[:10]
-        # initpose_names = initpose_names[:10]
+        # image_names = image_names[5235:]
+        # targetpose_names = targetpose_names[5235:]
+        # mask_names = mask_names[5235:]
+        # initpose_names = initpose_names[5235:]
 
         datalist = list(zip(image_names, initpose_names, targetpose_names, mask_names,))
 

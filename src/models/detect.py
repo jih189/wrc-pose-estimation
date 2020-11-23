@@ -33,14 +33,14 @@ obj = OM.ObjectModel()
 obj.loadObjectCADModel(CFG.CAD_MODEL)
 obj.setIntrinsicMatrix(CFG.CAMERA_MATRIX)
 
-obj.determineSharpEdges(0.4)
+obj.determineSharpEdges(0.8)
 obj.generateSamplePoints(0.0001)
 
 ###################### yolo ########################
 webcam = "4"
 cfg = CFG.CURRENT_POSE_ESITMATION_DIR + "cfg/yolov3-tiny3.cfg"
 weights = CFG.CURRENT_POSE_ESITMATION_DIR + "weights/best_yolo_model_wrc.pt"
-conf_thres = 0.7
+conf_thres = 0.4
 iou_thres = 0.4
 device = "cuda"
 obj_names = CFG.CURRENT_POSE_ESITMATION_DIR + "data/wrs-wrc.names"
@@ -65,12 +65,12 @@ rot_model.eval()
 
 ################# refine net ###########################
 refine_model = DeepIM().cuda()
-# refine_model = torch.load(CFG.BEST_MODEL_ITERATIVE_REFINE)
-refine_model.load_state_dict(
-    torch.load(
-        CFG.CURRENT_POSE_ESITMATION_DIR + "best_model_iterative_refine_pulley-test.pth"
-    )
-)
+refine_model = torch.load(CFG.BEST_MODEL_ITERATIVE_REFINE)
+# refine_model.load_state_dict(
+#     torch.load(
+#         CFG.CURRENT_POSE_ESITMATION_DIR + "best_model_iterative_refine_pulley-test.pth"
+#     )
+# )
 refine_model.eval()
 
 
@@ -171,6 +171,8 @@ def detect(object_id, img, estimated_depth):
                     int(xyxy[2].cpu().detach().numpy()),
                     int(xyxy[3].cpu().detach().numpy()),
                 ]
+        cv2.imshow("detect", demo)
+        cv2.waitKey(0)
 
     if foundObject:
         # rot classifier
@@ -228,7 +230,7 @@ def detect(object_id, img, estimated_depth):
         rough_pred_pose = obj.label2pose(viewpt, rot, offset, estimated_depth)
 
         # pose refinement
-        for t in range(20):
+        for t in range(15):
             obj.setModelviewMatrix(rough_pred_pose)
             obj.findVisibleSamplePoint()
 

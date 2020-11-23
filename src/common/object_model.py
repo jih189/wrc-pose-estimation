@@ -52,7 +52,7 @@ def get_centered_crop(topleft, botright):
 
     centerPoint = (int(topleft[0] + cropWidth / 2), int(topleft[1] + cropHeight / 2))
 
-    cropSize = int(max(cropHeight, cropWidth) / 2)
+    cropSize = int(max(cropHeight, cropWidth) / 2 * 1.2)
 
     topleft_new = np.array(
         [centerPoint[0] - cropSize, centerPoint[1] - cropSize], dtype=int
