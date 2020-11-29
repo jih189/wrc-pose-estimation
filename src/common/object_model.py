@@ -64,25 +64,6 @@ def get_centered_crop(topleft, botright):
     return topleft_new, botright_new
 
 
-def rotateAngle(pose_, angle):
-    pose = pose_.copy()
-    horizontalR = -np.arctan2(pose[0, 3], pose[2, 3])
-    verticalR = np.arctan2(
-        pose[1, 3], np.sqrt(pose[0, 3] * pose[0, 3] + pose[2, 3] * pose[2, 3])
-    )
-
-    Rmatrix = np.identity(4)
-    Rmatrix[:3, :3] = R.from_euler("XYZ", [verticalR, horizontalR, 0]).as_matrix()
-    pose = np.dot(Rmatrix, pose)
-
-    Rmatrix[:3, :3] = R.from_euler("Z", -np.radians(angle)).as_matrix()
-
-    pose = np.dot(Rmatrix, pose)
-    Rmatrix[:3, :3] = R.from_euler("XYZ", [-verticalR, -horizontalR, 0]).as_matrix()
-    pose = np.dot(Rmatrix, pose)
-    return pose
-
-
 def py_ang(v1, v2):
     """ Returns the angle in radians between vectors 'v1' and 'v2'    """
     cosang = np.dot(v1, v2)
@@ -160,6 +141,7 @@ class ObjectModel:
         self.pointcloud = []
         self.height = CFG.CAMERA_H
         self.width = CFG.CAMERA_W
+        self.cornerPoints = None
 
     # project a 3d point to a 2d point with pose
     # input: (3,) numpy matrix
@@ -178,6 +160,49 @@ class ObjectModel:
             (fx * pt3_cam[0] / pt3_cam[2] + ux),
             (fy * pt3_cam[1] / pt3_cam[2] + uy),
         )
+
+    def rotateAngle(self, pose_, angle):
+        """
+        use the solvepnp to estimation the pose after the image is rotated.
+        """
+        pose = pose_.copy()
+        # get the 2d corner points of the object according to current pose
+        cornerpoints_2d = self.getCornerPoints(pose)
+        # rotate the 2d corner points according to the original point of the object
+        rp = []
+        for p in cornerpoints_2d:
+            rp.append(self.rotate_f(self.project3Dto2D((0,0,0), pose), p, -np.radians(angle)))
+
+        objectPoints = np.array(self.cornerPoints)
+        imagePoints = np.array(rp)
+        _, rvec, tvec, _ = cv2.solvePnPRansac(
+            objectPoints,
+            imagePoints,
+            self.intrinsic,
+            np.zeros((4, 1)),
+            flags=cv2.SOLVEPNP_ITERATIVE,
+        )
+        rotMat, _ = cv2.Rodrigues(rvec)
+        pose = np.identity(4)
+        pose[:3, :3] = rotMat
+        pose[0, 3] = tvec[0][0]
+        pose[1, 3] = tvec[1][0]
+        pose[2, 3] = tvec[2][0]
+        # horizontalR = -np.arctan2(pose[0, 3], pose[2, 3])
+        # verticalR = np.arctan2(
+        #     pose[1, 3], np.sqrt(pose[0, 3] * pose[0, 3] + pose[2, 3] * pose[2, 3])
+        # )
+
+        # Rmatrix = np.identity(4)
+        # Rmatrix[:3, :3] = R.from_euler("XYZ", [verticalR, horizontalR, 0]).as_matrix()
+        # pose = np.dot(Rmatrix, pose)
+
+        # Rmatrix[:3, :3] = R.from_euler("z", -np.radians(angle)).as_matrix()
+
+        # pose = np.dot(Rmatrix, pose)
+        # Rmatrix[:3, :3] = R.from_euler("XYZ", [-verticalR, -horizontalR, 0]).as_matrix()
+        # pose = np.dot(Rmatrix, pose)
+        return pose
 
     # load the object CAD model
     def loadObjectCADModel(self, file_name):
@@ -200,7 +225,28 @@ class ObjectModel:
                 glVertex3f(v3[0], v3[1], v3[2])
                 glEnd()
         glEndList()
+        samplepoints = np.asarray(self.mesh_obj.vertices)
+        # # get diameter of model
+        maxdim = np.amax(samplepoints, axis=0)
+        mindim = np.amin(samplepoints, axis=0)
+        self.cornerPoints = np.array([
+            [mindim[0],mindim[1], mindim[2]],
+            [mindim[0],maxdim[1], mindim[2]],
+            [maxdim[0],mindim[1], mindim[2]],
+            [maxdim[0],maxdim[1], mindim[2]],
+            [mindim[0],mindim[1], maxdim[2]],
+            [mindim[0],maxdim[1], maxdim[2]],
+            [maxdim[0],mindim[1], maxdim[2]],
+            [maxdim[0],maxdim[1], maxdim[2]],
+        ])
 
+    def getCornerPoints(self, pose):
+        result = []
+        for c in self.cornerPoints:
+            p = self.project3Dto2D((c[0], c[1], c[2]), pose)
+            result.append(p)
+        return result
+        
     # set object pose
     def setModelviewMatrix(self, pose):
         # remove the symmetric pose
@@ -798,6 +844,20 @@ class ObjectModel:
         qx = ox + math.cos(angle) * (px - ox) - math.sin(angle) * (py - oy)
         qy = oy + math.sin(angle) * (px - ox) + math.cos(angle) * (py - oy)
         return int(qx), int(qy)
+
+    def rotate_f(self, origin, point, angle):
+        """
+        Rotate a point counterclockwise by a given angle around a given origin. 
+        The result is float format.
+
+        The angle should be given in radians.
+        """
+        ox, oy = origin
+        px, py = point
+
+        qx = ox + math.cos(angle) * (px - ox) - math.sin(angle) * (py - oy)
+        qy = oy + math.sin(angle) * (px - ox) + math.cos(angle) * (py - oy)
+        return float(qx), float(qy)
 
     # we may need to be carefule the rotate image may make the object out of the boundary
     def rotateImg(self, input, angle):
