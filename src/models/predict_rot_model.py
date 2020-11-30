@@ -143,31 +143,31 @@ c5 = (int(c5[0]), int(c5[1]))
 c6 = (int(c6[0]), int(c6[1]))
 c7 = (int(c7[0]), int(c7[1]))
 
-# viewpt = np.array(OM.idx2vp(pred[0]))
-# print("pred vp index ", pred[0])
+viewpt = np.array(OM.idx2vp(pred[0]))
+print("pred vp index ", pred[0])
 
-# rot = output[:, viewpt_class : viewpt_class + rot_class].data.cpu().numpy()
-# rot = np.argmax(rot, axis=1)
-# print("pred rot ", rot[0])
-# rot = rot[0] * np.pi / 30
+rot = output[:, viewpt_class : viewpt_class + rot_class].data.cpu().numpy()
+rot = np.argmax(rot, axis=1)
+print("pred rot ", rot[0])
+rot = rot[0] * np.pi / 30
 
 
 pred_img = frame.copy()
-# pred_pose = obj.label2pose(viewpt, rot, offset, depth)
+pred_pose = obj.label2pose(viewpt, rot, offset, depth)
 
-# obj.setModelviewMatrix(pred_pose)
-# obj.findVisibleSamplePoint()
-# for pt in obj.sharp_2d_pts:
-#     pt = mapt(int, pt)
-#     pred_img = cv2.circle(pred_img, pt, radius=0, color=(0, 255, 0), thickness=-1)
+obj.setModelviewMatrix(pred_pose)
+obj.findVisibleSamplePoint()
+for pt in obj.sharp_2d_pts:
+    pt = mapt(int, pt)
+    pred_img = cv2.circle(pred_img, pt, radius=0, color=(0, 255, 0), thickness=-1)
 
-# originPoint = mapt(int, obj.project3Dto2D((0.0, 0.0, 0.0), pred_pose))
-# xaxis = mapt(int, obj.project3Dto2D((0.05, 0.0, 0.0), pred_pose))
-# pred_img = cv2.line(pred_img, originPoint, xaxis, (255, 0, 0), 1)
-# yaxis = mapt(int, obj.project3Dto2D((0.0, 0.05, 0.0), pred_pose))
-# pred_img = cv2.line(pred_img, originPoint, yaxis, (0, 255, 0), 1)
-# zaxis = mapt(int, obj.project3Dto2D((0.0, 0.0, 0.05), pred_pose))
-# pred_img = cv2.line(pred_img, originPoint, zaxis, (0, 0, 255), 1)
+originPoint = mapt(int, obj.project3Dto2D((0.0, 0.0, 0.0), pred_pose))
+xaxis = mapt(int, obj.project3Dto2D((0.05, 0.0, 0.0), pred_pose))
+pred_img = cv2.line(pred_img, originPoint, xaxis, (255, 0, 0), 1)
+yaxis = mapt(int, obj.project3Dto2D((0.0, 0.05, 0.0), pred_pose))
+pred_img = cv2.line(pred_img, originPoint, yaxis, (0, 255, 0), 1)
+zaxis = mapt(int, obj.project3Dto2D((0.0, 0.0, 0.05), pred_pose))
+pred_img = cv2.line(pred_img, originPoint, zaxis, (0, 0, 255), 1)
 
 pred_img = cv2.circle(pred_img, c0, radius=2, color=(0, 0, 255), thickness=-1)
 pred_img = cv2.circle(pred_img, c1, radius=2, color=(0, 0, 255), thickness=-1)
