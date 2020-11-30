@@ -93,7 +93,7 @@ rendered red edge, and press 'c' to save the image. Press 'q' to quit the progra
 ----------------
 
 
-## training rough pose estimation and refinement
+## Training rough pose estimation and refinement
 We recommend you run everything in conda because the requirements of the environment of following is different from the environment of yolo. After you create a environment, <br/>
 Run <br/>
 ```
@@ -234,7 +234,7 @@ For test
 
 ### Author: Jiaming Hu
 
-## project Organization
+## Project Organization
 ------------
 
     ├── LICENSE

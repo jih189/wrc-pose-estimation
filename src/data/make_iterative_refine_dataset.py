@@ -100,7 +100,8 @@ def process_data(args):
                 rot_pose = OM.rotateAngle(pose, inplaneRotate)
 
                 # generate set of random poses
-                random_pose = obj.resample(rot_pose, 1)[0]
+                # random_pose = obj.resample(rot_pose, 1)[0]
+                random_pose = obj.resamplePose(rot_pose, 0.01, 0.05, 0.08)
                 # random_pose = rot_pose
 
                 # generate the ground true mask for object

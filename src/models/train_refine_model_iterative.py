@@ -35,8 +35,8 @@ testTrigger = Value(c_bool, False)
 
 # refine parameters
 batch_size = 64
-epochs = 120
-lr = 4e-5
+epochs = 150
+lr = 2e-6
 momentum = 0.9
 w_decay = 0.1
 seglambda = 0.5
@@ -51,12 +51,12 @@ pool_dir = "pred_temp/"
 # initiate the net
 mymodel = DeepIM().cuda()
 mymodel = nn.DataParallel(mymodel)
-mymodel.module.flownet.load_state_dict(
-    torch.load(CFG.BEST_MODEL_FLOWNET).module.state_dict()
-)
-mymodel.module.flownet.eval()
+# mymodel.module.flownet.load_state_dict(
+#     torch.load(CFG.BEST_MODEL_FLOWNET).module.state_dict()
+# )
+# mymodel.module.flownet.eval()
 
-# mymodel = torch.load(CFG.BEST_MODEL_ITERATIVE_REFINE)
+mymodel = torch.load(CFG.BEST_MODEL_ITERATIVE_REFINE)
 
 seg_criterion = nn.CrossEntropyLoss(reduce=False)
 
@@ -690,10 +690,11 @@ def generateData(obj, sample_points):
             )
 
             # randomly resample the pose
-            if bool(random.getrandbits(1)):
-                global_pred_pose = obj.resamplePose(
-                    global_pred_pose, diameter * 0.08, diameter * 0.15, 0.27
-                )
+            # todo this pose resample should be updated with better one
+            # if bool(random.getrandbits(1)):
+            #     global_pred_pose = obj.resamplePose(
+            #         global_pred_pose, diameter * 0.08, diameter * 0.15, 0.27
+            #     )
 
             obj.setModelviewMatrix(global_pred_pose)
             obj.findVisibleSamplePoint()
@@ -741,28 +742,28 @@ def main():
     # copy all files from dataset to pool
     input_filepath = CFG.REFINE_ITERATIVE_DATA_PATH
 
-    # generate a pool and processed directory if need
-    if not os.path.isdir(pool_dir):
-        os.makedirs(os.path.dirname(pool_dir), exist_ok=True)
-    else:
-        # if pool dir exists, then delete all files in it
-        removeFilesInDir(pool_dir)
+    # # generate a pool and processed directory if need
+    # if not os.path.isdir(pool_dir):
+    #     os.makedirs(os.path.dirname(pool_dir), exist_ok=True)
+    # else:
+    #     # if pool dir exists, then delete all files in it
+    #     removeFilesInDir(pool_dir)
 
-    if not os.path.isdir(processed_dir):
-        os.makedirs(os.path.dirname(processed_dir), exist_ok=True)
-    else:
-        # if processed dir exists, then delete all files in it
-        removeFilesInDir(processed_dir)
+    # if not os.path.isdir(processed_dir):
+    #     os.makedirs(os.path.dirname(processed_dir), exist_ok=True)
+    # else:
+    #     # if processed dir exists, then delete all files in it
+    #     removeFilesInDir(processed_dir)
 
-    # read images and poses
-    input_path = Path(input_filepath)
-    for f in input_path.iterdir():
-        shutil.copyfile(
-            str(f), pool_dir + str(f.name),
-        )
+    # # read images and poses
+    # input_path = Path(input_filepath)
+    # for f in input_path.iterdir():
+    #     shutil.copyfile(
+    #         str(f), pool_dir + str(f.name),
+    #     )
 
     learningrate = lr
-    numOfTotalIteration = 8
+    numOfTotalIteration = 9
 
     for iteration in range(numOfTotalIteration):
         # # generate the processed data
@@ -857,7 +858,7 @@ def main():
             elif pre_loss > valtem:
                 torch.save(mymodel, CFG.BEST_MODEL_ITERATIVE_REFINE)
                 pre_loss = valtem
-            if (epoch + 1) % 40 == 0:
+            if (epoch + 1) % 50 == 0:
                 scheduler.step()
 
         print("training process done for interation ", iteration)

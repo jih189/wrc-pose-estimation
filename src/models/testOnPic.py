@@ -29,6 +29,69 @@ import time
 np.seterr(divide="ignore", invalid="ignore")
 
 
+def drawOpticalFlow(
+    obj, init_pose, segmentMask, opticalFlow, mask_img, test_img, ex, ey, rescaleValue,
+):
+
+    seg_pred = (
+        torch.argmax(segmentMask, 1, keepdim=True)
+        .float()
+        .squeeze(1)
+        .cpu()
+        .detach()
+        .numpy()
+    )
+
+    obj.setModelviewMatrix(init_pose)
+    obj.findVisibleSamplePoint()
+    vpt_start = time.time()
+    obj.getVisiblePointCloud()
+    print("get visible point cloud time = ", time.time() - vpt_start)
+
+    opticalFlow = torch.sigmoid(opticalFlow)
+
+    padding = Variable(
+        torch.zeros(opticalFlow.shape[0], 1, opticalFlow.shape[2], opticalFlow.shape[3])
+    ).cuda()
+
+    opticalFlow = torch.cat((opticalFlow, padding), 1)
+
+    opticalFlow = opticalFlow * (mask_img.cuda() == 1.0)
+
+    for i in range(len(obj.pointcloud)):
+        y2d, x2d, x3d, y3d, z3d = obj.pointcloud[i]
+        if int(x2d) % 10 == 0 and int(y2d) % 10 == 0:
+            y2d = (y2d - ey) * rescaleValue
+            x2d = (x2d - ex) * rescaleValue
+            [mx, my] = opticalFlow[0, :2, int(y2d), int(x2d)].cpu().detach().numpy()
+            if mx != 0.0 or my != 0.0:
+                mx = (mx - 0.5) * CFG.IMG_SIZE
+                my = (my - 0.5) * CFG.IMG_SIZE
+                if (
+                    x2d + mx >= 0
+                    and x2d + mx < CFG.IMG_SIZE
+                    and y2d + my >= 0
+                    and y2d + my < CFG.IMG_SIZE
+                    and seg_pred[0, int(y2d + my), int(x2d + mx)] == 1.0
+                ):
+                    test_img = cv2.line(
+                        test_img,
+                        (int(x2d + mx), int(y2d + my)),
+                        (int(x2d), int(y2d)),
+                        (0, 255, 255),
+                        1,
+                    )
+                    test_img = cv2.circle(
+                        test_img,
+                        (int(x2d + mx), int(y2d + my)),
+                        radius=1,
+                        color=(255, 0, 0),
+                        thickness=-1,
+                    )
+
+    cv2.imshow("flow", test_img)
+
+
 def letterbox(
     img,
     new_shape=(416, 416),
@@ -273,7 +336,7 @@ if __name__ == "__main__":
         # print("time for rought pose estimation: ")
         # print(rough_pose_estimation_end - rough_pose_estimation_start)
 
-        numOfRefine = 15
+        numOfRefine = 12
 
         # pose refinement
         for t in range(numOfRefine):
@@ -413,14 +476,26 @@ if __name__ == "__main__":
             rough_pose_at_center = torch.from_numpy(rough_pose_at_center)
             rough_pose_at_center = rough_pose_at_center.unsqueeze(0)
 
-            if t == numOfRefine - 1:
-                # get the confidence
-                # confidence_estimation_time_start = time.time()
-                confidence = getConfid(segmentMask, opticalFlow, mask_img,)
-                # confidence_estimation_time_end = time.time()
-                # print("confidence estimation time:")
-                # print(confidence_estimation_time_end - confidence_estimation_time_start)
-                print("confidence ", confidence)
+            # drawOpticalFlow(
+            #     obj,
+            #     rough_pred_pose,
+            #     segmentMask,
+            #     opticalFlow,
+            #     mask_img,
+            #     test_img,
+            #     ex,
+            #     ey,
+            #     rescaleValue,
+            # )
+
+            # if t == numOfRefine - 1:
+            # get the confidence
+            # confidence_estimation_time_start = time.time()
+            # confidence = getConfid(segmentMask, opticalFlow, mask_img,)
+            # confidence_estimation_time_end = time.time()
+            # print("confidence estimation time:")
+            # print(confidence_estimation_time_end - confidence_estimation_time_start)
+            # print("confidence ", confidence)
 
             pred_pose = getPredictPose(
                 rough_pose_at_center,
