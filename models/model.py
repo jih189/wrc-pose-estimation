@@ -34,7 +34,7 @@ class Magic_Net(nn.Module):
         self.layer4[2].conv2 = nn.Conv2d(512, 512, kernel_size=15, stride=1, padding=7)
 
         self.avgpool1 = nn.AdaptiveAvgPool2d(1)
-        self.fc = nn.Linear(512, self.viewpt_class + self.rot_class + 2)
+        self.fc = nn.Linear(512, self.viewpt_class + self.rot_class + 2 + 16)# view point, rotation, 2d offset, corner points
 
     def forward(self, x):
         x = self.layer0(x)

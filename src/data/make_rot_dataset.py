@@ -100,10 +100,13 @@ def process_data(args):
             inplaneRotate = r * 45.0
             try:
                 rot_img = OM.rotate_image(img, inplaneRotate, center_pt)
-                rot_pose = OM.rotateAngle(pose, inplaneRotate)
+                rot_pose = obj.rotateAngle(pose, inplaneRotate)
 
                 # generate the real bounding box for object
                 obj.setModelviewMatrix(rot_pose)
+
+                # get the cornerpoints of the object
+                cornerpoints_2d = obj.getCornerPoints(rot_pose)
 
                 # random generate a bounding box around the object with given pose
                 obj.findVisibleSamplePoint()
@@ -210,6 +213,14 @@ def process_data(args):
                 )
 
                 np.save(
+                    output_filepath
+                    + "corner"
+                    + "{:06d}".format(current_output_index)
+                    + ".npy",
+                    cornerpoints_2d
+                )
+
+                np.save(
                     output_filepath + "{:06d}".format(current_output_index) + ".npy",
                     rot_pose,
                 )
@@ -265,8 +276,8 @@ def main(input_filepath, output_filepath):
     image_names.sort()
     pose_names.sort()
 
-    # image_names = image_names[:1]
-    # pose_names = pose_names[:1]
+    image_names = image_names[:10]
+    pose_names = pose_names[:10]
 
     # generate input for function
     datalist = list(zip(image_names, pose_names))
@@ -290,12 +301,12 @@ def main(input_filepath, output_filepath):
     val_list = random.sample(range(current_index), int((current_index + 1) * 0.3))
     train_list = [i for i in range(current_index) if i not in val_list]
 
-    f = open(output_filepath + "train.txt", "w")
+    f = open(output_filepath + "train.txt", 'w+')
     for i in train_list:
         f.write("{:06d}".format(i) + "\n")
     f.close()
 
-    f = open(output_filepath + "val.txt", "w")
+    f = open(output_filepath + "val.txt", 'w+')
     for i in val_list:
         f.write("{:06d}".format(i) + "\n")
     f.close()

@@ -85,7 +85,34 @@ class Rot_data(Dataset):
         inplaneRotation = inplaneRotation % (2 * np.pi) / (2 * np.pi / 60)
         inplaneRotation = int(inplaneRotation)
 
-        return img, vpidx, inplaneRotation, offset, depth
+        cornerPoints_2d = np.load(self.dataPath + "corner" + self.dataNames[idx] + ".npy")
+
+        c0 = np.array(
+            [(cornerPoints_2d[0][0] - upperleftx) / l, (cornerPoints_2d[0][1] - upperlefty) / l]
+        )
+        c1 = np.array(
+            [(cornerPoints_2d[1][0] - upperleftx) / l, (cornerPoints_2d[1][1] - upperlefty) / l]
+        )
+        c2 = np.array(
+            [(cornerPoints_2d[2][0] - upperleftx) / l, (cornerPoints_2d[2][1] - upperlefty) / l]
+        )
+        c3 = np.array(
+            [(cornerPoints_2d[3][0] - upperleftx) / l, (cornerPoints_2d[3][1] - upperlefty) / l]
+        )
+        c4 = np.array(
+            [(cornerPoints_2d[4][0] - upperleftx) / l, (cornerPoints_2d[4][1] - upperlefty) / l]
+        )
+        c5 = np.array(
+            [(cornerPoints_2d[5][0] - upperleftx) / l, (cornerPoints_2d[5][1] - upperlefty) / l]
+        )
+        c6 = np.array(
+            [(cornerPoints_2d[6][0] - upperleftx) / l, (cornerPoints_2d[6][1] - upperlefty) / l]
+        )
+        c7 = np.array(
+            [(cornerPoints_2d[7][0] - upperleftx) / l, (cornerPoints_2d[7][1] - upperlefty) / l]
+        )
+
+        return img, vpidx, inplaneRotation, offset, depth, c0, c1, c2, c3, c4, c5, c6, c7
 
 
 class Iterative_refine_data(Dataset):
