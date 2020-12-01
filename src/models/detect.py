@@ -11,6 +11,7 @@ import kornia
 
 from models.models import Darknet  # set ONNX_EXPORT in models.py
 from models.model import Magic_Net, FlowNet, DeepIM
+from enum import IntEnum
 
 from src.utils.utils import (
     load_classes,
@@ -57,7 +58,7 @@ yolo_model.to(device).eval()
 
 ################### magic net ########################
 viewpt_class = CFG.VIEWPOINT_NUM
-rot_class = 60
+rot_class = CFG.ROTATION_NUM
 
 rot_model = Magic_Net(viewpt_class=viewpt_class, rot_class=rot_class).cuda()
 rot_model = torch.load(CFG.BEST_MODEL_ROT)
@@ -119,9 +120,7 @@ def letterbox(
     return img, ratio, (dw, dh)
 
 
-def detect(object_id, img, estimated_depth):
-
-    frame = img
+def detect(object_id, frame, estimated_depth):
     demo = frame.copy()
     rot_frame = frame.copy()
     refine_frame = frame.copy()
@@ -153,6 +152,7 @@ def detect(object_id, img, estimated_depth):
     croptopleft, croplowright = None, None
 
     foundObject = False
+
     # Process detections
     if pred is not None and len(pred):
         # Rescale boxes from img_size to demo size
@@ -161,7 +161,7 @@ def detect(object_id, img, estimated_depth):
         for *xyxy, conf, cls in pred:
             label = "%s %.2f" % (names[int(cls)], conf)
             plot_one_box(xyxy, demo, label=label, color=colors[int(cls)])
-            if names[int(cls)] == object_id:
+            if names[int(cls)] == CFG.OBJ_NAME:
                 foundObject = True
                 croptopleft = [
                     int(xyxy[0].cpu().detach().numpy()),
@@ -171,15 +171,19 @@ def detect(object_id, img, estimated_depth):
                     int(xyxy[2].cpu().detach().numpy()),
                     int(xyxy[3].cpu().detach().numpy()),
                 ]
-        cv2.imshow("detect", demo)
-        cv2.waitKey(0)
 
     if foundObject:
+        # rough_pose_estimation_start = time.time()
+        # find the diagnal of the bounding box
+        objectDiag = math.sqrt(
+            (croplowright[0] - croptopleft[0]) ** 2
+            + (croplowright[1] - croptopleft[1]) ** 2
+        )
+
         # rot classifier
         upperleft, lowerright = OM.get_centered_crop(croptopleft, croplowright)
         crop_width = int(lowerright[0]) - int(upperleft[0])
 
-        # crop the image for rot classifier
         img_crop = np.zeros(
             (lowerright[1] - upperleft[1], lowerright[0] - upperleft[0], 3), np.uint8,
         )
@@ -221,16 +225,140 @@ def detect(object_id, img, estimated_depth):
         principle_pt = np.array([CFG.CAMERA_MATRIX[0, 2], CFG.CAMERA_MATRIX[1, 2]])
 
         position = (
-            torch.sigmoid(output[:, viewpt_class + rot_class :]).data.cpu().numpy()
+            torch.sigmoid(
+                output[:, viewpt_class + rot_class : viewpt_class + rot_class + 2]
+            )
+            .data.cpu()
+            .numpy()
+        )
+        c0 = (
+            torch.sigmoid(
+                output[:, viewpt_class + rot_class + 2 : viewpt_class + rot_class + 4]
+            )
+            .data.cpu()
+            .numpy()
+        )
+        c1 = (
+            torch.sigmoid(
+                output[:, viewpt_class + rot_class + 4 : viewpt_class + rot_class + 6]
+            )
+            .data.cpu()
+            .numpy()
+        )
+        c2 = (
+            torch.sigmoid(
+                output[:, viewpt_class + rot_class + 6 : viewpt_class + rot_class + 8]
+            )
+            .data.cpu()
+            .numpy()
+        )
+        c3 = (
+            torch.sigmoid(
+                output[:, viewpt_class + rot_class + 8 : viewpt_class + rot_class + 10]
+            )
+            .data.cpu()
+            .numpy()
+        )
+        c4 = (
+            torch.sigmoid(
+                output[:, viewpt_class + rot_class + 10 : viewpt_class + rot_class + 12]
+            )
+            .data.cpu()
+            .numpy()
+        )
+        c5 = (
+            torch.sigmoid(
+                output[:, viewpt_class + rot_class + 12 : viewpt_class + rot_class + 14]
+            )
+            .data.cpu()
+            .numpy()
+        )
+        c6 = (
+            torch.sigmoid(
+                output[:, viewpt_class + rot_class + 14 : viewpt_class + rot_class + 16]
+            )
+            .data.cpu()
+            .numpy()
+        )
+        c7 = (
+            torch.sigmoid(
+                output[:, viewpt_class + rot_class + 16 : viewpt_class + rot_class + 18]
+            )
+            .data.cpu()
+            .numpy()
         )
         position *= crop_width
+        c0 *= crop_width
+        c1 *= crop_width
+        c2 *= crop_width
+        c3 *= crop_width
+        c4 *= crop_width
+        c5 *= crop_width
+        c6 *= crop_width
+        c7 *= crop_width
         offset = position[:, :2]
         offset = np.array(upperleft) + offset.reshape(2) - principle_pt
+        c0 = np.array([upperleft[0], upperleft[1]]) + c0.reshape(2)
+        c1 = np.array([upperleft[0], upperleft[1]]) + c1.reshape(2)
+        c2 = np.array([upperleft[0], upperleft[1]]) + c2.reshape(2)
+        c3 = np.array([upperleft[0], upperleft[1]]) + c3.reshape(2)
+        c4 = np.array([upperleft[0], upperleft[1]]) + c4.reshape(2)
+        c5 = np.array([upperleft[0], upperleft[1]]) + c5.reshape(2)
+        c6 = np.array([upperleft[0], upperleft[1]]) + c6.reshape(2)
+        c7 = np.array([upperleft[0], upperleft[1]]) + c7.reshape(2)
 
-        rough_pred_pose = obj.label2pose(viewpt, rot, offset, estimated_depth)
+        _, rvec, tvec, _ = cv2.solvePnPRansac(
+            np.array(obj.cornerPoints),
+            np.array([c0, c1, c2, c3, c4, c5, c6, c7]),
+            CFG.CAMERA_MATRIX,
+            np.zeros((4, 1)),
+            flags=cv2.SOLVEPNP_EPNP,
+        )
+        rotMat, _ = cv2.Rodrigues(rvec)
+        rough_pred_pose = np.identity(4)
+        rough_pred_pose[:3, :3] = rotMat
+        rough_pred_pose[0, 3] = tvec[0][0]
+        rough_pred_pose[1, 3] = tvec[1][0]
+        rough_pred_pose[2, 3] = tvec[2][0]
+
+        temp_demo = demo.copy()
+
+        c0 = (int(c0[0]), int(c0[1]))
+        c1 = (int(c1[0]), int(c1[1]))
+        c2 = (int(c2[0]), int(c2[1]))
+        c3 = (int(c3[0]), int(c3[1]))
+        c4 = (int(c4[0]), int(c4[1]))
+        c5 = (int(c5[0]), int(c5[1]))
+        c6 = (int(c6[0]), int(c6[1]))
+        c7 = (int(c7[0]), int(c7[1]))
+
+        # drew the corner points on the object
+        temp_demo = cv2.circle(temp_demo, c0, radius=4, color=(0, 255, 0), thickness=-1)
+        temp_demo = cv2.circle(temp_demo, c1, radius=4, color=(0, 255, 0), thickness=-1)
+        temp_demo = cv2.circle(temp_demo, c2, radius=4, color=(0, 255, 0), thickness=-1)
+        temp_demo = cv2.circle(temp_demo, c3, radius=4, color=(0, 255, 0), thickness=-1)
+        temp_demo = cv2.circle(temp_demo, c4, radius=4, color=(0, 255, 0), thickness=-1)
+        temp_demo = cv2.circle(temp_demo, c5, radius=4, color=(0, 255, 0), thickness=-1)
+        temp_demo = cv2.circle(temp_demo, c6, radius=4, color=(0, 255, 0), thickness=-1)
+        temp_demo = cv2.circle(temp_demo, c7, radius=4, color=(0, 255, 0), thickness=-1)
+
+        obj.setModelviewMatrix(rough_pred_pose)
+        obj.findVisibleSamplePoint()
+
+        # test
+        for p in obj.sharp_2d_pts:
+            temp_demo = cv2.circle(
+                temp_demo,
+                (int(p[0]), int(p[1])),
+                radius=1,
+                color=(255, 0, 0),
+                thickness=-1,
+            )
+
+        numOfRefine = 1
 
         # pose refinement
-        for t in range(15):
+        for t in range(numOfRefine):
             obj.setModelviewMatrix(rough_pred_pose)
             obj.findVisibleSamplePoint()
 
@@ -311,7 +439,7 @@ def detect(object_id, img, estimated_depth):
 
             # load edge image
             edge_img = cv2.resize(
-                crop_edge, (CFG.IMG_SIZE, CFG.IMG_SIZE), interpolation=cv2.INTER_AREA
+                crop_edge, (CFG.IMG_SIZE, CFG.IMG_SIZE), interpolation=cv2.INTER_AREA,
             )
             edge_img = edge_img[:, :, np.newaxis].transpose(2, 0, 1)
 
@@ -320,7 +448,7 @@ def detect(object_id, img, estimated_depth):
 
             # load the mask image
             mask_img = cv2.resize(
-                crop_mask, (CFG.IMG_SIZE, CFG.IMG_SIZE), interpolation=cv2.INTER_AREA
+                crop_mask, (CFG.IMG_SIZE, CFG.IMG_SIZE), interpolation=cv2.INTER_AREA,
             )
             mask_img = mask_img[:, :, np.newaxis].transpose(2, 0, 1)
 
@@ -362,20 +490,6 @@ def detect(object_id, img, estimated_depth):
             rough_pose_at_center = torch.from_numpy(rough_pose_at_center)
             rough_pose_at_center = rough_pose_at_center.unsqueeze(0)
 
-            # get the confidence
-            if t == 9:
-                confidence = getConfid(segmentMask, opticalFlow, mask_img,)
-                print("confidence = ", confidence)
-                cv2.putText(
-                    demo,
-                    "confidence score = " + str(confidence * 100.0),
-                    (0, 60),
-                    cv2.FONT_HERSHEY_SIMPLEX,
-                    1.5,
-                    (0, 0, 255),
-                    2,
-                )
-
             pred_pose = getPredictPose(
                 rough_pose_at_center,
                 rot,
@@ -390,21 +504,229 @@ def detect(object_id, img, estimated_depth):
             )
 
             rough_pred_pose = pred_pose
-            rough_pred_pose = OM.symmetricRemove(rough_pred_pose)
 
-        obj.setModelviewMatrix(pred_pose)
+        confidence = getConfid(segmentMask, opticalFlow, mask_img,)
+        print("confidence:", confidence)
+
+        obj.setModelviewMatrix(rough_pred_pose)
         obj.findVisibleSamplePoint()
 
+        # test
         for p in obj.sharp_2d_pts:
-            p = (int(p[0]), int(p[1]))
-            demo = cv2.circle(demo, p, radius=2, color=(0, 0, 255), thickness=-1)
-        cv2.namedWindow("window", cv2.WND_PROP_FULLSCREEN)
-        cv2.setWindowProperty("window", cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN)
-        cv2.imshow("window", demo)
-        cv2.waitKey(2000)
+            temp_demo = cv2.circle(
+                temp_demo,
+                (int(p[0]), int(p[1])),
+                radius=1,
+                color=(0, 255, 0),
+                thickness=-1,
+            )
+        cv2.imshow("test", temp_demo)
+        cv2.waitKey(0)
 
         return pred_pose, confidence
     else:
         # can't detect the object
         print("can't detect object!!")
         return None, 0.0
+
+
+class Status(IntEnum):
+    NOT_FOUND = 0
+    FOUND = 1
+
+
+def vs_detect(object_id, img):
+    frame = img
+    demo = frame.copy()
+    rot_frame = frame.copy()
+    # resize image
+    frame = letterbox(frame, new_shape=416)[0]
+    # frame = cv2.resize(frame, (int(320), int(416)), interpolation=cv2.INTER_AREA)
+    frame = frame[:, :, :3]
+    frame = frame[:, :, ::-1].transpose(2, 0, 1)
+    frame = np.ascontiguousarray(frame)
+    # load image to the device
+    frame = torch.from_numpy(frame).to(device)
+
+    # convert image to be used
+    frame = frame.float()  # uint8 to fp16/32
+    frame /= 255.0  # 0 - 255 to 0.0 - 1.0
+    if frame.ndimension() == 3:
+        frame = frame.unsqueeze(0)
+
+    # Inference
+    pred = yolo_model(frame)[0].float()
+
+    # Apply NMS
+    pred = non_max_suppression(
+        pred, conf_thres, iou_thres, classes=None, agnostic=False
+    )
+
+    pred = pred[0]
+    croptopleft, croplowright = None, None
+
+    foundObject = False
+
+    # Process detections
+    if pred is not None and len(pred):
+        # Rescale boxes from img_size to demo size
+        pred[:, :4] = scale_coords(frame.shape[2:], pred[:, :4], demo.shape).round()
+
+        for *xyxy, conf, cls in pred:
+            label = "%s %.2f" % (names[int(cls)], conf)
+            if names[int(cls)] == CFG.OBJ_NAME:
+                foundObject = True
+                croptopleft = [
+                    int(xyxy[0].cpu().detach().numpy()),
+                    int(xyxy[1].cpu().detach().numpy()),
+                ]
+                croplowright = [
+                    int(xyxy[2].cpu().detach().numpy()),
+                    int(xyxy[3].cpu().detach().numpy()),
+                ]
+
+    if foundObject:
+        # rough_pose_estimation_start = time.time()
+        # find the diagnal of the bounding box
+        objectDiag = math.sqrt(
+            (croplowright[0] - croptopleft[0]) ** 2
+            + (croplowright[1] - croptopleft[1]) ** 2
+        )
+
+        # rot classifier
+        upperleft, lowerright = OM.get_centered_crop(croptopleft, croplowright)
+        crop_width = int(lowerright[0]) - int(upperleft[0])
+
+        img_crop = np.zeros(
+            (lowerright[1] - upperleft[1], lowerright[0] - upperleft[0], 3), np.uint8,
+        )
+        upperleft_crop_inner = [
+            max(0, upperleft[0]),
+            max(0, upperleft[1]),
+        ]
+        lowerright_crop_inner = [
+            min(rot_frame.shape[1], lowerright[0]),
+            min(rot_frame.shape[0], lowerright[1]),
+        ]
+        img_crop[
+            upperleft_crop_inner[1]
+            - upperleft[1] : lowerright_crop_inner[1]
+            - upperleft[1],
+            upperleft_crop_inner[0]
+            - upperleft[0] : lowerright_crop_inner[0]
+            - upperleft[0],
+        ] = rot_frame[
+            int(upperleft_crop_inner[1]) : int(lowerright_crop_inner[1]),
+            int(upperleft_crop_inner[0]) : int(lowerright_crop_inner[0]),
+        ]
+
+        img_crop = cv2.resize(img_crop, (CFG.IMG_SIZE, CFG.IMG_SIZE))
+        img_crop = img_crop[:, :, :3].transpose(2, 0, 1)
+        img_crop = img_crop[np.newaxis, ...]
+
+        input = Variable(torch.from_numpy(img_crop).cuda()).float()
+        output = rot_model(input)
+
+        principle_pt = np.array([CFG.CAMERA_MATRIX[0, 2], CFG.CAMERA_MATRIX[1, 2]])
+
+        c0 = (
+            torch.sigmoid(
+                output[:, viewpt_class + rot_class + 2 : viewpt_class + rot_class + 4]
+            )
+            .data.cpu()
+            .numpy()
+        )
+        c1 = (
+            torch.sigmoid(
+                output[:, viewpt_class + rot_class + 4 : viewpt_class + rot_class + 6]
+            )
+            .data.cpu()
+            .numpy()
+        )
+        c2 = (
+            torch.sigmoid(
+                output[:, viewpt_class + rot_class + 6 : viewpt_class + rot_class + 8]
+            )
+            .data.cpu()
+            .numpy()
+        )
+        c3 = (
+            torch.sigmoid(
+                output[:, viewpt_class + rot_class + 8 : viewpt_class + rot_class + 10]
+            )
+            .data.cpu()
+            .numpy()
+        )
+        c4 = (
+            torch.sigmoid(
+                output[:, viewpt_class + rot_class + 10 : viewpt_class + rot_class + 12]
+            )
+            .data.cpu()
+            .numpy()
+        )
+        c5 = (
+            torch.sigmoid(
+                output[:, viewpt_class + rot_class + 12 : viewpt_class + rot_class + 14]
+            )
+            .data.cpu()
+            .numpy()
+        )
+        c6 = (
+            torch.sigmoid(
+                output[:, viewpt_class + rot_class + 14 : viewpt_class + rot_class + 16]
+            )
+            .data.cpu()
+            .numpy()
+        )
+        c7 = (
+            torch.sigmoid(
+                output[:, viewpt_class + rot_class + 16 : viewpt_class + rot_class + 18]
+            )
+            .data.cpu()
+            .numpy()
+        )
+        c0 *= crop_width
+        c1 *= crop_width
+        c2 *= crop_width
+        c3 *= crop_width
+        c4 *= crop_width
+        c5 *= crop_width
+        c6 *= crop_width
+        c7 *= crop_width
+
+        c0 = np.array([upperleft[0], upperleft[1]]) + c0.reshape(2)
+        c1 = np.array([upperleft[0], upperleft[1]]) + c1.reshape(2)
+        c2 = np.array([upperleft[0], upperleft[1]]) + c2.reshape(2)
+        c3 = np.array([upperleft[0], upperleft[1]]) + c3.reshape(2)
+        c4 = np.array([upperleft[0], upperleft[1]]) + c4.reshape(2)
+        c5 = np.array([upperleft[0], upperleft[1]]) + c5.reshape(2)
+        c6 = np.array([upperleft[0], upperleft[1]]) + c6.reshape(2)
+        c7 = np.array([upperleft[0], upperleft[1]]) + c7.reshape(2)
+
+        _, rvec, tvec, _ = cv2.solvePnPRansac(
+            np.array(obj.cornerPoints),
+            np.array([c0, c1, c2, c3, c4, c5, c6, c7]),
+            CFG.CAMERA_MATRIX,
+            np.zeros((4, 1)),
+            flags=cv2.SOLVEPNP_EPNP,
+        )
+        rotMat, _ = cv2.Rodrigues(rvec)
+        rough_pred_pose = np.identity(4)
+        rough_pred_pose[:3, :3] = rotMat
+        rough_pred_pose[0, 3] = tvec[0][0]
+        rough_pred_pose[1, 3] = tvec[1][0]
+        rough_pred_pose[2, 3] = tvec[2][0]
+        rough_pred_pose = OM.symmetricRemove(rough_pred_pose)
+        obj.setModelviewMatrix(rough_pred_pose)
+        obj.findVisibleSamplePoint()
+
+        for p in obj.sharp_2d_pts:
+            p = (int(p[0]), int(p[1]))
+            demo = cv2.circle(demo, p, radius=2, color=(0, 0, 255), thickness=-1)
+
+        cv2.imshow("window", demo)
+        cv2.waitKey(0)
+        return rough_pred_pose, Status.FOUND
+    else:
+        # can't detect the object
+        return np.identity(4), Status.NOT_FOUND

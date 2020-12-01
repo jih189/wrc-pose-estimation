@@ -76,7 +76,21 @@ def train():
     for epoch in range(epochs):
         avg_loss = []
         for data in train_loader:
-            (input_img, vpidx, inplane_rot, offset_label, depth, c0, c1, c2, c3, c4, c5, c6, c7) = data
+            (
+                input_img,
+                vpidx,
+                inplane_rot,
+                offset_label,
+                depth,
+                c0,
+                c1,
+                c2,
+                c3,
+                c4,
+                c5,
+                c6,
+                c7,
+            ) = data
 
             optimizer.zero_grad()
 
@@ -119,34 +133,89 @@ def train():
             )
             # rot_loss = cal_rot_loss(output[:,viewpt_class:viewpt_class + rot_class], inplane_rot)
             offset_loss = offset_criterion(
-                torch.sigmoid(output[:, viewpt_class + rot_class : viewpt_class + rot_class + 2]), offset_label
+                torch.sigmoid(
+                    output[:, viewpt_class + rot_class : viewpt_class + rot_class + 2]
+                ),
+                offset_label,
             )
             c0_loss = offset_criterion(
-                torch.sigmoid(output[:, viewpt_class + rot_class + 2: viewpt_class + rot_class + 4]), c0
+                torch.sigmoid(
+                    output[
+                        :, viewpt_class + rot_class + 2 : viewpt_class + rot_class + 4
+                    ]
+                ),
+                c0,
             )
             c1_loss = offset_criterion(
-                torch.sigmoid(output[:, viewpt_class + rot_class + 4: viewpt_class + rot_class + 6]), c1
+                torch.sigmoid(
+                    output[
+                        :, viewpt_class + rot_class + 4 : viewpt_class + rot_class + 6
+                    ]
+                ),
+                c1,
             )
             c2_loss = offset_criterion(
-                torch.sigmoid(output[:, viewpt_class + rot_class + 6: viewpt_class + rot_class + 8]), c2
+                torch.sigmoid(
+                    output[
+                        :, viewpt_class + rot_class + 6 : viewpt_class + rot_class + 8
+                    ]
+                ),
+                c2,
             )
             c3_loss = offset_criterion(
-                torch.sigmoid(output[:, viewpt_class + rot_class + 8: viewpt_class + rot_class + 10]), c3
+                torch.sigmoid(
+                    output[
+                        :, viewpt_class + rot_class + 8 : viewpt_class + rot_class + 10
+                    ]
+                ),
+                c3,
             )
             c4_loss = offset_criterion(
-                torch.sigmoid(output[:, viewpt_class + rot_class + 10: viewpt_class + rot_class + 12]), c4
+                torch.sigmoid(
+                    output[
+                        :, viewpt_class + rot_class + 10 : viewpt_class + rot_class + 12
+                    ]
+                ),
+                c4,
             )
             c5_loss = offset_criterion(
-                torch.sigmoid(output[:, viewpt_class + rot_class + 12: viewpt_class + rot_class + 14]), c5
+                torch.sigmoid(
+                    output[
+                        :, viewpt_class + rot_class + 12 : viewpt_class + rot_class + 14
+                    ]
+                ),
+                c5,
             )
             c6_loss = offset_criterion(
-                torch.sigmoid(output[:, viewpt_class + rot_class + 14: viewpt_class + rot_class + 16]), c6
+                torch.sigmoid(
+                    output[
+                        :, viewpt_class + rot_class + 14 : viewpt_class + rot_class + 16
+                    ]
+                ),
+                c6,
             )
             c7_loss = offset_criterion(
-                torch.sigmoid(output[:, viewpt_class + rot_class + 16: viewpt_class + rot_class + 18]), c7
+                torch.sigmoid(
+                    output[
+                        :, viewpt_class + rot_class + 16 : viewpt_class + rot_class + 18
+                    ]
+                ),
+                c7,
             )
 
-            loss = viewpt_loss + rot_loss * rot_lamda + offset_lamda * offset_loss + offset_lamda * c0_loss + offset_lamda * c1_loss + offset_lamda * c2_loss + offset_lamda * c3_loss + offset_lamda * c4_loss + offset_lamda * c5_loss + offset_lamda * c6_loss + offset_lamda * c7_loss
+            loss = (
+                viewpt_loss
+                + rot_loss * rot_lamda
+                + offset_lamda * offset_loss
+                + offset_lamda * c0_loss
+                + offset_lamda * c1_loss
+                + offset_lamda * c2_loss
+                + offset_lamda * c3_loss
+                + offset_lamda * c4_loss
+                + offset_lamda * c5_loss
+                + offset_lamda * c6_loss
+                + offset_lamda * c7_loss
+            )
 
             loss.backward()
             optimizer.step()
@@ -191,7 +260,21 @@ def val():
     rot_avg_loss = []
     offset_avg_loss = []
     for data in val_loader:
-        input_img, vpidx, inplane_rot, offset_label, depth, c0, c1, c2, c3, c4, c5, c6, c7 = data
+        (
+            input_img,
+            vpidx,
+            inplane_rot,
+            offset_label,
+            depth,
+            c0,
+            c1,
+            c2,
+            c3,
+            c4,
+            c5,
+            c6,
+            c7,
+        ) = data
 
         input = Variable(input_img.cuda()).float()
 
@@ -218,34 +301,73 @@ def val():
         )
         # rot_loss = cal_rot_loss(output[:,viewpt_class:viewpt_class + rot_class], inplane_rot)
         offset_loss = offset_criterion(
-            torch.sigmoid(output[:, viewpt_class + rot_class : viewpt_class + rot_class + 2]), offset_label
+            torch.sigmoid(
+                output[:, viewpt_class + rot_class : viewpt_class + rot_class + 2]
+            ),
+            offset_label,
         )
         c0_loss = offset_criterion(
-            torch.sigmoid(output[:, viewpt_class + rot_class + 2: viewpt_class + rot_class + 4]), c0
+            torch.sigmoid(
+                output[:, viewpt_class + rot_class + 2 : viewpt_class + rot_class + 4]
+            ),
+            c0,
         )
         c1_loss = offset_criterion(
-            torch.sigmoid(output[:, viewpt_class + rot_class + 4: viewpt_class + rot_class + 6]), c1
+            torch.sigmoid(
+                output[:, viewpt_class + rot_class + 4 : viewpt_class + rot_class + 6]
+            ),
+            c1,
         )
         c2_loss = offset_criterion(
-            torch.sigmoid(output[:, viewpt_class + rot_class + 6: viewpt_class + rot_class + 8]), c2
+            torch.sigmoid(
+                output[:, viewpt_class + rot_class + 6 : viewpt_class + rot_class + 8]
+            ),
+            c2,
         )
         c3_loss = offset_criterion(
-            torch.sigmoid(output[:, viewpt_class + rot_class + 8: viewpt_class + rot_class + 10]), c3
+            torch.sigmoid(
+                output[:, viewpt_class + rot_class + 8 : viewpt_class + rot_class + 10]
+            ),
+            c3,
         )
         c4_loss = offset_criterion(
-            torch.sigmoid(output[:, viewpt_class + rot_class + 10: viewpt_class + rot_class + 12]), c4
+            torch.sigmoid(
+                output[:, viewpt_class + rot_class + 10 : viewpt_class + rot_class + 12]
+            ),
+            c4,
         )
         c5_loss = offset_criterion(
-            torch.sigmoid(output[:, viewpt_class + rot_class + 12: viewpt_class + rot_class + 14]), c5
+            torch.sigmoid(
+                output[:, viewpt_class + rot_class + 12 : viewpt_class + rot_class + 14]
+            ),
+            c5,
         )
         c6_loss = offset_criterion(
-            torch.sigmoid(output[:, viewpt_class + rot_class + 14: viewpt_class + rot_class + 16]), c6
+            torch.sigmoid(
+                output[:, viewpt_class + rot_class + 14 : viewpt_class + rot_class + 16]
+            ),
+            c6,
         )
         c7_loss = offset_criterion(
-            torch.sigmoid(output[:, viewpt_class + rot_class + 16: viewpt_class + rot_class + 18]), c7
+            torch.sigmoid(
+                output[:, viewpt_class + rot_class + 16 : viewpt_class + rot_class + 18]
+            ),
+            c7,
         )
 
-        loss = viewpt_loss + rot_loss * rot_lamda + offset_loss * offset_lamda + offset_lamda * c0_loss + offset_lamda * c1_loss + offset_lamda * c2_loss + offset_lamda * c3_loss + offset_lamda * c4_loss + offset_lamda * c5_loss + offset_lamda * c6_loss + offset_lamda * c7_loss
+        loss = (
+            viewpt_loss
+            + rot_loss * rot_lamda
+            + offset_loss * offset_lamda
+            + offset_lamda * c0_loss
+            + offset_lamda * c1_loss
+            + offset_lamda * c2_loss
+            + offset_lamda * c3_loss
+            + offset_lamda * c4_loss
+            + offset_lamda * c5_loss
+            + offset_lamda * c6_loss
+            + offset_lamda * c7_loss
+        )
 
         pred = output[:, :viewpt_class].data.cpu().numpy()
         pred = np.argmax(pred, axis=1)

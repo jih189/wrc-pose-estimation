@@ -33,7 +33,9 @@ SAMPLE_FACE_MODEL = (
 
 IMAGE_SAVE_PATH = CURRENT_POSE_ESITMATION_DIR + "data/images/" + OBJ_NAME + "/"
 VERIFY_IMAGE_PATH = CURRENT_POSE_ESITMATION_DIR + "data/raw/" + OBJ_NAME + "/"
-PROCESSED_DATA_PATH = CURRENT_POSE_ESITMATION_DIR + "data/processed/" + OBJ_NAME + "_rot/"
+PROCESSED_DATA_PATH = (
+    CURRENT_POSE_ESITMATION_DIR + "data/processed/" + OBJ_NAME + "_rot/"
+)
 REFINE_DATA_PATH = (
     CURRENT_POSE_ESITMATION_DIR + "data/processed/" + OBJ_NAME + "_refine/"
 )
@@ -87,6 +89,7 @@ CAMERA_H = 720
 
 ################################## hyper-parameters #######################################################
 VIEWPOINT_NUM = 642
+ROTATION_NUM = 60
 IMG_SIZE = 240
 EXPAND_SIZE = 2.4
 
@@ -95,3 +98,5 @@ LAMBDA_V = 1.0
 
 COLOR_AUGMENTATION_BRIGHTNESS = 15
 COLOR_AUGMENTATION_CONTRAST = 0.15
+
+USE_ROUGH_PRED = False

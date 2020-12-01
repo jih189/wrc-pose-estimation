@@ -217,7 +217,7 @@ def process_data(args):
                     + "corner"
                     + "{:06d}".format(current_output_index)
                     + ".npy",
-                    cornerpoints_2d
+                    cornerpoints_2d,
                 )
 
                 np.save(
@@ -276,8 +276,8 @@ def main(input_filepath, output_filepath):
     image_names.sort()
     pose_names.sort()
 
-    image_names = image_names[:10]
-    pose_names = pose_names[:10]
+    # image_names = image_names[:10]
+    # pose_names = pose_names[:10]
 
     # generate input for function
     datalist = list(zip(image_names, pose_names))
@@ -301,12 +301,12 @@ def main(input_filepath, output_filepath):
     val_list = random.sample(range(current_index), int((current_index + 1) * 0.3))
     train_list = [i for i in range(current_index) if i not in val_list]
 
-    f = open(output_filepath + "train.txt", 'w+')
+    f = open(output_filepath + "train.txt", "w+")
     for i in train_list:
         f.write("{:06d}".format(i) + "\n")
     f.close()
 
-    f = open(output_filepath + "val.txt", 'w+')
+    f = open(output_filepath + "val.txt", "w+")
     for i in val_list:
         f.write("{:06d}".format(i) + "\n")
     f.close()

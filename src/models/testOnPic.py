@@ -107,11 +107,12 @@ if __name__ == "__main__":
 
     ################### magic net ########################
     viewpt_class = CFG.VIEWPOINT_NUM
-    rot_class = 60
+    rot_class = CFG.ROTATION_NUM
 
     rot_model = Magic_Net(viewpt_class=viewpt_class, rot_class=rot_class).cuda()
-    rot_model = torch.load(CFG.BEST_MODEL_ROT)
-    # torch.save(rot_model.module.state_dict(), "best_model_rot_pulley-test.pth")
+    # rot_model = torch.load(CFG.BEST_MODEL_ROT)
+    rot_model.load_state_dict(torch.load(CFG.BEST_MODEL_ROT))
+    # torch.save(rot_model.module.state_dict(), "best_model_rot_shaft.pth")
     rot_model.eval()
 
     ################# refine net ###########################
@@ -126,7 +127,7 @@ if __name__ == "__main__":
     refine_model.eval()
 
     # read image
-    frame = cv2.imread("input-11.jpg")
+    frame = cv2.imread("input.jpg")
     demo = frame.copy()
     rot_frame = frame.copy()
     refine_frame = frame.copy()
@@ -215,7 +216,9 @@ if __name__ == "__main__":
         # cv2.imshow("crop", img_crop)
         # cv2.waitKey(0)
 
-        img_crop = cv2.resize(img_crop, (CFG.IMG_SIZE, CFG.IMG_SIZE))
+        img_crop = cv2.resize(
+            img_crop, (CFG.IMG_SIZE, CFG.IMG_SIZE), interpolation=cv2.INTER_AREA
+        )
         img_crop = img_crop[:, :, :3].transpose(2, 0, 1)
         img_crop = img_crop[np.newaxis, ...]
 
@@ -233,29 +236,123 @@ if __name__ == "__main__":
         principle_pt = np.array([CFG.CAMERA_MATRIX[0, 2], CFG.CAMERA_MATRIX[1, 2]])
 
         position = (
-            torch.sigmoid(output[:, viewpt_class + rot_class :]).data.cpu().numpy()
+            torch.sigmoid(
+                output[:, viewpt_class + rot_class : viewpt_class + rot_class + 2]
+            )
+            .data.cpu()
+            .numpy()
+        )
+        c0 = (
+            torch.sigmoid(
+                output[:, viewpt_class + rot_class + 2 : viewpt_class + rot_class + 4]
+            )
+            .data.cpu()
+            .numpy()
+        )
+        c1 = (
+            torch.sigmoid(
+                output[:, viewpt_class + rot_class + 4 : viewpt_class + rot_class + 6]
+            )
+            .data.cpu()
+            .numpy()
+        )
+        c2 = (
+            torch.sigmoid(
+                output[:, viewpt_class + rot_class + 6 : viewpt_class + rot_class + 8]
+            )
+            .data.cpu()
+            .numpy()
+        )
+        c3 = (
+            torch.sigmoid(
+                output[:, viewpt_class + rot_class + 8 : viewpt_class + rot_class + 10]
+            )
+            .data.cpu()
+            .numpy()
+        )
+        c4 = (
+            torch.sigmoid(
+                output[:, viewpt_class + rot_class + 10 : viewpt_class + rot_class + 12]
+            )
+            .data.cpu()
+            .numpy()
+        )
+        c5 = (
+            torch.sigmoid(
+                output[:, viewpt_class + rot_class + 12 : viewpt_class + rot_class + 14]
+            )
+            .data.cpu()
+            .numpy()
+        )
+        c6 = (
+            torch.sigmoid(
+                output[:, viewpt_class + rot_class + 14 : viewpt_class + rot_class + 16]
+            )
+            .data.cpu()
+            .numpy()
+        )
+        c7 = (
+            torch.sigmoid(
+                output[:, viewpt_class + rot_class + 16 : viewpt_class + rot_class + 18]
+            )
+            .data.cpu()
+            .numpy()
         )
         position *= crop_width
+        c0 *= crop_width
+        c1 *= crop_width
+        c2 *= crop_width
+        c3 *= crop_width
+        c4 *= crop_width
+        c5 *= crop_width
+        c6 *= crop_width
+        c7 *= crop_width
         offset = position[:, :2]
         offset = np.array(upperleft) + offset.reshape(2) - principle_pt
+        c0 = np.array([upperleft[0], upperleft[1]]) + c0.reshape(2)
+        c1 = np.array([upperleft[0], upperleft[1]]) + c1.reshape(2)
+        c2 = np.array([upperleft[0], upperleft[1]]) + c2.reshape(2)
+        c3 = np.array([upperleft[0], upperleft[1]]) + c3.reshape(2)
+        c4 = np.array([upperleft[0], upperleft[1]]) + c4.reshape(2)
+        c5 = np.array([upperleft[0], upperleft[1]]) + c5.reshape(2)
+        c6 = np.array([upperleft[0], upperleft[1]]) + c6.reshape(2)
+        c7 = np.array([upperleft[0], upperleft[1]]) + c7.reshape(2)
 
-        # get the rough pose from view point, rotation, offset, and depth
-        rough_pred_pose = obj.label2pose(viewpt, rot, offset, 0.5)
-
-        temp_demo = demo.copy()
-
-        obj.setModelviewMatrix(rough_pred_pose)
-        obj.renderVisibleFaces()
-        bx, by, w_temp, h_temp = cv2.boundingRect(obj.getVisibleArea())
-
-        currentDiag = math.sqrt(w_temp ** 2 + h_temp ** 2)
-
-        rough_pred_pose = obj.label2pose(
-            viewpt, rot, offset, 0.5 * currentDiag / objectDiag * DIAG_PARAM
+        _, rvec, tvec, _ = cv2.solvePnPRansac(
+            np.array(obj.cornerPoints),
+            np.array([c0, c1, c2, c3, c4, c5, c6, c7]),
+            CFG.CAMERA_MATRIX,
+            np.zeros((4, 1)),
+            flags=cv2.SOLVEPNP_EPNP,
         )
+        rotMat, _ = cv2.Rodrigues(rvec)
+        rough_pred_pose = np.identity(4)
+        rough_pred_pose[:3, :3] = rotMat
+        rough_pred_pose[0, 3] = tvec[0][0]
+        rough_pred_pose[1, 3] = tvec[1][0]
+        rough_pred_pose[2, 3] = tvec[2][0]
+
+        c0 = (int(c0[0]), int(c0[1]))
+        c1 = (int(c1[0]), int(c1[1]))
+        c2 = (int(c2[0]), int(c2[1]))
+        c3 = (int(c3[0]), int(c3[1]))
+        c4 = (int(c4[0]), int(c4[1]))
+        c5 = (int(c5[0]), int(c5[1]))
+        c6 = (int(c6[0]), int(c6[1]))
+        c7 = (int(c7[0]), int(c7[1]))
 
         obj.setModelviewMatrix(rough_pred_pose)
         obj.findVisibleSamplePoint()
+        temp_demo = demo.copy()
+
+        temp_demo = cv2.circle(temp_demo, c0, radius=2, color=(0, 0, 255), thickness=-1)
+        temp_demo = cv2.circle(temp_demo, c1, radius=2, color=(0, 0, 255), thickness=-1)
+        temp_demo = cv2.circle(temp_demo, c2, radius=2, color=(0, 0, 255), thickness=-1)
+        temp_demo = cv2.circle(temp_demo, c3, radius=2, color=(0, 0, 255), thickness=-1)
+        temp_demo = cv2.circle(temp_demo, c4, radius=2, color=(0, 0, 255), thickness=-1)
+        temp_demo = cv2.circle(temp_demo, c5, radius=2, color=(0, 0, 255), thickness=-1)
+        temp_demo = cv2.circle(temp_demo, c6, radius=2, color=(0, 0, 255), thickness=-1)
+        temp_demo = cv2.circle(temp_demo, c7, radius=2, color=(0, 0, 255), thickness=-1)
 
         # test
         for p in obj.sharp_2d_pts:

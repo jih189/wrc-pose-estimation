@@ -19,7 +19,7 @@ import sys
 def symmetricRemove(pose_input_):
     pose_input = pose_input_.copy()
     eulerVec = (R.from_matrix(pose_input[:3, :3])).as_euler("ZYX")
-    eulerVec[2] = 0
+    eulerVec[2] = -1.57
     pose_input[:3, :3] = (R.from_euler("ZYX", eulerVec)).as_matrix()
     return pose_input
 
@@ -171,7 +171,11 @@ class ObjectModel:
         # rotate the 2d corner points according to the original point of the object
         rp = []
         for p in cornerpoints_2d:
-            rp.append(self.rotate_f(self.project3Dto2D((0,0,0), pose), p, -np.radians(angle)))
+            rp.append(
+                self.rotate_f(
+                    self.project3Dto2D((0, 0, 0), pose), p, -np.radians(angle)
+                )
+            )
 
         objectPoints = np.array(self.cornerPoints)
         imagePoints = np.array(rp)
@@ -229,16 +233,18 @@ class ObjectModel:
         # # get diameter of model
         maxdim = np.amax(samplepoints, axis=0)
         mindim = np.amin(samplepoints, axis=0)
-        self.cornerPoints = np.array([
-            [mindim[0],mindim[1], mindim[2]],
-            [mindim[0],maxdim[1], mindim[2]],
-            [maxdim[0],mindim[1], mindim[2]],
-            [maxdim[0],maxdim[1], mindim[2]],
-            [mindim[0],mindim[1], maxdim[2]],
-            [mindim[0],maxdim[1], maxdim[2]],
-            [maxdim[0],mindim[1], maxdim[2]],
-            [maxdim[0],maxdim[1], maxdim[2]],
-        ])
+        self.cornerPoints = np.array(
+            [
+                [mindim[0], mindim[1], mindim[2]],
+                [mindim[0], maxdim[1], mindim[2]],
+                [maxdim[0], mindim[1], mindim[2]],
+                [maxdim[0], maxdim[1], mindim[2]],
+                [mindim[0], mindim[1], maxdim[2]],
+                [mindim[0], maxdim[1], maxdim[2]],
+                [maxdim[0], mindim[1], maxdim[2]],
+                [maxdim[0], maxdim[1], maxdim[2]],
+            ]
+        )
 
     def getCornerPoints(self, pose):
         result = []
@@ -246,7 +252,7 @@ class ObjectModel:
             p = self.project3Dto2D((c[0], c[1], c[2]), pose)
             result.append(p)
         return result
-        
+
     # set object pose
     def setModelviewMatrix(self, pose):
         # remove the symmetric pose
@@ -506,13 +512,13 @@ class ObjectModel:
     def resample(self, pose, numOfPose):
 
         # generate random value for rotation and translation
-        xRot_1 = np.random.normal(0, 0.15, int(numOfPose / 2))
-        yRot_1 = np.random.normal(0, 0.15, int(numOfPose / 2))
-        zRot_1 = np.random.normal(0, 0.15, int(numOfPose / 2))
+        xRot_1 = np.random.normal(0, 0.06, int(numOfPose / 2))
+        yRot_1 = np.random.normal(0, 0.06, int(numOfPose / 2))
+        zRot_1 = np.random.normal(0, 0.06, int(numOfPose / 2))
 
-        xTrans_1 = np.random.normal(0, 0.01, int(numOfPose / 2))
-        yTrans_1 = np.random.normal(0, 0.01, int(numOfPose / 2))
-        zTrans_1 = np.random.normal(0, 0.08, int(numOfPose / 2))
+        xTrans_1 = np.random.normal(0, 0.003, int(numOfPose / 2))
+        yTrans_1 = np.random.normal(0, 0.003, int(numOfPose / 2))
+        zTrans_1 = np.random.normal(0, 0.01, int(numOfPose / 2))
 
         xRot_2 = np.random.normal(0, 0.3, numOfPose - int(numOfPose / 2))
         yRot_2 = np.random.normal(0, 0.3, numOfPose - int(numOfPose / 2))

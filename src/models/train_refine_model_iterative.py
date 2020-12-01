@@ -36,7 +36,7 @@ testTrigger = Value(c_bool, False)
 # refine parameters
 batch_size = 64
 epochs = 120
-lr = 4e-5
+lr = 1e-5
 momentum = 0.9
 w_decay = 0.1
 seglambda = 0.5
@@ -51,12 +51,12 @@ pool_dir = "pred_temp/"
 # initiate the net
 mymodel = DeepIM().cuda()
 mymodel = nn.DataParallel(mymodel)
-mymodel.module.flownet.load_state_dict(
-    torch.load(CFG.BEST_MODEL_FLOWNET).module.state_dict()
-)
-mymodel.module.flownet.eval()
+# mymodel.module.flownet.load_state_dict(
+#     torch.load(CFG.BEST_MODEL_FLOWNET).module.state_dict()
+# )
+# mymodel.module.flownet.eval()
 
-# mymodel = torch.load(CFG.BEST_MODEL_ITERATIVE_REFINE)
+mymodel = torch.load(CFG.BEST_MODEL_ITERATIVE_REFINE)
 
 seg_criterion = nn.CrossEntropyLoss(reduce=False)
 
@@ -691,9 +691,7 @@ def generateData(obj, sample_points):
 
             # randomly resample the pose
             if bool(random.getrandbits(1)):
-                global_pred_pose = obj.resamplePose(
-                    global_pred_pose, diameter * 0.08, diameter * 0.15, 0.27
-                )
+                global_pred_pose = obj.resamplePose(rot_pose, 0.005, 0.01, 0.07)
 
             obj.setModelviewMatrix(global_pred_pose)
             obj.findVisibleSamplePoint()
