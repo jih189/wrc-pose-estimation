@@ -13,7 +13,7 @@ np.seterr(divide="ignore", invalid="ignore")
 # you need to update the table points for your case###
 tablex = 0.04
 tabley = 0.0
-tablez = 0.05
+tablez = -0.05
 tablePoints_base = [
     [0.019565, 0.0, -0.019565],
     [0.019565, 0.0, -0.006521],

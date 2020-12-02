@@ -84,7 +84,7 @@ if __name__ == "__main__":
     obj.setIntrinsicMatrix(CFG.CAMERA_MATRIX)
 
     obj.determineSharpEdges(0.8)
-    obj.generateSamplePoints(0.001)
+    obj.generateSamplePoints(0.0005)
 
     ###################### yolo ########################
     cfg = "cfg/yolov3-tiny3.cfg"
@@ -176,8 +176,8 @@ if __name__ == "__main__":
             pred[:, :4] = scale_coords(frame.shape[2:], pred[:, :4], demo.shape).round()
 
             for *xyxy, conf, cls in pred:
-                label = "%s %.2f" % (names[int(cls)], conf)
-                plot_one_box(xyxy, demo, label=label, color=colors[int(cls)])
+                # label = "%s %.2f" % (names[int(cls)], conf)
+                # plot_one_box(xyxy, demo, label=label, color=colors[int(cls)])
                 if names[int(cls)] == CFG.OBJ_NAME:
                     foundObject = True
                     croptopleft = [
@@ -411,16 +411,16 @@ if __name__ == "__main__":
             obj.findVisibleSamplePoint()
 
             # test
-            for p in obj.sharp_2d_pts:
-                temp_demo = cv2.circle(
-                    temp_demo,
-                    (int(p[0]), int(p[1])),
-                    radius=1,
-                    color=(255, 0, 0),
-                    thickness=-1,
-                )
+            # for p in obj.sharp_2d_pts:
+            #     temp_demo = cv2.circle(
+            #         temp_demo,
+            #         (int(p[0]), int(p[1])),
+            #         radius=1,
+            #         color=(255, 0, 0),
+            #         thickness=-1,
+            #     )
 
-            numOfRefine = 1
+            numOfRefine = 5
 
             # pose refinement
             for t in range(numOfRefine):
@@ -605,7 +605,7 @@ if __name__ == "__main__":
                     temp_demo,
                     (int(p[0]), int(p[1])),
                     radius=1,
-                    color=(0, 255, 0),
+                    color=(0, 0, 255),
                     thickness=-1,
                 )
             cv2.imshow("test", temp_demo)

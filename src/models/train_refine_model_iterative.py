@@ -691,7 +691,7 @@ def generateData(obj, sample_points):
 
             # randomly resample the pose
             if bool(random.getrandbits(1)):
-                global_pred_pose = obj.resamplePose(rot_pose, 0.005, 0.01, 0.07)
+                global_pred_pose = obj.resamplePose(global_pred_pose, 0.005, 0.01, 0.07)
 
             obj.setModelviewMatrix(global_pred_pose)
             obj.findVisibleSamplePoint()

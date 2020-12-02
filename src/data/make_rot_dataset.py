@@ -98,42 +98,42 @@ def process_data(args):
         # generate different rotation to increase the number of data
         for r in range(8):
             inplaneRotate = r * 45.0
-            try:
-                rot_img = OM.rotate_image(img, inplaneRotate, center_pt)
-                rot_pose = obj.rotateAngle(pose, inplaneRotate)
 
-                # generate the real bounding box for object
-                obj.setModelviewMatrix(rot_pose)
+            rot_img = OM.rotate_image(img, inplaneRotate, center_pt)
+            rot_pose = obj.rotateAngle(pose, inplaneRotate)
 
-                # get the cornerpoints of the object
-                cornerpoints_2d = obj.getCornerPoints(rot_pose)
+            # generate the real bounding box for object
+            obj.setModelviewMatrix(rot_pose)
 
-                # random generate a bounding box around the object with given pose
-                obj.findVisibleSamplePoint()
+            # get the cornerpoints of the object
+            cornerpoints_2d = obj.getCornerPoints(rot_pose)
 
-                # ensure the object is not outside of the view
-                visiblemask = obj.getVisibleArea()
-                if visibleArea == -1:
-                    visibleArea = cv2.countNonZero(visiblemask)
-                elif visibleArea * 0.95 > cv2.countNonZero(visiblemask):
-                    continue
+            # random generate a bounding box around the object with given pose
+            obj.findVisibleSamplePoint()
 
-                # extract the bounding box
-                bx, by, bw, bh = cv2.boundingRect(visiblemask)
-                upperleft = np.array([bx, by])
-                lowerright = np.array([bx + bw, by + bh])
+            # ensure the object is not outside of the view
+            visiblemask = obj.getVisibleArea()
+            if visibleArea == -1:
+                visibleArea = cv2.countNonZero(visiblemask)
+            elif visibleArea * 0.95 > cv2.countNonZero(visiblemask):
+                continue
 
-                high = np.clip(10 / depth, 0, 50)
-                upperleft = (
-                    upperleft - np.random.uniform(0, high, upperleft.shape)
-                ).astype(np.int)
-                lowerright = (
-                    lowerright + np.random.uniform(0, high, lowerright.shape)
-                ).astype(np.int)
-            except Exception as e:
-                print("error in generate bounding box!!!!")
-                print(str(e))
-                testTrigger.value = True
+            # extract the bounding box
+            bx, by, bw, bh = cv2.boundingRect(visiblemask)
+            upperleft = np.array([bx, by])
+            lowerright = np.array([bx + bw, by + bh])
+
+            high = np.clip(10 / depth, 0, 50)
+            upperleft = (
+                upperleft - np.random.uniform(0, high, upperleft.shape)
+            ).astype(np.int)
+            lowerright = (
+                lowerright + np.random.uniform(0, high, lowerright.shape)
+            ).astype(np.int)
+            # except Exception as e:
+            #     print("error in generate bounding box!!!!")
+            #     print(str(e))
+            #     testTrigger.value = True
 
             # adjust the bounding box
             crop_upperleft, crop_lowerright = OM.get_centered_crop(
@@ -276,8 +276,8 @@ def main(input_filepath, output_filepath):
     image_names.sort()
     pose_names.sort()
 
-    # image_names = image_names[:10]
-    # pose_names = pose_names[:10]
+    # image_names = image_names[1600:]
+    # pose_names = pose_names[1600:]
 
     # generate input for function
     datalist = list(zip(image_names, pose_names))

@@ -179,13 +179,15 @@ class ObjectModel:
 
         objectPoints = np.array(self.cornerPoints)
         imagePoints = np.array(rp)
+
         _, rvec, tvec, _ = cv2.solvePnPRansac(
             objectPoints,
             imagePoints,
             self.intrinsic,
             np.zeros((4, 1)),
-            flags=cv2.SOLVEPNP_ITERATIVE,
+            flags=cv2.SOLVEPNP_EPNP,
         )
+
         rotMat, _ = cv2.Rodrigues(rvec)
         pose = np.identity(4)
         pose[:3, :3] = rotMat
