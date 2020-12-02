@@ -220,26 +220,27 @@ def getConfid(segmentMask, opticalFlow, mask_img):
     # predicted matching error
     matchingError = []
 
-    for y2d in range(CFG.IMG_SIZE):
-        for x2d in range(CFG.IMG_SIZE):
+    for y2d in range(0, CFG.IMG_SIZE, 5):
+        for x2d in range(0, CFG.IMG_SIZE, 5):
             if mask_img[0, 0, y2d, x2d] == 1.0:
                 [mx, my] = opticalFlow[0, :2, y2d, x2d].cpu().detach().numpy()
                 mx = (mx - 0.5) * CFG.IMG_SIZE
                 my = (my - 0.5) * CFG.IMG_SIZE
                 if (
-                    x2d + mx >= 0
+                    seg_pred[0, int(y2d + my), int(x2d + mx)] == 1.0
+                    and x2d + mx >= 0
                     and x2d + mx < CFG.IMG_SIZE
                     and y2d + my >= 0
                     and y2d + my < CFG.IMG_SIZE
-                    and seg_pred[0, int(y2d + my), int(x2d + mx)] == 1.0
-                    and int(x2d) % 5 == 0
-                    and int(y2d) % 5 == 0
                 ):
                     matchingError.append(math.sqrt(mx ** 2 + my ** 2))
-
-    flowError = sum(matchingError) / len(matchingError) / opticalFlow.shape[3]
     iou_value = (
         1.0 - iou(mask_img.cuda().squeeze(1), segmentMask.squeeze(1), 1).cpu().numpy()
     )
+
+    if len(matchingError) == 0:
+        flowError = iou_value
+    else:
+        flowError = sum(matchingError) / len(matchingError) / opticalFlow.shape[3]
 
     return math.exp(-(CFG.LAMBDA_E * flowError + CFG.LAMBDA_V * iou_value))
