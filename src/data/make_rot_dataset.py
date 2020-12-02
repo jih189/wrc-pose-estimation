@@ -275,10 +275,7 @@ def main(input_filepath, output_filepath):
             pose_names.append(str(f))
     image_names.sort()
     pose_names.sort()
-
-    image_names = image_names[:10]
-    pose_names = pose_names[:10]
-
+    
     # generate input for function
     datalist = list(zip(image_names, pose_names))
 
