@@ -11,9 +11,16 @@ from scipy.spatial.transform import Rotation as R
 np.seterr(divide="ignore", invalid="ignore")
 
 # you need to update the table points for your case###
-tablex = -0.04
-tabley = -0.0045
-tablez = 0.0
+
+tablex = 0.0
+tabley = 0.0
+tablez = 0.09
+
+# tablex = -0.04
+# tabley = -0.0045
+# tablez = 0.0
+
+# 1,4,13,16
 tablePoints_base = [
     [0.019565, 0.0, -0.019565],
     [0.019565, 0.0, -0.006521],
@@ -74,7 +81,7 @@ if __name__ == "__main__":
 
     while True:
         transform = np.identity(4)
-        transform[:3, :3] = (R.from_euler("X", 3.14159)).as_matrix()
+        transform[:3, :3] = (R.from_euler("Z", 1.57079)).as_matrix()
         transform[0][3] = tablex
         transform[1][3] = tabley
         transform[2][3] = tablez

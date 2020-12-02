@@ -126,7 +126,7 @@ if __name__ == "__main__":
     refine_model.eval()
 
     # read image
-    frame = cv2.imread("input-3.jpg")
+    frame = cv2.imread("input-sbar3.png")
     demo = frame.copy()
     rot_frame = frame.copy()
     refine_frame = frame.copy()
