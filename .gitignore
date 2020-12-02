@@ -87,9 +87,12 @@ target/
 
 data/
 wandb/
+weights/
+cfg/
 *.pth
 *.pt
 
 temp
 pred_temp
 *.jpg
+*.png
