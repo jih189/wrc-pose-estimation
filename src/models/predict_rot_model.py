@@ -42,7 +42,7 @@ rot_class = 60
 
 model = Magic_Net(viewpt_class=viewpt_class, rot_class=rot_class).cuda()
 model = nn.DataParallel(model)
-model = torch.load(CFG.BEST_MODEL_ROT)
+model.load_state_dict(torch.load(CFG.BEST_MODEL_ROT))
 model.eval()
 
 # predict offset, view point, and inplane rotation
@@ -102,15 +102,67 @@ upperleftx, upperlefty, lowerrightx, lowerrighty = (
 l = lowerrightx - upperleftx
 principle_pt = np.array([CFG.CAMERA_MATRIX[0, 2], CFG.CAMERA_MATRIX[1, 2]])
 
-position = torch.sigmoid(output[:, viewpt_class + rot_class : viewpt_class + rot_class + 2]).data.cpu().numpy()
-c0 = torch.sigmoid(output[:, viewpt_class + rot_class + 2: viewpt_class + rot_class + 4]).data.cpu().numpy()
-c1 = torch.sigmoid(output[:, viewpt_class + rot_class + 4: viewpt_class + rot_class + 6]).data.cpu().numpy()
-c2 = torch.sigmoid(output[:, viewpt_class + rot_class + 6: viewpt_class + rot_class + 8]).data.cpu().numpy()
-c3 = torch.sigmoid(output[:, viewpt_class + rot_class + 8: viewpt_class + rot_class + 10]).data.cpu().numpy()
-c4 = torch.sigmoid(output[:, viewpt_class + rot_class + 10: viewpt_class + rot_class + 12]).data.cpu().numpy()
-c5 = torch.sigmoid(output[:, viewpt_class + rot_class + 12: viewpt_class + rot_class + 14]).data.cpu().numpy()
-c6 = torch.sigmoid(output[:, viewpt_class + rot_class + 14: viewpt_class + rot_class + 16]).data.cpu().numpy()
-c7 = torch.sigmoid(output[:, viewpt_class + rot_class + 16: viewpt_class + rot_class + 18]).data.cpu().numpy()
+position = (
+    torch.sigmoid(output[:, viewpt_class + rot_class : viewpt_class + rot_class + 2])
+    .data.cpu()
+    .numpy()
+)
+c0 = (
+    torch.sigmoid(
+        output[:, viewpt_class + rot_class + 2 : viewpt_class + rot_class + 4]
+    )
+    .data.cpu()
+    .numpy()
+)
+c1 = (
+    torch.sigmoid(
+        output[:, viewpt_class + rot_class + 4 : viewpt_class + rot_class + 6]
+    )
+    .data.cpu()
+    .numpy()
+)
+c2 = (
+    torch.sigmoid(
+        output[:, viewpt_class + rot_class + 6 : viewpt_class + rot_class + 8]
+    )
+    .data.cpu()
+    .numpy()
+)
+c3 = (
+    torch.sigmoid(
+        output[:, viewpt_class + rot_class + 8 : viewpt_class + rot_class + 10]
+    )
+    .data.cpu()
+    .numpy()
+)
+c4 = (
+    torch.sigmoid(
+        output[:, viewpt_class + rot_class + 10 : viewpt_class + rot_class + 12]
+    )
+    .data.cpu()
+    .numpy()
+)
+c5 = (
+    torch.sigmoid(
+        output[:, viewpt_class + rot_class + 12 : viewpt_class + rot_class + 14]
+    )
+    .data.cpu()
+    .numpy()
+)
+c6 = (
+    torch.sigmoid(
+        output[:, viewpt_class + rot_class + 14 : viewpt_class + rot_class + 16]
+    )
+    .data.cpu()
+    .numpy()
+)
+c7 = (
+    torch.sigmoid(
+        output[:, viewpt_class + rot_class + 16 : viewpt_class + rot_class + 18]
+    )
+    .data.cpu()
+    .numpy()
+)
 
 position *= l
 c0 *= l
@@ -126,7 +178,7 @@ offset = position[:, :2]
 
 offset = np.array([upperleftx, upperlefty]) + offset.reshape(2) - principle_pt
 c0 = np.array([upperleftx, upperlefty]) + c0.reshape(2)
-c1 = np.array([upperleftx, upperlefty]) + c1.reshape(2) 
+c1 = np.array([upperleftx, upperlefty]) + c1.reshape(2)
 c2 = np.array([upperleftx, upperlefty]) + c2.reshape(2)
 c3 = np.array([upperleftx, upperlefty]) + c3.reshape(2)
 c4 = np.array([upperleftx, upperlefty]) + c4.reshape(2)

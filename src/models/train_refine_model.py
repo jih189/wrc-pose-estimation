@@ -55,10 +55,6 @@ mymodel.module.flownet.load_state_dict(
 )
 mymodel.module.flownet.eval()
 
-
-# validation setup
-# mymodel = torch.load(CFG.BEST_MODEL_REFINE)
-# mymodel.eval()
 # wandb.watch(mymodel)
 
 seg_criterion = nn.CrossEntropyLoss(reduce=False)
@@ -222,10 +218,10 @@ def train():
         mymodel.train()
 
         if pre_loss == None:
-            torch.save(mymodel, CFG.BEST_MODEL_REFINE)
+            torch.save(mymodel.module.state_dict(), CFG.BEST_MODEL_REFINE)
             pre_loss = val_loss
         elif pre_loss < val_loss:
-            torch.save(mymodel, CFG.BEST_MODEL_REFINE)
+            torch.save(mymodel.module.state_dict(), CFG.BEST_MODEL_REFINE)
             pre_loss = val_loss
         mymodel.train()
         if (epoch + 1) % 30 == 0:

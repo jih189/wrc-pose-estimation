@@ -375,7 +375,6 @@ def main(input_filepath, output_filepath):
         rot_class = CFG.ROTATION_NUM
 
         rot_model = Magic_Net(viewpt_class=viewpt_class, rot_class=rot_class)
-        # rot_model = torch.load(CFG.BEST_MODEL_ROT)
         rot_model.load_state_dict(torch.load(CFG.BEST_MODEL_ROT))
         rot_model.eval()
         rot_model.share_memory()

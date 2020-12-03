@@ -56,7 +56,7 @@ mymodel = nn.DataParallel(mymodel)
 # )
 # mymodel.module.flownet.eval()
 
-mymodel = torch.load(CFG.BEST_MODEL_ITERATIVE_REFINE)
+mymodel.load_state_dict(torch.load(CFG.BEST_MODEL_ITERATIVE_REFINE))
 
 seg_criterion = nn.CrossEntropyLoss(reduce=False)
 
@@ -576,7 +576,7 @@ def train(sample_points, train_loader, train_dataset):
 
 # generate the init pose for next round
 def generateData(obj, sample_points):
-    mymodel = torch.load(CFG.BEST_MODEL_ITERATIVE_REFINE)
+    mymodel.load_state_dict(torch.load(CFG.BEST_MODEL_ITERATIVE_REFINE))
     mymodel.eval()
 
     val_dataset = Iterative_refine_data(data_path=processed_dir, isTrain=False)
@@ -850,10 +850,10 @@ def main():
             valtem = val(sample_points, val_loader, val_dataset)
 
             if pre_loss == None:
-                torch.save(mymodel, CFG.BEST_MODEL_ITERATIVE_REFINE)
+                torch.save(mymodel.module.state_dict(), CFG.BEST_MODEL_ITERATIVE_REFINE)
                 pre_loss = valtem
             elif pre_loss > valtem:
-                torch.save(mymodel, CFG.BEST_MODEL_ITERATIVE_REFINE)
+                torch.save(mymodel.module.state_dict(), CFG.BEST_MODEL_ITERATIVE_REFINE)
                 pre_loss = valtem
             if (epoch + 1) % 40 == 0:
                 scheduler.step()

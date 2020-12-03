@@ -110,20 +110,12 @@ if __name__ == "__main__":
     rot_class = CFG.ROTATION_NUM
 
     rot_model = Magic_Net(viewpt_class=viewpt_class, rot_class=rot_class).cuda()
-    # rot_model = torch.load(CFG.BEST_MODEL_ROT)
     rot_model.load_state_dict(torch.load(CFG.BEST_MODEL_ROT))
-    # torch.save(rot_model.module.state_dict(), "best_model_rot_shaft.pth")
     rot_model.eval()
 
     ################# refine net ###########################
     refine_model = DeepIM().cuda()
-    # refine_model.load_state_dict(
-    #     torch.load("best_model_iterative_refine_pulley-test.pth")
-    # )
-    refine_model = torch.load(CFG.BEST_MODEL_ITERATIVE_REFINE)
-    # torch.save(
-    #     refine_model.module.state_dict(), "best_model_iterative_refine_pulley-test.pth"
-    # )
+    refine_model.load_state_dict(torch.load(CFG.BEST_MODEL_ITERATIVE_REFINE))
     refine_model.eval()
 
     # read image
@@ -365,10 +357,6 @@ if __name__ == "__main__":
             )
         cv2.imshow("test", temp_demo)
         cv2.waitKey(0)
-
-        # rough_pose_estimation_end = time.time()
-        # print("time for rought pose estimation: ")
-        # print(rough_pose_estimation_end - rough_pose_estimation_start)
 
         numOfRefine = 15
 

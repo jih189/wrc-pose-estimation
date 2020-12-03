@@ -61,17 +61,12 @@ viewpt_class = CFG.VIEWPOINT_NUM
 rot_class = CFG.ROTATION_NUM
 
 rot_model = Magic_Net(viewpt_class=viewpt_class, rot_class=rot_class).cuda()
-rot_model = torch.load(CFG.BEST_MODEL_ROT)
+rot_model.load_state_dict(torch.load(CFG.BEST_MODEL_ROT))
 rot_model.eval()
 
 ################# refine net ###########################
 refine_model = DeepIM().cuda()
-refine_model = torch.load(CFG.BEST_MODEL_ITERATIVE_REFINE)
-# refine_model.load_state_dict(
-#     torch.load(
-#         CFG.CURRENT_POSE_ESITMATION_DIR + "best_model_iterative_refine_pulley-test.pth"
-#     )
-# )
+refine_model.load_state_dict(torch.load(CFG.BEST_MODEL_ITERATIVE_REFINE))
 refine_model.eval()
 
 

@@ -23,11 +23,8 @@ def init():
     mymodel = DeepIM().cuda()
 
     mymodel = nn.DataParallel(mymodel)
-    mymodel = torch.load(CFG.BEST_MODEL_REFINE)
+    mymodel.load_state_dict(torch.load(CFG.BEST_MODEL_REFINE))
     mymodel.eval()
-    # mymodel.module.flownet.load_state_dict(
-    #     torch.load(CFG.BEST_MODEL_FLOWNET).module.state_dict()
-    # )
 
     return mymodel
 

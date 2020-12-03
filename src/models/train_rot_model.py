@@ -44,10 +44,6 @@ val_loader = DataLoader(
 model = Magic_Net(viewpt_class=viewpt_class, rot_class=rot_class).cuda()
 model = nn.DataParallel(model)
 
-# Evaluation setup
-# model = torch.load(CFG.BEST_MODEL_ROT)
-# model.eval()
-
 # read the weights
 vp_weights = np.load(CFG.PROCESSED_DATA_PATH + "vp_weight.npy")
 rot_weights = np.load(CFG.PROCESSED_DATA_PATH + "rot_weight.npy")
@@ -238,10 +234,10 @@ def train():
         # #     }
         # # )
         if pre_loss == None:
-            torch.save(model, CFG.BEST_MODEL_ROT)
+            torch.save(model.module.state_dict(), CFG.BEST_MODEL_ROT)
             pre_loss = val_loss
         elif pre_loss > val_loss:
-            torch.save(model, CFG.BEST_MODEL_ROT)
+            torch.save(model.module.state_dict(), CFG.BEST_MODEL_ROT)
             pre_loss = val_loss
 
         model.train()

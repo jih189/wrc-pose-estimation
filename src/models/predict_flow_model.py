@@ -18,7 +18,7 @@ def init():
     mymodel = FlowNet().cuda()
 
     mymodel = nn.DataParallel(mymodel)
-    mymodel = torch.load(CFG.BEST_MODEL_FLOWNET)
+    mymodel.load_state_dict(torch.load(CFG.BEST_MODEL_FLOWNET))
     mymodel.eval()
 
     return mymodel
