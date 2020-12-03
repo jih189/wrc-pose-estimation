@@ -299,7 +299,12 @@ def process_data(args):
                     )
                 else:
                     # generate set of random poses
-                    random_pose = obj.resamplePose(rot_pose, 0.005, 0.01, 0.07)
+                    random_pose = obj.resamplePose(
+                        rot_pose,
+                        CFG.OFFSETSAMPLE_VALUE,
+                        CFG.DEPTHSAMPLE_VALUE,
+                        CFG.ROTATIONSAMPLE_VALUE,
+                    )
 
                 # set pose on object
                 obj.setModelviewMatrix(random_pose)

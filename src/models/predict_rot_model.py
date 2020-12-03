@@ -41,7 +41,6 @@ viewpt_class = CFG.VIEWPOINT_NUM
 rot_class = 60
 
 model = Magic_Net(viewpt_class=viewpt_class, rot_class=rot_class).cuda()
-model = nn.DataParallel(model)
 model.load_state_dict(torch.load(CFG.BEST_MODEL_ROT))
 model.eval()
 

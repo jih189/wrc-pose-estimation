@@ -51,12 +51,17 @@ pool_dir = "pred_temp/"
 # initiate the net
 mymodel = DeepIM().cuda()
 mymodel = nn.DataParallel(mymodel)
+
+###############################################################################
+# # training setup
 # mymodel.module.flownet.load_state_dict(
 #     torch.load(CFG.BEST_MODEL_FLOWNET).module.state_dict()
 # )
 # mymodel.module.flownet.eval()
 
+# use pre-trained model
 mymodel.load_state_dict(torch.load(CFG.BEST_MODEL_ITERATIVE_REFINE))
+##############################################################################
 
 seg_criterion = nn.CrossEntropyLoss(reduce=False)
 
@@ -575,7 +580,7 @@ def train(sample_points, train_loader, train_dataset):
 
 
 # generate the init pose for next round
-def generateData(obj, sample_points):
+def generateData(obj, sample_points, offsetValue, depthValue, rotationValue):
     mymodel.load_state_dict(torch.load(CFG.BEST_MODEL_ITERATIVE_REFINE))
     mymodel.eval()
 
@@ -691,7 +696,10 @@ def generateData(obj, sample_points):
 
             # randomly resample the pose
             if bool(random.getrandbits(1)):
-                global_pred_pose = obj.resamplePose(global_pred_pose, 0.005, 0.01, 0.07)
+                # need to modify the sample point value here
+                global_pred_pose = obj.resamplePose(
+                    global_pred_pose, offsetValue, depthValue, rotationValue
+                )
 
             obj.setModelviewMatrix(global_pred_pose)
             obj.findVisibleSamplePoint()
@@ -704,8 +712,6 @@ def generateData(obj, sample_points):
             cv2.imwrite(
                 pool_dir + "{:06d}".format(savedIndex) + "demo.png", original_img,
             )
-
-            # global_pred_pose = OM.symmetricRemove(global_pred_pose)
 
             np.save(
                 pool_dir + "{:06d}".format(savedIndex) + "initPose.npy",
@@ -761,6 +767,12 @@ def main():
 
     learningrate = lr
     numOfTotalIteration = 8
+
+    offsetSampleValue, depthSampleValue, rotationSampleValue = (
+        CFG.OFFSETSAMPLE_VALUE,
+        CFG.DEPTHSAMPLE_VALUE,
+        CFG.ROTATIONSAMPLE_VALUE,
+    )
 
     for iteration in range(numOfTotalIteration):
         # # generate the processed data
@@ -872,7 +884,13 @@ def main():
 
         removeFilesInDir(pool_dir)
         obj = init(0.001)
-        generateData(obj, sample_points)
+        # reduce the noise of pose sampling
+        offsetSampleValue /= 2.0
+        depthSampleValue /= 2.0
+        rotationSampleValue /= 2.0
+        generateData(
+            obj, sample_points, offsetSampleValue, depthSampleValue, rotationSampleValue
+        )
         removeFilesInDir(processed_dir)
         print("data generation done!")
         OM.exit()
