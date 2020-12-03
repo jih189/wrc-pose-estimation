@@ -92,4 +92,7 @@ wandb/
 
 temp
 pred_temp
+*.png
 *.jpg
+weights/
+cfg/
