@@ -36,11 +36,11 @@ testTrigger = Value(c_bool, False)
 # refine parameters
 batch_size = 64
 epochs = 120
-lr = 1e-5
+lr = 4e-5
 momentum = 0.9
 w_decay = 0.1
 seglambda = 0.5
-flowlambda = 5.0
+flowlambda = 8.0
 
 # file addresses
 train_dir = CFG.REFINE_ITERATIVE_DATA_PATH
@@ -50,6 +50,7 @@ pool_dir = "pred_temp/"
 
 # initiate the net
 mymodel = DeepIM().cuda()
+mymodel.load_state_dict(torch.load(CFG.BEST_MODEL_ITERATIVE_REFINE))
 mymodel = nn.DataParallel(mymodel)
 
 ###############################################################################
@@ -60,8 +61,8 @@ mymodel = nn.DataParallel(mymodel)
 # mymodel.module.flownet.eval()
 
 # use pre-trained model
-mymodel.load_state_dict(torch.load(CFG.BEST_MODEL_ITERATIVE_REFINE))
-##############################################################################
+
+#############################################################################
 
 seg_criterion = nn.CrossEntropyLoss(reduce=False)
 
@@ -581,7 +582,7 @@ def train(sample_points, train_loader, train_dataset):
 
 # generate the init pose for next round
 def generateData(obj, sample_points, offsetValue, depthValue, rotationValue):
-    mymodel.load_state_dict(torch.load(CFG.BEST_MODEL_ITERATIVE_REFINE))
+    # mymodel.model.load_state_dict(torch.load(CFG.BEST_MODEL_ITERATIVE_REFINE))
     mymodel.eval()
 
     val_dataset = Iterative_refine_data(data_path=processed_dir, isTrain=False)

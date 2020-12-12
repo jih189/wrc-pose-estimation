@@ -39,6 +39,9 @@ def get_vs_pose(object_id, img):
 
 
 def vs_handler(request, response):
+    if request["object_id"] == "":
+        print("receive test request!")
+        return False
     print(f"Object ID is: {request['object_id']}")
 
     base64_bytes = request["image"]["data"].encode("ascii")

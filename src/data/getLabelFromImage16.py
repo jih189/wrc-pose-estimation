@@ -329,13 +329,14 @@ if __name__ == "__main__":
             else:
                 print("where is no pose!")
         elif ch & 0xFF == ord("k"):
+            print(pose)
             usingMarker = not usingMarker
         elif ch & 0xFF == ord("q"):
             break
         elif ch & 0xFF == ord("m"):
-            tabley -= 0.001
+            tablex -= 0.001
         elif ch & 0xFF == ord("n"):
-            tabley += 0.001
+            tablex += 0.001
 
     # When everything done, release the capture
     capture.release()

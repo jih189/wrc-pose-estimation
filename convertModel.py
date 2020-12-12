@@ -9,12 +9,12 @@ from models.model import Magic_Net, FlowNet, DeepIM
 
 
 ################### magic net ########################
-viewpt_class = CFG.VIEWPOINT_NUM
-rot_class = CFG.ROTATION_NUM
+# viewpt_class = CFG.VIEWPOINT_NUM
+# rot_class = CFG.ROTATION_NUM
 
-rot_model = Magic_Net(viewpt_class=viewpt_class, rot_class=rot_class).cuda()
-rot_model = torch.load(CFG.BEST_MODEL_ROT)
-torch.save(rot_model.module.state_dict(), CFG.BEST_MODEL_ROT)
+# rot_model = Magic_Net(viewpt_class=viewpt_class, rot_class=rot_class).cuda()
+# rot_model = torch.load(CFG.BEST_MODEL_ROT)
+# torch.save(rot_model.module.state_dict(), CFG.BEST_MODEL_ROT)
 
 ################# refine net ###########################
 refine_model = DeepIM().cuda()

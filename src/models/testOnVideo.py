@@ -413,7 +413,7 @@ if __name__ == "__main__":
             #         thickness=-1,
             #     )
 
-            numOfRefine = 5
+            numOfRefine = 8
 
             # pose refinement
             for t in range(numOfRefine):
@@ -459,6 +459,9 @@ if __name__ == "__main__":
                     int(upperleft_crop_inner[1]) : int(lowerright_crop_inner[1]),
                     int(upperleft_crop_inner[0]) : int(lowerright_crop_inner[0]),
                 ].copy()
+
+                cv2.imshow("test", crop_img)
+                cv2.waitKey(0)
 
                 crop_mask[
                     upperleft_crop_inner[1] - ey : lowerright_crop_inner[1] - ey,
@@ -586,8 +589,8 @@ if __name__ == "__main__":
 
                 rough_pred_pose = pred_pose
 
-            confidence = getConfid(segmentMask, opticalFlow, mask_img,)
-            print("confidence:", confidence)
+            # confidence = getConfid(segmentMask, opticalFlow, mask_img,)
+            # print("confidence:", confidence)
 
             obj.setModelviewMatrix(rough_pred_pose)
             obj.findVisibleSamplePoint()

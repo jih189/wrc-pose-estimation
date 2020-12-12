@@ -50,7 +50,7 @@ def getPredictPose(initPose, rot, trans, dist, imagesize, rescaleValue):
             * rescaleValue
             * rescaleValue
         )
-        * torch.tensor(CFG.CAMERA_MATRIX[1, 1] / CFG.CAMERA_MATRIX[1, 1]).cuda(),
+        * torch.tensor(CFG.CAMERA_MATRIX[1, 1] / CFG.CAMERA_MATRIX[0, 0]).cuda(),
     )
 
     ch = torch.cos(horizontalR)
