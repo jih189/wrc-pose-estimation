@@ -345,7 +345,7 @@ def detect(object_id, frame, estimated_depth):
                 thickness=-1,
             )
 
-        numOfRefine = 12
+        numOfRefine = 10
 
         # pose refinement
         for t in range(numOfRefine):
@@ -515,11 +515,11 @@ def detect(object_id, frame, estimated_depth):
         cv2.imshow("test", temp_demo)
         cv2.waitKey(5)
 
-        return pred_pose, confidence
+        return pred_pose, confidence, Status.FOUND
     else:
         # can't detect the object
         print("can't detect object!!")
-        return None, 0.0
+        return None, 0.0, Status.NOT_FOUND
 
 
 class Status(IntEnum):
@@ -585,8 +585,21 @@ def vs_detect(object_id, img):
             int(croptopleft[0] + (croplowright[0] - croptopleft[0]) / 2),
             int(croptopleft[1] + (croplowright[1] - croptopleft[1]) / 2),
         )
-        # camera_horizontalR = math.atan2(yolo_center[1], CFG.CAMERA_MATRIX[0,0])
-        # camera_verticalR = -math.atan2(yolo_center[0], math.sqrt(yolo_center[1]*yolo_center[1]+CFG.CAMERA_MATRIX[1,1]*CFG.CAMERA_MATRIX[1,1])*)
+        center_offset_x = yolo_center[0] - CFG.CAMERA_MATRIX[0, 2]
+        center_offset_y = yolo_center[1] - CFG.CAMERA_MATRIX[1, 2]
+        print("object offset from center")
+        print("horizontal ", center_offset_x)
+        print("vertical ", center_offset_y)
+        camera_horizontalR = math.atan2(center_offset_x, CFG.CAMERA_MATRIX[0, 0])
+        camera_verticalR = -math.atan2(
+            center_offset_y,
+            math.sqrt(
+                center_offset_x * center_offset_x
+                + CFG.CAMERA_MATRIX[1, 1] * CFG.CAMERA_MATRIX[1, 1]
+            )
+            * CFG.CAMERA_MATRIX[1, 1]
+            / CFG.CAMERA_MATRIX[0, 0],
+        )
 
         # rough_pose_estimation_start = time.time()
 
@@ -714,7 +727,7 @@ def vs_detect(object_id, img):
         rough_pred_pose[1, 3] = tvec[1][0]
         rough_pred_pose[2, 3] = tvec[2][0]
 
-        numOfRefine = 0
+        numOfRefine = 5
 
         # pose refinement
         for t in range(numOfRefine):
@@ -872,9 +885,17 @@ def vs_detect(object_id, img):
             p = (int(p[0]), int(p[1]))
             demo = cv2.circle(demo, p, radius=2, color=(0, 0, 255), thickness=-1)
 
+        demo = cv2.circle(
+            demo,
+            (int(CFG.CAMERA_MATRIX[0, 2]), int(CFG.CAMERA_MATRIX[1, 2])),
+            radius=5,
+            color=(255, 0, 255),
+            thickness=-1,
+        )
+
         cv2.imshow("window", demo)
         cv2.waitKey(5)
-        return rough_pred_pose, Status.FOUND
+        return rough_pred_pose, camera_horizontalR, camera_verticalR, Status.FOUND
     else:
         # can't detect the object
-        return np.identity(4), Status.NOT_FOUND
+        return np.identity(4), 0.0, 0.0, Status.NOT_FOUND
