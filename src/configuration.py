@@ -4,9 +4,13 @@ import os
 
 CURRENT_POSE_ESITMATION_DIR = os.getcwd() + "/"
 
-OBJ_NAME = "pulley"
-CAD_MODEL = CURRENT_POSE_ESITMATION_DIR + "data/mesh/MBRFA30-2-P6.obj"
-SAMPLE_FACE_MODEL = CURRENT_POSE_ESITMATION_DIR + "data/mesh/MBRFA30-2-P6.obj"
+# OBJ_NAME = "pulley"
+# CAD_MODEL = CURRENT_POSE_ESITMATION_DIR + "data/mesh/MBRFA30-2-P6.obj"
+# SAMPLE_FACE_MODEL = CURRENT_POSE_ESITMATION_DIR + "data/mesh/MBRFA30-2-P6.obj"
+
+OBJ_NAME = "sbar"
+CAD_MODEL = CURRENT_POSE_ESITMATION_DIR + "data/mesh/sbar2.obj"
+SAMPLE_FACE_MODEL = CURRENT_POSE_ESITMATION_DIR + "data/mesh/sbar2.obj"
 
 
 # OBJ_NAME = "shaft"
@@ -71,13 +75,19 @@ BEST_MODEL_ITERATIVE_REFINE = (
 # )
 
 
-# camera matrix of wrist camera
+# # camera matrix of wrist camera
+# CAMERA_MATRIX = np.array(
+#     [
+#         [1390.6298269250192, 0, 665.4334864497848],
+#         [0, 1389.3521948493603, 314.5310503226418],
+#         [0, 0, 1],
+#     ],
+#     dtype="double",
+# )
+
+# camera matrix of rpd
 CAMERA_MATRIX = np.array(
-    [
-        [1390.6298269250192, 0, 665.4334864497848],
-        [0, 1389.3521948493603, 314.5310503226418],
-        [0, 0, 1],
-    ],
+    [[1256.98914, 0, 623.943729], [0, 1267.18897, 372.156269], [0, 0, 1],],
     dtype="double",
 )
 
@@ -93,8 +103,8 @@ ROTATION_NUM = 60
 IMG_SIZE = 240
 EXPAND_SIZE = 2.4
 
-LAMBDA_E = 1.0
-LAMBDA_V = 1.0
+LAMBDA_E = 0.7
+LAMBDA_V = 0.7
 
 COLOR_AUGMENTATION_BRIGHTNESS = 15
 COLOR_AUGMENTATION_CONTRAST = 0.15

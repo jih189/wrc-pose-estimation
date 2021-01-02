@@ -392,7 +392,11 @@ def detect(object_id, frame, estimated_depth):
                 int(upperleft_crop_inner[0]) : int(lowerright_crop_inner[0]),
             ].copy()
 
-            cv2.imshow("check", crop_img)
+            try:
+                cv2.imshow("check", crop_img)
+            except cv2.error:
+                print("Invalid crop_img")
+                return None, 0.0, Status.NOT_FOUND
 
             crop_mask[
                 upperleft_crop_inner[1] - ey : lowerright_crop_inner[1] - ey,

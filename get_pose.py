@@ -9,7 +9,8 @@ import cv2
 def get_pose(object_id, img, estimated_depth):
     result, confidence, status = detect(object_id, img, estimated_depth)
     print(result)
-    result = result.reshape(16,)
+    if result is not None:
+        result = result.reshape(16,)
     return result, confidence, status
 
 
@@ -26,7 +27,10 @@ def handler(request, response):
         request["object_id"], img_np, float(request["estimated_depth"])
     )
     print(out)
-    response["row_major_hmatrix"] = f"{out.tolist()}"
+    if out is None:
+        response["row_major_hmatrix"] = ""
+    else:
+        response["row_major_hmatrix"] = f"{out.tolist()}"
     response["confidence"] = confidence
     response["status"] = status
 
@@ -35,7 +39,8 @@ def handler(request, response):
 
 def get_vs_pose(object_id, img):
     result, camera_horizontalR, camera_verticalR, status = vs_detect(object_id, img)
-    result = result.reshape(16,)
+    if result is not None:
+        result = result.reshape(16,)
     return result, camera_horizontalR, camera_verticalR, status
 
 

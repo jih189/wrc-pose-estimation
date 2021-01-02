@@ -50,7 +50,7 @@ pool_dir = "pred_temp/"
 
 # initiate the net
 mymodel = DeepIM().cuda()
-mymodel.load_state_dict(torch.load(CFG.BEST_MODEL_ITERATIVE_REFINE))
+# mymodel.load_state_dict(torch.load(CFG.BEST_MODEL_ITERATIVE_REFINE))
 mymodel = nn.DataParallel(mymodel)
 
 ###############################################################################
@@ -836,7 +836,7 @@ def main():
         f.close()
 
         # initialize the object
-        obj = init(0.00001)
+        obj = init(0.0001)
 
         sample_points = torch.as_tensor(obj.sharp_sample_points)
 
