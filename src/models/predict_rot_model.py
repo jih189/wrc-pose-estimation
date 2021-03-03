@@ -14,13 +14,12 @@ def mapt(f, *seq):
     return tuple(map(f, *seq))
 
 
-OM.setup(CFG.CAMERA_W, CFG.CAMERA_H)
-
-OM.setProjectMatrixWithIntr(CFG.CAMERA_MATRIX, CFG.CAMERA_W, CFG.CAMERA_H)
+# OM.setup(CFG.CAMERA_W, CFG.CAMERA_H)
+# OM.setProjectMatrixWithIntr(CFG.CAMERA_MATRIX, CFG.CAMERA_W, CFG.CAMERA_H)
 
 obj = OM.ObjectModel()
 obj.loadObjectCADModel(CFG.CAD_MODEL)
-obj.setIntrinsicMatrix(CFG.CAMERA_MATRIX)
+# obj.setIntrinsicMatrix(CFG.CAMERA_MATRIX)
 
 obj.determineSharpEdges(0.8)
 obj.generateSamplePoints(0.0001)

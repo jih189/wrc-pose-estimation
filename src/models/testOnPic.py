@@ -76,12 +76,12 @@ def letterbox(
 
 if __name__ == "__main__":
 
-    OM.setup(CFG.CAMERA_W, CFG.CAMERA_H)
-    OM.setProjectMatrixWithIntr(CFG.CAMERA_MATRIX, CFG.CAMERA_W, CFG.CAMERA_H)
+    # OM.setup(CFG.CAMERA_W, CFG.CAMERA_H)
+    # OM.setProjectMatrixWithIntr(CFG.CAMERA_MATRIX, CFG.CAMERA_W, CFG.CAMERA_H)
 
     obj = OM.ObjectModel()
     obj.loadObjectCADModel(CFG.CAD_MODEL)
-    obj.setIntrinsicMatrix(CFG.CAMERA_MATRIX)
+    # obj.setIntrinsicMatrix(CFG.CAMERA_MATRIX)
 
     obj.determineSharpEdges(0.8)
     obj.generateSamplePoints(0.0001)
@@ -376,7 +376,7 @@ if __name__ == "__main__":
             mask = obj.getVisibleArea()
 
             # get edge img
-            edge = obj.getEdge(refine_frame.shape[0], refine_frame.shape[1])
+            edge = obj.getEdge()
 
             # find the crop size
             [x, y, w, h] = cv2.boundingRect(mask)

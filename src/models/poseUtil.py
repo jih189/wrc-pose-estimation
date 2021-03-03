@@ -101,7 +101,7 @@ def getRotationError(pred_pose, targetPose):
     rot_delta = torch.bmm(target_rot, pred_rot_T)
     rot_delta = rot_delta.data.cpu().numpy()
     rot_delta_angle_axis = np.array(
-        [R.from_matrix(rot_mtx).as_rotvec() for rot_mtx in rot_delta]
+        [R.from_dcm(rot_mtx).as_rotvec() for rot_mtx in rot_delta]
     )
     rot_delta_angle = np.linalg.norm(rot_delta_angle_axis, axis=1)
     return rot_delta_angle

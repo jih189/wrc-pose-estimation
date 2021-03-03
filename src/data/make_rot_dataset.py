@@ -15,6 +15,8 @@ from ctypes import c_bool
 import torch
 import torch.nn as nn
 
+import time
+
 torch.multiprocessing.set_sharing_strategy("file_system")
 
 # global variable for multiprocessing
@@ -23,20 +25,6 @@ output_counter = Value("i", 0)
 vparr = Array("i", [0] * CFG.VIEWPOINT_NUM)
 rotarr = Array("i", [0] * 60)
 testTrigger = Value(c_bool, False)
-
-# object init
-def init():
-    # load the object mesh
-    OM.setup(CFG.CAMERA_W, CFG.CAMERA_H)
-    OM.setProjectMatrixWithIntr(CFG.CAMERA_MATRIX, CFG.CAMERA_W, CFG.CAMERA_H)
-    obj = OM.ObjectModel()
-    obj.setIntrinsicMatrix(CFG.CAMERA_MATRIX)
-    obj.loadObjectCADModel(CFG.CAD_MODEL)
-
-    obj.determineSharpEdges(0.6)
-    obj.generateSamplePoints(0.001)
-
-    return obj
 
 
 # parallel function for process data
@@ -49,11 +37,19 @@ def process_data(args):
 
     output_filepath = CFG.PROCESSED_DATA_PATH
 
-    obj = init()
-
     # parse input
     (id, datalist) = args
     (img_names, pose_names) = list(zip(*datalist))
+
+    # pause the thread according to the id so object model will not
+    # be initilized at the same time which will cause problem
+    time.sleep(id * 0.1)
+
+    # init the object model
+    obj = OM.ObjectModel()
+    obj.loadObjectCADModel(CFG.CAD_MODEL)
+    obj.determineSharpEdges(0.6)
+
 
     while True:
         if testTrigger.value == True:
@@ -104,12 +100,16 @@ def process_data(args):
 
             # generate the real bounding box for object
             obj.setModelviewMatrix(rot_pose)
+            
+            # render object
+            try:
+                obj.render()
+            except Exception as e:
+                print(str(e))
+                print("id ", id)
 
             # get the cornerpoints of the object
             cornerpoints_2d = obj.getCornerPoints(rot_pose)
-
-            # random generate a bounding box around the object with given pose
-            obj.findVisibleSamplePoint()
 
             # ensure the object is not outside of the view
             visiblemask = obj.getVisibleArea()
@@ -120,6 +120,7 @@ def process_data(args):
 
             # extract the bounding box
             bx, by, bw, bh = cv2.boundingRect(visiblemask)
+
             upperleft = np.array([bx, by])
             lowerright = np.array([bx + bw, by + bh])
 
@@ -191,7 +192,6 @@ def process_data(args):
                     print("error in cropping image!!!")
                     print(str(e))
                     testTrigger.value = True
-                    cv2.waitKey(0)
 
                 with output_counter.get_lock():
                     current_output_index = output_counter.value
@@ -276,8 +276,8 @@ def main(input_filepath, output_filepath):
     image_names.sort()
     pose_names.sort()
 
-    # image_names = image_names[1600:]
-    # pose_names = pose_names[1600:]
+    # image_names = image_names[:1]
+    # pose_names = pose_names[:1]
 
     # generate input for function
     datalist = list(zip(image_names, pose_names))

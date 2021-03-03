@@ -27,12 +27,12 @@ import cv2
 # ignore warming
 np.seterr(divide="ignore", invalid="ignore")
 
-OM.setup(CFG.CAMERA_W, CFG.CAMERA_H)
-OM.setProjectMatrixWithIntr(CFG.CAMERA_MATRIX, CFG.CAMERA_W, CFG.CAMERA_H)
+# OM.setup(CFG.CAMERA_W, CFG.CAMERA_H)
+# OM.setProjectMatrixWithIntr(CFG.CAMERA_MATRIX, CFG.CAMERA_W, CFG.CAMERA_H)
 
 obj = OM.ObjectModel()
 obj.loadObjectCADModel(CFG.CAD_MODEL)
-obj.setIntrinsicMatrix(CFG.CAMERA_MATRIX)
+# obj.setIntrinsicMatrix(CFG.CAMERA_MATRIX)
 
 obj.determineSharpEdges(0.8)
 obj.generateSamplePoints(0.0001)
@@ -358,7 +358,7 @@ def detect(object_id, frame, estimated_depth):
             mask = obj.getVisibleArea()
 
             # get edge img
-            edge = obj.getEdge(refine_frame.shape[0], refine_frame.shape[1])
+            edge = obj.getEdge()
 
             # find the crop size
             [x, y, w, h] = cv2.boundingRect(mask)
@@ -744,7 +744,7 @@ def vs_detect(object_id, img):
             mask = obj.getVisibleArea()
 
             # get edge img
-            edge = obj.getEdge(refine_frame.shape[0], refine_frame.shape[1])
+            edge = obj.getEdge()
 
             # find the crop size
             [x, y, w, h] = cv2.boundingRect(mask)

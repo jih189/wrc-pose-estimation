@@ -95,8 +95,17 @@ rendered red edge, and press 'c' to save the image. Press 'q' to quit the progra
 
 ## training rough pose estimation and refinement
 We recommend you run everything in conda because the requirements of the environment of following is different from the environment of yolo. After you create a environment, <br/>
+Here is the command to install conda <br/>
+```
+wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh
+chmod +x Miniconda3-latest-Linux-x86_64.sh
+./Miniconda3-latest-Linux-x86_64.sh
+# follow line is create a new conda environment
+conda create -n newenv
+```
 Run <br/>
 ```
+pip3 install --upgrade pip
 pip install -r requirements.txt
 ```
 under the project root, so it will install packages you need. If you have run it before, then please skip it.<br/><br/>

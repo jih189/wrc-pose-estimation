@@ -38,16 +38,15 @@ class Rot_data(Dataset):
         self.resX = resX
         self.resY = resY
 
-        OM.setup(CFG.CAMERA_W, CFG.CAMERA_H)
-
-        OM.setProjectMatrixWithIntr(CFG.CAMERA_MATRIX, CFG.CAMERA_W, CFG.CAMERA_H)
+        # OM.setup(CFG.CAMERA_W, CFG.CAMERA_H)
+        # OM.setProjectMatrixWithIntr(CFG.CAMERA_MATRIX, CFG.CAMERA_W, CFG.CAMERA_H)
 
         self.obj = OM.ObjectModel()
         self.obj.loadObjectCADModel(CFG.CAD_MODEL)
-        self.obj.setIntrinsicMatrix(CFG.CAMERA_MATRIX)
+        # self.obj.setIntrinsicMatrix(CFG.CAMERA_MATRIX)
 
-        self.obj.determineSharpEdges(0.05)
-        self.obj.generateSamplePoints(0.001)
+        # self.obj.determineSharpEdges(0.05)
+        # self.obj.generateSamplePoints(0.001)
 
     def __len__(self):
         return len(self.dataNames)

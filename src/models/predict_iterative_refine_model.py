@@ -32,12 +32,12 @@ def init():
 
 def predict(mymodel, predict_index, view_image):
 
-    OM.setup(CFG.CAMERA_W, CFG.CAMERA_H)
-    OM.setProjectMatrixWithIntr(CFG.CAMERA_MATRIX, CFG.CAMERA_W, CFG.CAMERA_H)
+    # OM.setup(CFG.CAMERA_W, CFG.CAMERA_H)
+    # OM.setProjectMatrixWithIntr(CFG.CAMERA_MATRIX, CFG.CAMERA_W, CFG.CAMERA_H)
 
     obj = OM.ObjectModel()
     obj.loadObjectCADModel(CFG.CAD_MODEL)
-    obj.setIntrinsicMatrix(CFG.CAMERA_MATRIX)
+    # obj.setIntrinsicMatrix(CFG.CAMERA_MATRIX)
 
     obj.determineSharpEdges(0.4)
     obj.generateSamplePoints(0.0003)
@@ -70,7 +70,7 @@ def predict(mymodel, predict_index, view_image):
         mask = obj.getVisibleArea()
 
         # get edge img
-        edge = obj.getEdge(img.shape[0], img.shape[1])
+        edge = obj.getEdge()
 
         # find the crop size
         [x, y, w, h] = cv2.boundingRect(mask)

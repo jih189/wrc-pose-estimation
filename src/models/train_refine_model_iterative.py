@@ -24,6 +24,8 @@ from ctypes import c_bool
 # importing shutil module
 import shutil
 
+import time
+
 # allow multiple processes to access the file system
 torch.multiprocessing.set_sharing_strategy("file_system")
 
@@ -79,16 +81,12 @@ samplepoints = np.asarray(o3d.io.read_triangle_mesh(CFG.CAD_MODEL).vertices)
 diameter = np.linalg.norm(np.amax(samplepoints, axis=0) - np.amin(samplepoints, axis=0))
 
 # object init.
-def init(sampleValue):
+def init():
     # load the object mesh
-    OM.setup(CFG.CAMERA_W, CFG.CAMERA_H)
-    OM.setProjectMatrixWithIntr(CFG.CAMERA_MATRIX, CFG.CAMERA_W, CFG.CAMERA_H)
     obj = OM.ObjectModel()
-    obj.setIntrinsicMatrix(CFG.CAMERA_MATRIX)
     obj.loadObjectCADModel(CFG.CAD_MODEL)
 
-    obj.determineSharpEdges(0.8)
-    obj.generateSamplePoints(sampleValue)
+    obj.determineSharpEdges(0.6)
     return obj
 
 
@@ -98,11 +96,14 @@ def process_data(args):
     global output_counter
     global testTrigger
 
-    obj = init(0.0001)
-
     # parse input
     (id, datalist) = args
     (img_names, initpose_names, targetpose_names, mask_names) = list(zip(*datalist))
+    # pause the thread according to the id so object model will not
+    # be initilized at the same time which will cause problem
+    time.sleep(id * 0.1)
+
+    obj = init()
 
     while True:
         if testTrigger.value == True:
@@ -141,8 +142,8 @@ def process_data(args):
             # set pose on object
             obj.setModelviewMatrix(initpose)
 
-            # generate edge of on the object
-            obj.findVisibleSamplePoint()
+            # render object
+            obj.render()
 
             # generate preprocessed data
             # inital pose mask(it may not return any mask because
@@ -154,7 +155,7 @@ def process_data(args):
                 continue
 
             # get edge img
-            edge = obj.getEdge(img.shape[0], img.shape[1])
+            edge = obj.getEdge_gl()
 
             # find the crop size
             [_, _, w, h] = cv2.boundingRect(init_mask)
@@ -320,8 +321,6 @@ def process_data(args):
             print("fail in pre-processing")
             print(str(e))
             testTrigger.value = True
-
-    OM.exit()
 
 
 def val(sample_points, val_loader, val_dataset):
@@ -703,12 +702,12 @@ def generateData(obj, sample_points, offsetValue, depthValue, rotationValue):
                 )
 
             obj.setModelviewMatrix(global_pred_pose)
-            obj.findVisibleSamplePoint()
-            for p in obj.sharp_2d_pts:
-                p = (int(p[0]), int(p[1]))
-                original_img = cv2.circle(
-                    original_img, p, radius=1, color=(0, 0, 255), thickness=-1
-                )
+
+            # render object
+            obj.render()
+
+            # draw edge of random pose on img
+            original_img = obj.drawEdge_gl(original_img)
 
             cv2.imwrite(
                 pool_dir + "{:06d}".format(savedIndex) + "demo.png", original_img,
@@ -836,7 +835,9 @@ def main():
         f.close()
 
         # initialize the object
-        obj = init(0.0001)
+        obj = init()
+
+        obj.generateSamplePoints(0.0001)
 
         sample_points = torch.as_tensor(obj.sharp_sample_points)
 
@@ -884,7 +885,7 @@ def main():
         f.close()
 
         removeFilesInDir(pool_dir)
-        obj = init(0.001)
+        obj = init()
         # reduce the noise of pose sampling
         offsetSampleValue /= 2.0
         depthSampleValue /= 2.0
@@ -894,7 +895,6 @@ def main():
         )
         removeFilesInDir(processed_dir)
         print("data generation done!")
-        OM.exit()
 
         # reset the learning rate
         # for g in optimizer.param_groups:

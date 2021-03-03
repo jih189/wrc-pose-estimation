@@ -25,6 +25,8 @@ import torch.nn as nn
 
 from models.model import Magic_Net
 
+import time
+
 torch.multiprocessing.set_sharing_strategy("file_system")
 
 counter = Value("i", 0)
@@ -33,16 +35,10 @@ testTrigger = Value(c_bool, False)
 
 
 def init():
-    # load the object mesh
-    OM.setup(CFG.CAMERA_W, CFG.CAMERA_H)
-    OM.setProjectMatrixWithIntr(CFG.CAMERA_MATRIX, CFG.CAMERA_W, CFG.CAMERA_H)
-
     obj = OM.ObjectModel()
-    obj.setIntrinsicMatrix(CFG.CAMERA_MATRIX)
     obj.loadObjectCADModel(CFG.CAD_MODEL)
 
-    obj.determineSharpEdges(0.8)
-    obj.generateSamplePoints(0.0001)
+    obj.determineSharpEdges(0.6)
     return obj
 
 
@@ -210,13 +206,16 @@ def process_data(args):
     global output_counter
     global testTrigger
 
-    output_filepath = CFG.REFINE_ITERATIVE_DATA_PATH
-
-    obj = init()
-
     # parse input
     (id, datalist, isYCB, rot_model) = args
     (img_names, pose_names) = list(zip(*datalist))
+
+    output_filepath = CFG.REFINE_ITERATIVE_DATA_PATH
+
+    # pause the thread according to the id so object model will not
+    # be initilized at the same time which will cause problem
+    time.sleep(id * 0.1)
+    obj = init()
 
     while True:
         if testTrigger.value == True:
@@ -262,7 +261,9 @@ def process_data(args):
 
                 # generate the ground true mask for object
                 obj.setModelviewMatrix(rot_pose)
-                obj.findVisibleSamplePoint()
+                
+                # render object
+                obj.render()
 
                 if isYCB:
                     # read the mask
@@ -309,16 +310,11 @@ def process_data(args):
                 # set pose on object
                 obj.setModelviewMatrix(random_pose)
 
-                # generate edge of on the object
-                obj.findVisibleSamplePoint()
+                # render object
+                obj.render()
 
-                # get edge img
-                imgWithEdge = rot_img.copy()
-                for p in obj.sharp_2d_pts:
-                    p = (int(p[0]), int(p[1]))
-                    imgWithEdge = cv2.circle(
-                        imgWithEdge, p, radius=1, color=(0, 0, 255), thickness=-1
-                    )
+                # draw edge of random pose on img
+                imgWithEdge = obj.drawEdge_gl(rot_img)
 
                 with output_counter.get_lock():
                     current_output_index = output_counter.value
@@ -409,8 +405,8 @@ def main(input_filepath, output_filepath):
                 mask_names.append(str(f))
         mask_names.sort()
 
-    # image_names = image_names[:10]
-    # pose_names = pose_names[:10]
+    # image_names = image_names[400:401]
+    # pose_names = pose_names[400:401]
 
     # generate input for function
     if isYCB:

@@ -13,30 +13,32 @@ import torch
 from torch.nn import functional as F
 import src.configuration as CFG
 
+from PIL import Image
+
 import sys
 
 # map the pose to the pose which has the same shape, so it can avoid the symetric issue
 def symmetricRemove(pose_input_):
     pose_input = pose_input_.copy()
-    eulerVec = (R.from_matrix(pose_input[:3, :3])).as_euler("ZYX")
+    eulerVec = (R.from_dcm(pose_input[:3, :3])).as_euler("ZYX")
     eulerVec[2] = -1.57
-    pose_input[:3, :3] = (R.from_euler("ZYX", eulerVec)).as_matrix()
+    pose_input[:3, :3] = (R.from_euler("ZYX", eulerVec)).as_dcm()
     return pose_input
 
 
 def symmetricRemove_housing(pose_input_):
     pose_input = pose_input_.copy()
-    eulerVec = (R.from_matrix(pose_input[:3, :3])).as_euler("ZYX")
+    eulerVec = (R.from_dcm(pose_input[:3, :3])).as_euler("ZYX")
     eulerVec[2] = eulerVec[2] % (np.pi / 2)
-    pose_input[:3, :3] = (R.from_euler("ZYX", eulerVec)).as_matrix()
+    pose_input[:3, :3] = (R.from_euler("ZYX", eulerVec)).as_dcm()
     return pose_input
 
 
 def symmetricRemove_nut(pose_input_):
     pose_input = pose_input_.copy()
-    eulerVec = (R.from_matrix(pose_input[:3, :3])).as_euler("ZYX")
+    eulerVec = (R.from_dcm(pose_input[:3, :3])).as_euler("ZYX")
     eulerVec[2] = eulerVec[2] % (np.pi / 3)
-    pose_input[:3, :3] = (R.from_euler("ZYX", eulerVec)).as_matrix()
+    pose_input[:3, :3] = (R.from_euler("ZYX", eulerVec)).as_dcm()
     return pose_input
 
 
@@ -133,15 +135,68 @@ class ObjectModel:
         self.sharp_sample_points_edge_indices = []
         self.visible_sharpedge_samplepoint = []
         self.dl = 0
-        self.intrinsic = None
+        self.de = 0
+        self.intrinsic = CFG.CAMERA_MATRIX
         self.pose = None
         self.sharp_2d_pts = []
         self.templateKernel = None
         self.kernelSize = None
         self.pointcloud = []
+        self.pointcloud_test = []
         self.height = CFG.CAMERA_H
         self.width = CFG.CAMERA_W
         self.cornerPoints = None
+
+        if not pygame.get_init():
+            pygame.init()
+            pygame.mixer.quit()
+
+        pygame.display.set_mode((self.width, self.height), pygame.DOUBLEBUF | pygame.OPENGL)
+        pygame.display.set_caption("Demo")
+        pygame.display.iconify()
+
+        glEnable(GL_DEPTH_TEST)
+        glShadeModel(GL_FLAT)
+
+        glMatrixMode(GL_PROJECTION)
+        fx = self.intrinsic[0, 0]
+        fy = self.intrinsic[1, 1]
+        ux = self.intrinsic[0, 2]
+        uy = self.intrinsic[1, 2]
+
+        near = 0.1
+        far = 30.0
+
+        Mp = np.array(
+            [
+                [2.0 * fx / self.width, 0.0, 0.0, 0.0],
+                [0, -2.0 * fy / self.height, 0.0, 0.0],
+                [
+                    2.0 * ux / self.width - 1.0,
+                    -2.0 * uy / self.height + 1.0,
+                    (far + near) / (far - near),
+                    1.0,
+                ],
+                [0.0, 0.0, -2.0 * far * near / (far - near), 0.0],
+            ]
+        )
+
+        glLoadMatrixf(Mp)
+
+        # # create a handle and assign the VBO for the mesh data to it
+        # self.py_id = glGenBuffers(1)
+        # # bind the VBO to the GL_ARRAY_BUFFER target in the OpenGL context
+        # glBindBuffer(GL_PIXEL_PACK_BUFFER, self.py_id)
+        # # allocate enough memory for this VBO to contain the mesh data
+        # glBufferData(GL_PIXEL_PACK_BUFFER, self.width * self.height * 3, None, GL_STREAM_READ)
+        # # unbind py_id
+        # glBindBuffer(GL_PIXEL_PACK_BUFFER, 0)
+        
+
+    def shutdown_py(self):
+        if pygame.get_init():
+            pygame.quit()
+            print("del object")
 
     # project a 3d point to a 2d point with pose
     # input: (3,) numpy matrix
@@ -200,13 +255,13 @@ class ObjectModel:
         # )
 
         # Rmatrix = np.identity(4)
-        # Rmatrix[:3, :3] = R.from_euler("XYZ", [verticalR, horizontalR, 0]).as_matrix()
+        # Rmatrix[:3, :3] = R.from_euler("XYZ", [verticalR, horizontalR, 0]).as_dcm()
         # pose = np.dot(Rmatrix, pose)
 
-        # Rmatrix[:3, :3] = R.from_euler("z", -np.radians(angle)).as_matrix()
+        # Rmatrix[:3, :3] = R.from_euler("z", -np.radians(angle)).as_dcm()
 
         # pose = np.dot(Rmatrix, pose)
-        # Rmatrix[:3, :3] = R.from_euler("XYZ", [-verticalR, -horizontalR, 0]).as_matrix()
+        # Rmatrix[:3, :3] = R.from_euler("XYZ", [-verticalR, -horizontalR, 0]).as_dcm()
         # pose = np.dot(Rmatrix, pose)
         return pose
 
@@ -225,6 +280,7 @@ class ObjectModel:
                 v1 = self.mesh_obj.vertices[face[0]]
                 v2 = self.mesh_obj.vertices[face[1]]
                 v3 = self.mesh_obj.vertices[face[2]]
+                glColor3f(0.5, 0.5, 0.5) # set the object to gray color
                 glBegin(GL_TRIANGLES)
                 glVertex3f(v1[0], v1[1], v1[2])
                 glVertex3f(v2[0], v2[1], v2[2])
@@ -303,41 +359,50 @@ class ObjectModel:
 
     # render the mesh object
     def render(self):
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT)
 
-        lightfv = ctypes.c_float * 4
-        glLightfv(GL_LIGHT0, GL_POSITION, lightfv(0.0, 0.0, -1.0, 0.0))
-        glEnable(GL_LIGHT0)
+        # lightfv = ctypes.c_float * 4
+        # glLightfv(GL_LIGHT0, GL_POSITION, lightfv(0.0, 0.0, 1.0, 0.0))
+        # glEnable(GL_LIGHT0)
 
-        # # define light condition here
-        # glLightfv(GL_LIGHT1, GL_POSITION, lightfv(0.0, 1.0, 0.0, 0.0))
-        # glLightfv(GL_LIGHT1, GL_AMBIENT, lightfv(0.0, 0.0, 0.0, 1.0))
-        # glLightfv(GL_LIGHT1, GL_DIFFUSE, lightfv(1.0, 1.0, 1.0, 1.0))
-        # glEnable(GL_LIGHT1)
+        # # # define light condition here
+        # # glLightfv(GL_LIGHT1, GL_POSITION, lightfv(0.0, 1.0, 0.0, 0.0))
+        # # glLightfv(GL_LIGHT1, GL_AMBIENT, lightfv(0.0, 0.0, 0.0, 1.0))
+        # # glLightfv(GL_LIGHT1, GL_DIFFUSE, lightfv(1.0, 1.0, 1.0, 1.0))
+        # # glEnable(GL_LIGHT1)
 
-        # glLightfv(GL_LIGHT2, GL_POSITION, lightfv(0.0, -1.0, 0.0, 0.0))
-        # glLightfv(GL_LIGHT2, GL_AMBIENT, lightfv(0.0, 0.0, 0.0, 1.0))
-        # glLightfv(GL_LIGHT2, GL_DIFFUSE, lightfv(1.0, 1.0, 1.0, 1.0))
-        # glEnable(GL_LIGHT2)
+        # # glLightfv(GL_LIGHT2, GL_POSITION, lightfv(0.0, -1.0, 0.0, 0.0))
+        # # glLightfv(GL_LIGHT2, GL_AMBIENT, lightfv(0.0, 0.0, 0.0, 1.0))
+        # # glLightfv(GL_LIGHT2, GL_DIFFUSE, lightfv(1.0, 1.0, 1.0, 1.0))
+        # # glEnable(GL_LIGHT2)
 
-        # glLightfv(GL_LIGHT3, GL_POSITION, lightfv(1.0, 0.0, 0.0, 0.0))
-        # glLightfv(GL_LIGHT3, GL_AMBIENT, lightfv(0.0, 0.0, 0.0, 1.0))
-        # glLightfv(GL_LIGHT3, GL_DIFFUSE, lightfv(1.0, 1.0, 1.0, 1.0))
-        # glEnable(GL_LIGHT3)
+        # # glLightfv(GL_LIGHT3, GL_POSITION, lightfv(1.0, 0.0, 0.0, 0.0))
+        # # glLightfv(GL_LIGHT3, GL_AMBIENT, lightfv(0.0, 0.0, 0.0, 1.0))
+        # # glLightfv(GL_LIGHT3, GL_DIFFUSE, lightfv(1.0, 1.0, 1.0, 1.0))
+        # # glEnable(GL_LIGHT3)
 
-        # glLightfv(GL_LIGHT4, GL_POSITION, lightfv(-1.0, 0.0, 0.0, 0.0))
-        # glLightfv(GL_LIGHT4, GL_AMBIENT, lightfv(0.0, 0.0, 0.0, 1.0))
-        # glLightfv(GL_LIGHT4, GL_DIFFUSE, lightfv(1.0, 1.0, 1.0, 1.0))
-        # glEnable(GL_LIGHT4)
+        # # glLightfv(GL_LIGHT4, GL_POSITION, lightfv(-1.0, 0.0, 0.0, 0.0))
+        # # glLightfv(GL_LIGHT4, GL_AMBIENT, lightfv(0.0, 0.0, 0.0, 1.0))
+        # # glLightfv(GL_LIGHT4, GL_DIFFUSE, lightfv(1.0, 1.0, 1.0, 1.0))
+        # # glEnable(GL_LIGHT4)
 
-        # glLightfv(GL_LIGHT5, GL_POSITION, lightfv(0.0, 0.0, 1.0, 0.0))
-        # glLightfv(GL_LIGHT5, GL_AMBIENT, lightfv(0.0, 0.0, 0.0, 1.0))
-        # glLightfv(GL_LIGHT5, GL_DIFFUSE, lightfv(1.0, 1.0, 1.0, 1.0))
-        # glEnable(GL_LIGHT5)
+        # # glLightfv(GL_LIGHT5, GL_POSITION, lightfv(0.0, 0.0, 1.0, 0.0))
+        # # glLightfv(GL_LIGHT5, GL_AMBIENT, lightfv(0.0, 0.0, 0.0, 1.0))
+        # # glLightfv(GL_LIGHT5, GL_DIFFUSE, lightfv(1.0, 1.0, 1.0, 1.0))
+        # # glEnable(GL_LIGHT5)
 
-        glEnable(GL_LIGHTING)
+        # glEnable(GL_LIGHTING)
+        # Draw the face (fill) with offset
+        glPolygonMode(GL_FRONT_AND_BACK, GL_FILL)
 
-        visualization.draw(self.mesh_obj)
+        glPushMatrix()
+        # draw object model saved in display list
+        glCallList(self.dl)
+        glCallList(self.de)
+        glPopMatrix()
+
+        # visualization.draw(self.mesh_obj)
+        # pygame.display.flip()
 
     # filter out the edge which is not sharp enough
     def determineSharpEdges(self, th_sharp):
@@ -388,6 +453,22 @@ class ObjectModel:
                         self.sharp_edges.append(
                             (self.mesh_obj.vertices[i], self.mesh_obj.vertices[j])
                         )
+        
+        # add sharp edges to de
+        self.de = glGenLists(1)
+        if not self.de:
+            print("Fail to create a display edge")
+            return
+        glNewList(self.de, GL_COMPILE)
+
+        for h1, h2 in self.sharp_edges:
+            glLineWidth(2.0)
+            glColor3f(1.0, 1.0, 1.0)
+            glBegin(GL_LINES)
+            glVertex3f(h1[0], h1[1], h1[2])
+            glVertex3f(h2[0], h2[1], h2[2])
+            glEnd()
+        glEndList()
 
     # generate sample points on the edges of the object
     def generateSamplePoints(self, sample_th):
@@ -428,18 +509,35 @@ class ObjectModel:
     def rotatePoseWithAngle(self, pose_, horizontalR, verticalR):
         pose = pose_.copy()
         Rmatrix = np.identity(4)
-        Rmatrix[:3, :3] = R.from_euler("XYZ", [verticalR, horizontalR, 0]).as_matrix()
+        Rmatrix[:3, :3] = R.from_euler("XYZ", [verticalR, horizontalR, 0]).as_dcm()
         pose = np.dot(Rmatrix, pose)
 
         return pose
 
     # generate teh sharp edge of image
-    def getEdge(self, height, width):
-        edgeImg = np.zeros((height, width), np.uint8)
+    def getEdge(self):
+        edgeImg = np.zeros((self.height, self.width), np.uint8)
         for p in self.sharp_2d_pts:
             p = (int(p[0]), int(p[1]))
             edgeImg = cv2.circle(edgeImg, p, radius=0, color=(255), thickness=-1)
         return edgeImg
+
+    # read the color of the object in opengl
+    def getEdge_gl(self):
+        buffer = glReadPixels(
+            0, 0, self.width, self.height, GL_RGB, GL_UNSIGNED_BYTE
+        )
+        ret = np.frombuffer(buffer, np.uint8).reshape(self.height, self.width, 3)
+        ret = cv2.flip(ret, 0)
+        ret = cv2.cvtColor(ret, cv2.COLOR_BGR2GRAY)
+        _, ret = cv2.threshold(ret, 200, 255, cv2.THRESH_BINARY)
+        return ret
+
+    def drawEdge_gl(self, img_):
+        img = img_.copy()
+        edge = self.getEdge_gl()
+        img[edge>0] = [0,0,255]
+        return img
 
     # get the max distance from center to each point
     def getMaxDis2Point(self):
@@ -462,29 +560,29 @@ class ObjectModel:
         horizontalR = np.arctan2(pose[0, 3], pose[2, 3])
         r = R.from_euler("Y", -horizontalR)
         Rmatrix = np.identity(4)
-        Rmatrix[:3, :3] = r.as_matrix()
+        Rmatrix[:3, :3] = r.as_dcm()
         center_pose = np.dot(Rmatrix, pose)
 
         verticalR = np.arctan2(
             pose[1, 3], np.sqrt(pose[0, 3] * pose[0, 3] + pose[2, 3] * pose[2, 3])
         )
         r = R.from_euler("X", verticalR)
-        Rmatrix[:3, :3] = r.as_matrix()
+        Rmatrix[:3, :3] = r.as_dcm()
         center_pose = np.dot(Rmatrix, center_pose)
 
         # generate the random rotation
         tempPose = np.identity(4)
         Rmatrix = np.identity(4)
         r = R.from_euler("X", xRot[0])
-        Rmatrix[:3, :3] = r.as_matrix()
+        Rmatrix[:3, :3] = r.as_dcm()
         tempPose = np.dot(Rmatrix, tempPose)
 
         r = R.from_euler("Y", yRot[0])
-        Rmatrix[:3, :3] = r.as_matrix()
+        Rmatrix[:3, :3] = r.as_dcm()
         tempPose = np.dot(Rmatrix, tempPose)
 
         r = R.from_euler("Z", zRot[0])
-        Rmatrix[:3, :3] = r.as_matrix()
+        Rmatrix[:3, :3] = r.as_dcm()
         tempPose = np.dot(Rmatrix, tempPose)
 
         rot_center_pose = np.identity(4)
@@ -501,11 +599,11 @@ class ObjectModel:
 
         # rotate it back
         r = R.from_euler("Y", horizontalR)
-        Rmatrix[:3, :3] = r.as_matrix()
+        Rmatrix[:3, :3] = r.as_dcm()
         tempPose = np.dot(Rmatrix, center_pose)
 
         r = R.from_euler("X", -verticalR)
-        Rmatrix[:3, :3] = r.as_matrix()
+        Rmatrix[:3, :3] = r.as_dcm()
         tempPose = np.dot(Rmatrix, tempPose)
 
         return tempPose
@@ -542,14 +640,14 @@ class ObjectModel:
         horizontalR = np.arctan2(pose[0, 3], pose[2, 3])
         r = R.from_euler("Y", -horizontalR)
         Rmatrix = np.identity(4)
-        Rmatrix[:3, :3] = r.as_matrix()
+        Rmatrix[:3, :3] = r.as_dcm()
         center_pose = np.dot(Rmatrix, pose)
 
         verticalR = np.arctan2(
             pose[1, 3], np.sqrt(pose[0, 3] * pose[0, 3] + pose[2, 3] * pose[2, 3])
         )
         r = R.from_euler("X", verticalR)
-        Rmatrix[:3, :3] = r.as_matrix()
+        Rmatrix[:3, :3] = r.as_dcm()
         center_pose = np.dot(Rmatrix, center_pose)
 
         poses = []
@@ -558,15 +656,15 @@ class ObjectModel:
             tempPose = np.identity(4)
             Rmatrix = np.identity(4)
             r = R.from_euler("X", xRot[i])
-            Rmatrix[:3, :3] = r.as_matrix()
+            Rmatrix[:3, :3] = r.as_dcm()
             tempPose = np.dot(Rmatrix, tempPose)
 
             r = R.from_euler("Y", yRot[i])
-            Rmatrix[:3, :3] = r.as_matrix()
+            Rmatrix[:3, :3] = r.as_dcm()
             tempPose = np.dot(Rmatrix, tempPose)
 
             r = R.from_euler("Z", zRot[i])
-            Rmatrix[:3, :3] = r.as_matrix()
+            Rmatrix[:3, :3] = r.as_dcm()
             tempPose = np.dot(Rmatrix, tempPose)
 
             tempPose = np.dot(center_pose, tempPose)
@@ -580,24 +678,76 @@ class ObjectModel:
 
             # rotate it back
             r = R.from_euler("Y", horizontalR)
-            Rmatrix[:3, :3] = r.as_matrix()
+            Rmatrix[:3, :3] = r.as_dcm()
             tempPose = np.dot(Rmatrix, tempPose)
 
             r = R.from_euler("X", -verticalR)
-            Rmatrix[:3, :3] = r.as_matrix()
+            Rmatrix[:3, :3] = r.as_dcm()
             tempPose = np.dot(Rmatrix, tempPose)
 
             poses.append(tempPose)
 
         return poses
+    
+    # # this is used for test PBO
+    def drawImage(self):
+        # PBO
+        # pixel_buffer = glGenBuffers(1)
+        # glBindBuffer(GL_PIXEL_PACK_BUFFER, pixel_buffer)
+        # glBufferData(GL_PIXEL_PACK_BUFFER, self.height * self.width * 3, None, GL_STREAM_READ)
 
-    # get the mask of the object
+        # glReadPixels(0, 0, self.width, self.height, GL_RGB, GL_UNSIGNED_BYTE, 0)
+        # buffer = glMapBuffer(GL_PIXEL_PACK_BUFFER, GL_READ_ONLY)
+        # # buffer = glReadPixels(
+        # #     0, 0, self.width, self.height, GL_RGB, GL_UNSIGNED_BYTE
+        # # )
+        # image = Image.frombuffer("RGB", (self.width, self.height), ctypes.string_at(buffer, self.height * self.width * 3), 'raw',
+        #                          "RGB", 0, 1)
+        # image = image.transpose(Image.FLIP_TOP_BOTTOM)
+        # ret = np.asarray(image)
+        # glUnmapBuffer(GL_PIXEL_PACK_BUFFER)
+        # glBindBuffer(GL_PIXEL_PACK_BUFFER, 0)
+        # glDeleteBuffers(1, [pixel_buffer])
+
+        #FBO
+        # fbo = glGenFramebuffers(1)
+        # glBindFramebuffer(GL_FRAMEBUFFER, fbo)
+
+        # # render buffer as color buffer
+        # colorbuffer = glGenRenderbuffers(1)
+        # glBindRenderbuffer(GL_RENDERBUFFER, colorbuffer)
+        # glRenderbufferStorage(GL_RENDERBUFFER, GL_RGB, self.width, self.height)
+        # glBindRenderbuffer(GL_RENDERBUFFER, 0)
+        # glFramebufferRenderbuffer(
+        #     GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_RENDERBUFFER,
+        #     colorbuffer
+        # )
+
+        # debug_buffer = glReadPixels(0, 0, self.width, self.height, GL_RGB,
+        #                                GL_UNSIGNED_BYTE)
+        # image = Image.frombytes(mode="RGB", size=(self.width, self.height),
+        #                         data=debug_buffer)
+        # image = image.transpose(Image.FLIP_TOP_BOTTOM)
+        # ret = np.asarray(image)
+
+        # glBindFramebuffer(GL_FRAMEBUFFER, 0) # unbind FB
+
+        buffer = glReadPixels(
+            0, 0, self.width, self.height, GL_RGB, GL_UNSIGNED_BYTE
+        )
+        ret = np.frombuffer(buffer, dtype=np.uint8).reshape(self.height, self.width, 3)
+        ret = cv2.flip(ret, 0)
+
+        return ret
+
+    # get the mask of the object in uint8 format
     def getVisibleArea(self):
         ret = np.zeros([self.height, self.width], dtype=np.uint8)
         mask = self.getMask()
         ret[mask] = 255
         return ret
 
+    # get the mask of the object
     def getMask(self):
         buffer = glReadPixels(
             0, 0, self.width, self.height, GL_DEPTH_COMPONENT, GL_FLOAT
@@ -614,71 +764,22 @@ class ObjectModel:
         proj = glGetDoublev(GL_PROJECTION_MATRIX)
         view = glGetIntegerv(GL_VIEWPORT)
         z = glReadPixels(0, 0, self.width, self.height, GL_DEPTH_COMPONENT, GL_FLOAT)
-
         z = np.frombuffer(z, np.float32).reshape(self.height, self.width, 1)
 
-        result = np.zeros((self.height, self.width, 3))  # x y z
         for x in range(self.width):
             for y in range(self.height):
-                x3d, y3d, z3d = gluUnProject(x, y, z[y, x], model, proj, view)
-                result[y, x, 0] = x3d
-                result[y, x, 1] = y3d
-                result[y, x, 2] = z3d
+                # only process the object pixels
+                if z[y, x] < 0.95:
+                    x3d, y3d, z3d = gluUnProject(x, y, z[y, x], model, proj, view)
+                    self.pointcloud.append((self.height - y - 1, x, x3d, y3d, z3d))
 
-        result = cv2.flip(result, 0)
-        for x in range(self.width):
-            for y in range(self.height):
-                if (
-                    result[y, x, 0] > -3.0
-                    and result[y, x, 0] < 3.0
-                    and result[y, x, 1] > -3.0
-                    and result[y, x, 1] < 3.0
-                    and result[y, x, 2] > -3.0
-                    and result[y, x, 2] < 3.0
-                ):
-                    self.pointcloud.append(
-                        (y, x, result[y, x, 0], result[y, x, 1], result[y, x, 2])
-                    )
-
-    def getVisiblePointCloud_test(self):
-        self.pointcloud.clear()
-        model = glGetDoublev(GL_MODELVIEW_MATRIX)
-        proj = glGetDoublev(GL_PROJECTION_MATRIX)
-        view = glGetIntegerv(GL_VIEWPORT)
-        z = glReadPixels(0, 0, self.width, self.height, GL_DEPTH_COMPONENT, GL_FLOAT)
-
-        z = np.frombuffer(z, np.float32).reshape(self.height, self.width, 1)
-
-        result = np.zeros((self.height, self.width, 3))  # x y z
-        for x in range(self.width):
-            for y in range(self.height):
-                x3d, y3d, z3d = gluUnProject(x, y, z[y, x], model, proj, view)
-                result[y, x, 0] = x3d
-                result[y, x, 1] = y3d
-                result[y, x, 2] = z3d
-
-        result = cv2.flip(result, 0)
-        for x in range(self.width):
-            for y in range(self.height):
-                if (
-                    result[y, x, 0] > -3.0
-                    and result[y, x, 0] < 3.0
-                    and result[y, x, 1] > -3.0
-                    and result[y, x, 1] < 3.0
-                    and result[y, x, 2] > -3.0
-                    and result[y, x, 2] < 3.0
-                ):
-                    self.pointcloud.append(
-                        (y, x, result[y, x, 0], result[y, x, 1], result[y, x, 2])
-                    )
 
     # after the object is rendered, the optical flow can be calculated to the
     def getOptFlowWithPoses(self, height, width, targetpose):
 
         img = np.zeros((self.height, self.width, 3), dtype=np.uint8)
         self.getVisiblePointCloud()
-        for i in range(len(self.pointcloud)):
-            y2d, x2d, x3d, y3d, z3d = self.pointcloud[i]
+        for y2d, x2d, x3d, y3d, z3d in self.pointcloud:
             (xn, yn) = self.project3Dto2D((x3d, y3d, z3d), targetpose)
             img[int(y2d), int(x2d), 0] = int(((xn - x2d) / width + 0.5) * 255)
             img[int(y2d), int(x2d), 1] = int(((yn - y2d) / height + 0.5) * 255)
@@ -689,8 +790,7 @@ class ObjectModel:
 
         img = np.zeros((self.height, self.width, 3), dtype=np.uint8)
         self.getVisiblePointCloud()
-        for i in range(len(self.pointcloud)):
-            y2d, x2d, x3d, y3d, z3d = self.pointcloud[i]
+        for y2d, x2d, x3d, y3d, z3d in self.pointcloud:
             (xn, yn) = self.project3Dto2D((x3d, y3d, z3d), targetpose)
             if mask[int(yn), int(xn), 0] == 255:
                 img[int(y2d), int(x2d), 0] = int(((xn - x2d) / width + 0.5) * 255)
@@ -704,8 +804,7 @@ class ObjectModel:
 
         img = np.zeros((self.height, self.width, 3), dtype=np.uint8)
         self.getVisiblePointCloud()
-        for i in range(len(self.pointcloud)):
-            y2d, x2d, x3d, y3d, z3d = self.pointcloud[i]
+        for y2d, x2d, x3d, y3d, z3d in self.pointcloud:
             img[int(y2d), int(x2d), 0] = int(
                 (x3d + maxDistance) / (2 * maxDistance) * 255
             )
@@ -810,25 +909,6 @@ class ObjectModel:
         glDeleteQueriesARB(vQueries)
         glPopMatrix()
 
-    def findVisibleSamplePoint_test(self):
-        glPushMatrix()
-
-        # disable writing to depth buffer
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
-
-        # Draw the face (fill) with offset
-        glPolygonMode(GL_FRONT_AND_BACK, GL_FILL)
-        glEnable(GL_POLYGON_OFFSET_FILL)
-        glPolygonOffset(1.0, 1.0)
-        glColor3f(1.0, 1.0, 1.0)
-
-        # draw object model saved in display list
-        glCallList(self.dl)
-
-        glDisable(GL_POLYGON_OFFSET_FILL)
-
-        glPopMatrix()
-
     def setIntrinsicMatrix(self, intrinsic_):
         self.intrinsic = intrinsic_.copy()
 
@@ -897,7 +977,7 @@ class ObjectModel:
         # generate different pose of the object and draw the edge in the views as the kernel
         for v in range(numOfView):
             # generate the pose
-            curpose = (R.from_euler("XYZ", directionrpy[v])).as_matrix()
+            curpose = (R.from_euler("XYZ", directionrpy[v])).as_dcm()
             Cur_matrix[:3, :3] = curpose
             self.setModelviewMatrix(Cur_matrix)
             upperleft, lowerright = self.findVisibleSamplePoint()
@@ -957,12 +1037,12 @@ class ObjectModel:
         pose[:3, :3] = self.VP2Rotation(viewpoint)
         pose[2, 3] = depth
         r = R.from_euler("Z", -inplaneR)
-        pose[:3, :3] = np.dot(r.as_matrix(), pose[:3, :3])
+        pose[:3, :3] = np.dot(r.as_dcm(), pose[:3, :3])
 
         horizontalR = np.arctan2(offset[0], self.intrinsic[0, 0])
         r = R.from_euler("Y", horizontalR)
         Rmatrix = np.identity(4)
-        Rmatrix[:3, :3] = r.as_matrix()
+        Rmatrix[:3, :3] = r.as_dcm()
         pose = np.dot(Rmatrix, pose)
         verticalR = np.arctan2(
             offset[1],
@@ -972,7 +1052,7 @@ class ObjectModel:
         )
         r = R.from_euler("X", -verticalR)
         Rmatrix = np.identity(4)
-        Rmatrix[:3, :3] = r.as_matrix()
+        Rmatrix[:3, :3] = r.as_dcm()
         pose = np.dot(Rmatrix, pose)
 
         return pose
@@ -1031,7 +1111,7 @@ class ObjectModel:
         Z = math.atan2(p[1], np.sqrt(p[0] * p[0] + p[2] * p[2]))
 
         rot_m = np.identity(3)
-        rot_m = R.from_euler("XYZ", [Z, Y, X]).as_matrix()
+        rot_m = R.from_euler("XYZ", [Z, Y, X]).as_dcm()
         return rot_m
 
     def symmetricAnalysis(self):
@@ -1048,7 +1128,7 @@ class ObjectModel:
         # generate different view points for the object
         start = time.time()
         for v in range(numOfView):
-            curpose = (R.from_euler("XYZ", directionrpy[v])).as_matrix()
+            curpose = (R.from_euler("XYZ", directionrpy[v])).as_dcm()
             Cur_matrix[:3, :3] = curpose
             self.setModelviewMatrix(Cur_matrix)
             upperleft, lowerright = self.findVisibleSamplePoint()
@@ -1167,56 +1247,59 @@ class ObjectModel:
             print(setGroup[s])
 
 
-# display the rendered object
-def testInPygame():
-    pygame.display.flip()
-    pygame.time.wait(10)
-
-
 # setup the pygame
-def setup(width, height):
-    if not pygame.get_init():
-        pygame.init()
-        pygame.mixer.quit()
-    window = pygame.display.set_mode((width, height), pygame.DOUBLEBUF | pygame.OPENGL)
-    pygame.display.set_caption("Test demo")
-    pygame.display.iconify()
+# def setup(width, height, id):
+#     print("     id ", id, " setup start")
+#     if not pygame.get_init():
+#         try:
+#             pygame.init()
+#         except Exception as e:
+#             print(str(e))
+#         print("           id ", id, " pygame init !!!!!!!!!!!!!!")
+#         pygame.mixer.quit()
+#         print("           id ", id, " mixer quit!!!!!")
+        
+    
+#     pygame.display.set_mode((width, height), pygame.DOUBLEBUF | pygame.OPENGL)
+#     pygame.display.set_caption("Test demo")
+#     pygame.display.iconify()
 
-    glEnable(GL_DEPTH_TEST)
-    glShadeModel(GL_FLAT)
+#     glEnable(GL_DEPTH_TEST)
+#     glShadeModel(GL_FLAT)
+#     # print("     id ", id, "setup done")
 
 
-def exit():
-    if pygame.get_init():
-        pygame.quit()
+# def exit():
+#     if pygame.get_init():
+#         pygame.quit()
 
 
 # set camera intrinsic matrix
-def setProjectMatrixWithIntr(intrinsic, width, height):
+# def setProjectMatrixWithIntr(intrinsic, width, height):
 
-    glMatrixMode(GL_PROJECTION)
-    fx = intrinsic[0, 0]
-    fy = intrinsic[1, 1]
-    ux = intrinsic[0, 2]
-    uy = intrinsic[1, 2]
-    width_ = width
-    height_ = height
+#     glMatrixMode(GL_PROJECTION)
+#     fx = intrinsic[0, 0]
+#     fy = intrinsic[1, 1]
+#     ux = intrinsic[0, 2]
+#     uy = intrinsic[1, 2]
+#     width_ = width
+#     height_ = height
 
-    near = 0.1
-    far = 30.0
+#     near = 0.1
+#     far = 30.0
 
-    Mp = np.array(
-        [
-            [2.0 * fx / width_, 0.0, 0.0, 0.0],
-            [0, -2.0 * fy / height_, 0.0, 0.0],
-            [
-                2.0 * ux / width_ - 1.0,
-                -2.0 * uy / height_ + 1.0,
-                (far + near) / (far - near),
-                1.0,
-            ],
-            [0.0, 0.0, -2.0 * far * near / (far - near), 0.0],
-        ]
-    )
+#     Mp = np.array(
+#         [
+#             [2.0 * fx / width_, 0.0, 0.0, 0.0],
+#             [0, -2.0 * fy / height_, 0.0, 0.0],
+#             [
+#                 2.0 * ux / width_ - 1.0,
+#                 -2.0 * uy / height_ + 1.0,
+#                 (far + near) / (far - near),
+#                 1.0,
+#             ],
+#             [0.0, 0.0, -2.0 * far * near / (far - near), 0.0],
+#         ]
+#     )
 
-    glLoadMatrixf(Mp)
+#     glLoadMatrixf(Mp)
