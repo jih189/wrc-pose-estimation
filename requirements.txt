@@ -18,7 +18,7 @@ matplotlib
 pyglet
 pygame==2.0.0.dev6
 --find-links https://download.pytorch.org/whl/torch_stable.html
-torch==1.5.0+cu101
+torch==2.12.0
 torchvision==0.6.0+cu101 -f https://download.pytorch.org/whl/torch_stable.html
 open3d
 kornia==0.2.0
